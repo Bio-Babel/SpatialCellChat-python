@@ -1,0 +1,24 @@
+site_name: SpatialCellChat-python
+use_directory_urls: false
+theme:
+  name: material
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: numpy
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+  - mkdocs-jupyter:
+      include_source: true
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Visium psoriasis end-to-end: tutorials/SpatialCellChat_analysis_of_spatial_transcriptomics_data.ipynb
+  - API Reference: api.md

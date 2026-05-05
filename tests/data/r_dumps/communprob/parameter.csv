@@ -1,0 +1,2 @@
+"raw.use","ratio","tol","Kh","n","nLR","nLR1","scale.distance","use.AGAN","distance.use","interaction.range","contact.dependent","contact.range","contact.dependent.forced","all.contact.dependent","all.diffusible"
+TRUE,1,1,0.5,1,4,4,1.5,TRUE,TRUE,250,TRUE,10,FALSE,FALSE,TRUE

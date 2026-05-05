@@ -1,0 +1,12 @@
+{
+  "joint_idents": ["G0", "G1", "G2", "G3"],
+  "dataset_names": ["control", "treatment"],
+  "add_names_default": ["Dataset_1", "Dataset_2"],
+  "cell_levels_1": ["G0", "G1", "G2"],
+  "cell_levels_2": ["G1", "G2", "G3"],
+  "sig_1": ["PW_a", "PW_b", "PW_c"],
+  "sig_2": ["PW_a", "PW_b", "PW_d"],
+  "joint_sigs": ["PW_a", "PW_b", "PW_c", "PW_d"],
+  "R_session": "R version 4.3.3 (2024-02-29)",
+  "SpatialCellChat_version": "0.1.0"
+}

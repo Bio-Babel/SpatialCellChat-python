@@ -1,0 +1,6 @@
+	V1	V2	V3
+outdeg_unweighted	2	2	1
+indeg_unweighted	2	1	2
+outdeg	0.7	0.8	0.3
+indeg	0.4	0.5	0.9
+page_rank	0.374881194840462	0.277606439724566	0.347512365434972

@@ -1,0 +1,392 @@
+"""SpatialCellChat-python — Python port of the R SpatialCellChat package.
+
+Top-level re-exports follow R naming so that translated tutorials read
+naturally. See ``database``, ``datasets``, ``preprocessing``, ``spatial``,
+``modeling``, ``analysis``, and the ``viz_*`` modules.
+"""
+
+from __future__ import annotations
+
+__version__ = "0.1.0"
+
+from . import (
+    _expr,
+    _hill,
+    _palette,
+    _themes,
+    _utils,
+    analysis_network,
+    analysis_ranking,
+    analysis_topics,
+    database,
+    datasets,
+    de,
+    modeling,
+    modeling_avg,
+    preprocessing,
+    spatial,
+    viz_basic,
+    viz_delegated,
+    viz_embedding,
+    viz_heatmap,
+    viz_network,
+    viz_plotly,
+    viz_spatial,
+)
+from .viz_basic import (
+    barPlot,
+    barplot_internal,
+    communicationDistPlot,
+    communicationDistPlot2,
+    netAnalysis_dot,
+    netVisual_barplot,
+    pieChart,
+    plotFeatures,
+    plotStatistics_Gi,
+    plotStatistics_Lee,
+    savePlotWithCow,
+    showDatabaseCategory,
+    vizDimLoadings,
+)
+from .viz_delegated import StackedVlnPlot, dotPlot, plotGeneExpression
+from .viz_embedding import (
+    netAnalysis_contribution,
+    netAnalysis_diff_signalingRole_scatter,
+    netAnalysis_river,
+    netAnalysis_signalingChanges_scatter,
+    netAnalysis_signalingRole_network,
+    netAnalysis_signalingRole_scatter,
+    netVisual_embedding,
+    netVisual_embeddingPairwise,
+    netVisual_embeddingPairwiseZoomIn,
+    netVisual_embeddingZoomIn,
+)
+from .viz_heatmap import (
+    doHeatmap,
+    netAnalysis_signalingRole_heatmap,
+    netVisual_TopicComposition,
+    netVisual_TopicSignaling,
+    netVisual_bubble,
+    netVisual_heatmap,
+)
+from .viz_network import (
+    netVisual,
+    netVisual_aggregate,
+    netVisual_chord_cell,
+    netVisual_chord_cell_internal,
+    netVisual_chord_gene,
+    netVisual_circle,
+    netVisual_diffInteraction,
+    netVisual_hierarchy1,
+    netVisual_hierarchy2,
+    netVisual_individual,
+    netVisual_spatial,
+)
+from .viz_plotly import plotly_spatialDimPlot, plotly_spatialLRpairPlot
+from .viz_spatial import (
+    netVisual_CommunField,
+    netVisual_CommunFieldGrid,
+    netVisual_CommunFieldZoomIn,
+    netVisual_CommunFlow,
+    spatialCCCDistPlot,
+    spatialDimPlot,
+    spatialFeaturePlot,
+    spatialGiPlot,
+    spatialLeePlot,
+    spatialTopicPlot,
+    spatialVisual_scoring,
+    visualizePie,
+)
+from ._centrality import centr_signaling_names, centr_value
+from .analysis_network import (
+    computeCommunField,
+    computeEigengap,
+    computeLaplacian,
+    computeNetD_structure,
+    computeNetSimilarity,
+    computeNetSimilarityPairwise,
+    get_dens,
+    netAnalysis_computeCentrality,
+    netClustering,
+    netEmbedding,
+    netMappingDEG,
+)
+from .analysis_ranking import (
+    compareInteractions,
+    getMaxWeight,
+    mergeInteractions,
+    rankNet,
+    rankNetPairwise,
+    rankSimilarity,
+)
+from .analysis_topics import (
+    computeEnrichmentScore,
+    extractEnrichedLR,
+    extractTopicSignaling,
+    identifyCellTopics,
+    identifyCommunicationPatterns,
+    identifyTopicCommunities,
+    selectK,
+    suggestK,
+    suggestK1,
+)
+from ._snn import buildSNN
+from ._expr import (
+    computeAveExpr,
+    computeExpr_agonist,
+    computeExpr_antagonist,
+    computeExpr_complex,
+    computeExpr_coreceptor,
+    computeExpr_LR,
+    computeExprGroup_agonist,
+    computeExprGroup_antagonist,
+)
+from ._hill import HillFunctionFordataLR, createPspatialFrom_dspatial
+from .modeling import (
+    aggregateNet,
+    computeCommunProb,
+    computeCommunProbPathway,
+    filterCommunication,
+    filterProbability,
+    identifyEnrichedInteractions,
+    scMatrixTruncation,
+    subsetCommunication,
+)
+from .modeling_avg import (
+    computeAvgCommunProb,
+    computeAvgCommunProb_LR_Avg,
+    computeAvgCommunProb_LR_Sum,
+    computeAvgCommunProb_LR_Visium_Avg,
+    computeAvgCommunProb_LR_Visium_Sum,
+    computeAvgCommunProb_Visium,
+)
+from .spatial import (
+    computeCellDistance,
+    computeColocalization,
+    computeGridSize,
+    computeRegionDistance,
+    createCellCellContactMatrixFrom_dspatial,
+    makeGridSpatialCellChat,
+)
+from ._palette import colorRamp3, ggPalette, scPalette
+from ._themes import (
+    CellChat_theme_opts,
+    generate_RedsBlues_colormap,
+    generate_custom_colorscale,
+    themeFeaturePlot,
+)
+from ._utils import (
+    elementwiseProductForSparseMatandDenseMat,
+    geometricMean,
+    myElementwiseProduct,
+    scaleMat,
+    thresholdedMean,
+    triMean,
+)
+from .database import (
+    checkGeneSymbol,
+    extractGene,
+    extractGeneSubset,
+    extractGeneSubsetFromPair,
+    load_db,
+    load_ppi,
+    searchPair,
+    subsetDB,
+    updateCellChatDB,
+)
+from .de import (
+    identifyOverExpressedGenes,
+    identifyOverExpressedInteractions,
+    identifyOverExpressedLigandReceptor,
+)
+from .preprocessing import (
+    normalizeData,
+    preProcessing,
+    projectData,
+    runPCA,
+    runUMAP,
+    scaleData,
+    sketchData,
+    sketchDataAdata,
+    subsetData,
+    updateClusterLabels,
+)
+
+__all__ = [
+    "__version__",
+    "database",
+    "datasets",
+    # math/utility primitives
+    "geometricMean",
+    "triMean",
+    "thresholdedMean",
+    "myElementwiseProduct",
+    "elementwiseProductForSparseMatandDenseMat",
+    "scaleMat",
+    # palettes
+    "colorRamp3",
+    "ggPalette",
+    "scPalette",
+    # themes / colormaps
+    "CellChat_theme_opts",
+    "themeFeaturePlot",
+    "generate_custom_colorscale",
+    "generate_RedsBlues_colormap",
+    # database loaders + queries
+    "load_db",
+    "load_ppi",
+    "subsetDB",
+    "searchPair",
+    "extractGene",
+    "extractGeneSubset",
+    "extractGeneSubsetFromPair",
+    "checkGeneSymbol",
+    "updateCellChatDB",
+    # preprocessing
+    "preProcessing",
+    "normalizeData",
+    "scaleData",
+    "runPCA",
+    "runUMAP",
+    "subsetData",
+    "updateClusterLabels",
+    "sketchData",
+    "sketchDataAdata",
+    "projectData",
+    # DE
+    "identifyOverExpressedGenes",
+    "identifyOverExpressedLigandReceptor",
+    "identifyOverExpressedInteractions",
+    # spatial
+    "computeCellDistance",
+    "computeRegionDistance",
+    "createCellCellContactMatrixFrom_dspatial",
+    "makeGridSpatialCellChat",
+    "computeGridSize",
+    "computeColocalization",
+    # Hill / Pspatial
+    "HillFunctionFordataLR",
+    "createPspatialFrom_dspatial",
+    # Expression helpers (CellChat IP)
+    "computeAveExpr",
+    "computeExpr_complex",
+    "computeExpr_LR",
+    "computeExpr_coreceptor",
+    "computeExpr_agonist",
+    "computeExpr_antagonist",
+    "computeExprGroup_agonist",
+    "computeExprGroup_antagonist",
+    # Communication probability core (CellChat IP)
+    "computeCommunProb",
+    "computeCommunProbPathway",
+    "aggregateNet",
+    "filterCommunication",
+    "filterProbability",
+    "scMatrixTruncation",
+    "subsetCommunication",
+    "identifyEnrichedInteractions",
+    # AvgCommunProb variants
+    "computeAvgCommunProb",
+    "computeAvgCommunProb_Visium",
+    "computeAvgCommunProb_LR_Sum",
+    "computeAvgCommunProb_LR_Avg",
+    "computeAvgCommunProb_LR_Visium_Sum",
+    "computeAvgCommunProb_LR_Visium_Avg",
+    # SNN
+    "buildSNN",
+    # network analysis
+    "netAnalysis_computeCentrality",
+    "centr_value",
+    "centr_signaling_names",
+    "computeLaplacian",
+    "computeEigengap",
+    "computeNetSimilarity",
+    "computeNetSimilarityPairwise",
+    "netEmbedding",
+    "netClustering",
+    "netMappingDEG",
+    "computeNetD_structure",
+    "computeCommunField",
+    "get_dens",
+    # NMF / topics
+    "selectK",
+    "suggestK",
+    "suggestK1",
+    "identifyCommunicationPatterns",
+    "computeEnrichmentScore",
+    "identifyCellTopics",
+    "identifyTopicCommunities",
+    "extractTopicSignaling",
+    "extractEnrichedLR",
+    # ranking / comparison
+    "compareInteractions",
+    "rankNet",
+    "rankNetPairwise",
+    "rankSimilarity",
+    "getMaxWeight",
+    "mergeInteractions",
+    # viz_basic
+    "barPlot",
+    "barplot_internal",
+    "netVisual_barplot",
+    "netAnalysis_dot",
+    "pieChart",
+    "showDatabaseCategory",
+    "vizDimLoadings",
+    "plotFeatures",
+    "plotStatistics_Lee",
+    "plotStatistics_Gi",
+    "savePlotWithCow",
+    "communicationDistPlot",
+    "communicationDistPlot2",
+    # viz_delegated (sc.pl shims)
+    "dotPlot",
+    "StackedVlnPlot",
+    "plotGeneExpression",
+    # viz_heatmap
+    "netVisual_heatmap",
+    "netAnalysis_signalingRole_heatmap",
+    "netVisual_bubble",
+    "doHeatmap",
+    "netVisual_TopicComposition",
+    "netVisual_TopicSignaling",
+    # viz_embedding + signaling-role
+    "netVisual_embedding",
+    "netVisual_embeddingZoomIn",
+    "netVisual_embeddingPairwise",
+    "netVisual_embeddingPairwiseZoomIn",
+    "netAnalysis_signalingRole_scatter",
+    "netAnalysis_diff_signalingRole_scatter",
+    "netAnalysis_signalingChanges_scatter",
+    "netAnalysis_signalingRole_network",
+    "netAnalysis_contribution",
+    "netAnalysis_river",
+    # viz_spatial
+    "spatialDimPlot",
+    "spatialFeaturePlot",
+    "spatialLeePlot",
+    "spatialGiPlot",
+    "spatialCCCDistPlot",
+    "spatialVisual_scoring",
+    "spatialTopicPlot",
+    "netVisual_CommunField",
+    "netVisual_CommunFieldGrid",
+    "netVisual_CommunFieldZoomIn",
+    "netVisual_CommunFlow",
+    "visualizePie",
+    # viz_network + dispatch
+    "netVisual_circle",
+    "netVisual_hierarchy1",
+    "netVisual_hierarchy2",
+    "netVisual_diffInteraction",
+    "netVisual_spatial",
+    "netVisual_chord_cell",
+    "netVisual_chord_cell_internal",
+    "netVisual_chord_gene",
+    "netVisual",
+    "netVisual_aggregate",
+    "netVisual_individual",
+    # viz_plotly
+    "plotly_spatialDimPlot",
+    "plotly_spatialLRpairPlot",
+]
