@@ -43,6 +43,13 @@ def _make_adata_with_net(n_cells: int = 9, n_genes: int = 12, seed: int = 0) -> 
     )
     var = pd.DataFrame(index=[f"g{i}" for i in range(n_genes)])
     adata = ad.AnnData(X=X, obs=obs, var=var)
+    # ``doHeatmap`` defaults to ``slot="scale.data"`` (R parity:
+    # visualization.R:9226).  R's :func:`Seurat::GetAssayData` errors
+    # when ``scale.data`` is empty, and the Python helper now mirrors
+    # that — so populate the canonical ``data_scale`` layer here with
+    # a copy of ``X``.  This keeps the fixture trivially scaled
+    # without depending on the full :func:`scaleData` pipeline.
+    adata.layers["data_scale"] = np.asarray(X.toarray(), dtype=float)
 
     K = 3
     nLR = 4

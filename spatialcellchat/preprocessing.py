@@ -144,7 +144,7 @@ def scaleData(
     adata: ad.AnnData,
     do_center: bool = True,
     layer_in: Optional[str] = None,
-    layer_out: str = "scaled",
+    layer_out: str = "data_scale",
 ) -> ad.AnnData:
     """Z-score standardisation across cells, gene-by-gene.
 
@@ -161,8 +161,10 @@ def scaleData(
         Mirrors R's ``do.center``.
     layer_in : str, optional
         Layer to read; defaults to ``adata.X``.
-    layer_out : str, default ``"scaled"``
-        Name of the layer that will receive the scaled matrix.
+    layer_out : str, default ``"data_scale"``
+        Name of the layer that will receive the scaled matrix.  This is
+        the canonical key for R's ``chat@data.scale`` slot
+        (see :data:`spatialcellchat._anndata.DATA_SLOT_TO_LAYER`).
 
     Returns
     -------
@@ -203,7 +205,7 @@ def runPCA(
     dimPC: int = 50,
     seed_use: int = 42,
     weight_by_var: bool = True,
-    layer_in: Optional[str] = "scaled",
+    layer_in: Optional[str] = "data_scale",
     obsm_key: str = "X_pca",
 ) -> ad.AnnData:
     """Principal components on (cells x features).
@@ -228,8 +230,9 @@ def runPCA(
         (fast path) or the squared singular values (full path) — exactly
         what the R source does.
     layer_in : str, optional
-        Layer to read. Defaults to ``"scaled"``; pass ``None`` to use
-        ``adata.X``.
+        Layer to read. Defaults to ``"data_scale"`` (R's
+        ``chat@data.scale`` slot, populated by :func:`scaleData`); pass
+        ``None`` to use ``adata.X``.
     obsm_key : str, default ``"X_pca"``
         Where to store the resulting cell embeddings.
 
@@ -875,7 +878,7 @@ def projectData(
     alpha: float = 0.5,
     normalizeAdjMatrix: str = "rows",
     layer_in: str = "data_signaling",
-    layer_out: str = "projected",
+    layer_out: str = "data_project",
     adj_gene_names: Optional[Sequence[str]] = None,
 ) -> ad.AnnData:
     """Project the signaling-gene expression matrix on a PPI graph.
@@ -899,8 +902,10 @@ def projectData(
         ``"rows"`` or ``"columns"``.
     layer_in : str, default ``"data_signaling"``
         Layer that holds the (cells x genes) expression to project.
-    layer_out : str, default ``"projected"``
-        Layer name for the projected matrix (cells x genes).
+    layer_out : str, default ``"data_project"``
+        Layer name for the projected matrix (cells x genes).  Canonical
+        store for R's ``chat@data.project`` slot
+        (see :data:`spatialcellchat._anndata.DATA_SLOT_TO_LAYER`).
     adj_gene_names : sequence of str, optional
         Required when ``adjMatrix`` is a plain ``ndarray``; ignored for
         DataFrames.

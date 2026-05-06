@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import matplotlib
 
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any, List, Mapping, Optional, Sequence, Union
 
 import anndata as ad
 import matplotlib.pyplot as plt
@@ -50,6 +50,7 @@ from scipy import sparse
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
 
+from ._anndata import resolve_data_matrix
 from ._centrality import centr_signaling_names, centr_value
 from ._palette import scPalette, ggPalette
 from ._plot_helpers import _scatterpie_layer, _spatial_layer
@@ -174,13 +175,25 @@ def _xy_from_adata(adata: ad.AnnData) -> np.ndarray:
 
 
 def _idents_from_adata(adata: ad.AnnData, group_by: Optional[str]) -> pd.Categorical:
-    """Resolve cell-group labels from ``obs`` (mirrors ``object@idents``)."""
+    """Resolve cell-group labels from ``obs`` (mirrors ``object@idents``).
+
+    Lookup precedence matches the rest of the package
+    (:func:`_anndata.get_idents_levels`, :mod:`viz_basic`, :mod:`modeling`):
+    ``"cellchat_idents"`` (canonical CellChat label per the porting
+    contract) → ``"active_ident"`` (Seurat-style fallback) →
+    ``"cell.type"``.  This keeps ``group_by=None`` behaviour consistent
+    across viz helpers so a tutorial that sets ``cellchat_idents`` (per
+    the contract) plays the same role as R's ``chat@idents``.
+    """
     if group_by is None:
-        if "active_ident" in adata.obs.columns:
-            labels = adata.obs["active_ident"]
+        for key in ("cellchat_idents", "active_ident", "cell.type"):
+            if key in adata.obs.columns:
+                labels = adata.obs[key]
+                break
         else:
             raise ValueError(
-                "adata.obs has no 'active_ident' column; please pass group_by."
+                "adata.obs has no 'cellchat_idents' / 'active_ident' / "
+                "'cell.type' column; please pass group_by."
             )
     else:
         labels = adata.obs[group_by]
@@ -564,9 +577,13 @@ def spatialFeaturePlot(
         Specific L-R pair names (or a DataFrame with an
         ``interaction_name`` column).
     slot_name : {"data.signaling","data"}, default ``"data.signaling"``
-        Which expression slot to read from. ``data.signaling`` reads
-        ``uns['cellchat']['data.signaling']``; ``data`` falls back to
-        ``adata.X``.
+        Which expression slot to read from (R: ``slot.name``).
+        ``"data.signaling"`` resolves to
+        ``adata.layers["data_signaling"]`` (the ALRA-imputed values
+        written by :func:`preProcessing`); ``"data"`` resolves to
+        ``adata.X`` (the live normalised matrix written by
+        :func:`normalizeData`).  Lookup goes through
+        :func:`spatialcellchat._anndata.resolve_data_matrix`.
     enriched_only : bool, default ``True``
         Restrict ``signaling`` / ``pairLR_use`` to enriched pairs.
     thresh : float, default ``0.05``
@@ -610,28 +627,15 @@ def spatialFeaturePlot(
 
     var_names = list(adata.var_names)
     obs_cols = list(adata.obs.columns)
-
-    # Resolve the expression matrix backing ``features`` lookup.  R: ``data
-    # <- methods::slot(object, slot.name)``; Python prefers
-    # ``uns['cellchat'][slot_name]`` then falls back to ``adata.X``.
     cc = adata.uns.get("cellchat", {}) if "cellchat" in adata.uns else {}
-    data_block = None
-    if slot_name in cc:
-        data_block = cc[slot_name]
-    if data_block is not None:
-        # Expect (genes, cells) DataFrame; coerce.
-        if isinstance(data_block, pd.DataFrame):
-            data_full = data_block
-        else:
-            data_full = pd.DataFrame(np.asarray(data_block))
-            data_full.index = pd.Index(var_names[: data_full.shape[0]])
-    else:
-        X = adata.X
-        if sparse.issparse(X):
-            data_full = pd.DataFrame(np.asarray(X.todense()).T,
-                                     index=pd.Index(var_names))
-        else:
-            data_full = pd.DataFrame(np.asarray(X).T, index=pd.Index(var_names))
+
+    # R: ``data <- methods::slot(object, slot.name)``.  After ``preProcessing``
+    # the ``data.signaling`` slot holds ALRA-imputed values; the canonical
+    # AnnData store for that is ``adata.layers["data_signaling"]``.  Always
+    # route through :func:`resolve_data_matrix` so that the user-facing
+    # ``slot_name`` ("data.signaling" / "data") maps to the right storage
+    # without silent fall-through to a stale ``adata.X``.
+    data_full = resolve_data_matrix(adata, slot_name)
 
     # ---------- resolve feature names / expression matrix ----------
     if signaling is not None:
@@ -1405,42 +1409,70 @@ def spatialLeePlot(
     cmap = _gradient_cmap(cmap_colors)
 
     if type == "data":
-        # Wrap the data as a one-axis textual figure for completeness.
+        # R parity (visualization.R:8452-8454): the ``data`` branch
+        # transposes ``mat`` once more before returning, so the output
+        # frame has rows = ``group_by1`` (idents) and columns =
+        # ``group_by2`` (e.g. SecretedHotspot).  The Python port
+        # previously rendered ``mat_t`` directly, which is the
+        # *opposite* orientation.
+        data_df = mat_t.T
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.axis("off")
+        # ``mat_t.T`` may produce a DataFrame; render the table with
+        # rounded values, NaN displayed as empty cells (mirrors R which
+        # leaves NA blanks in ``ComplexHeatmap`` cell text).
+        cell_text = [
+            ["" if pd.isna(v) else f"{v:.3f}"
+             for v in row]
+            for row in data_df.values
+        ]
         ax.table(
-            cellText=mat_t.round(3).values.astype(str),
-            rowLabels=mat_t.index,
-            colLabels=mat_t.columns,
+            cellText=cell_text,
+            rowLabels=data_df.index,
+            colLabels=data_df.columns,
             loc="center",
         )
+        # Stash the dataframe for programmatic access (R returns the
+        # data frame directly; Python's matplotlib backend returns a
+        # Figure, but the underlying values are still useful).
+        fig._spatialLeePlot_data = data_df  # type: ignore[attr-defined]
         return fig
 
     if type == "dot":
-        fig, ax = plt.subplots(figsize=(max(4, len(mat_t.index) * 0.7),
-                                        max(4, len(mat_t.columns) * 0.5)))
-        # build long form
+        # R parity (visualization.R:8456):
+        #   df <- as.data.frame(as.table(t(mat[nrow(mat):1,])))
+        # i.e. ``mat`` (rows=group_by2, cols=group_by1) is row-reversed
+        # then transposed, giving rows=group_by1 (idents) and cols=
+        # group_by2 reversed.  ggplot then maps ``aes(x=df$x, y=df$y)``
+        # → x-axis = group_by1, y-axis = group_by2 (reversed).  The
+        # previous Python implementation put group_by2 on the x-axis,
+        # which is the transpose of R.
+        rev_index = list(reversed(list(mat_t.index)))
+        mat_dot = mat_t.loc[rev_index].T  # rows = group_by1, cols = group_by2_rev
+        x_cats_axis = list(mat_dot.index)      # group_by1 (idents) → x-axis
+        y_cats_axis = list(mat_dot.columns)    # group_by2 reversed → y-axis
+
+        fig, ax = plt.subplots(figsize=(max(4, len(x_cats_axis) * 0.7),
+                                        max(4, len(y_cats_axis) * 0.5)))
         records = []
-        for ix in mat_t.index:
-            for jy in mat_t.columns:
-                v = mat_t.loc[ix, jy]
+        for x_idx, xn in enumerate(x_cats_axis):
+            for y_idx, yn in enumerate(y_cats_axis):
+                v = mat_dot.loc[xn, yn]
                 if not np.isnan(v):
-                    records.append((ix, jy, v))
+                    records.append((x_idx, y_idx, float(v)))
         if records:
             xs = [r[0] for r in records]
             ys = [r[1] for r in records]
             vs = np.array([r[2] for r in records], dtype=float)
-            xpos = [list(mat_t.index).index(x) for x in xs]
-            ypos = [list(mat_t.columns).index(y) for y in ys]
             sizes = np.interp(vs, (vs.min(), vs.max()), dot_size)
-            sc = ax.scatter(xpos, ypos, s=(sizes ** 2) * 5, c=vs, cmap=cmap)
+            sc = ax.scatter(xs, ys, s=(sizes ** 2) * 5, c=vs, cmap=cmap)
             cb = fig.colorbar(sc, ax=ax, fraction=0.04, shrink=0.6)
             cb.set_label("Cooccurrence")
-        ax.set_xticks(range(len(mat_t.index)))
-        ax.set_xticklabels(list(mat_t.index), rotation=x_lab_rot,
+        ax.set_xticks(range(len(x_cats_axis)))
+        ax.set_xticklabels(x_cats_axis, rotation=x_lab_rot,
                            ha="right", fontsize=font_size - 2)
-        ax.set_yticks(range(len(mat_t.columns)))
-        ax.set_yticklabels(list(mat_t.columns), fontsize=font_size)
+        ax.set_yticks(range(len(y_cats_axis)))
+        ax.set_yticklabels(y_cats_axis, fontsize=font_size)
         ax.grid(True, color="grey", alpha=0.3, linewidth=0.1)
         if title_name is not None:
             ax.set_title(title_name, fontsize=font_size_title)
@@ -1450,7 +1482,10 @@ def spatialLeePlot(
     if type == "heatmap":
         fig, ax = plt.subplots(figsize=(max(5, len(mat_t.columns) * 0.6),
                                         max(4, len(mat_t.index) * 0.5)))
-        # mat_t: rows = x, cols = y. We want columns on x-axis like R.
+        # mat_t: rows=group_by2, cols=group_by1.  Plotted as-is so the
+        # heatmap y-axis carries group_by2 levels (e.g. SecretedHotspot)
+        # and the x-axis carries group_by1 levels (idents) — same layout
+        # ComplexHeatmap produces in R (visualization.R:8519-8527).
         plot_mat = mat_t.values
         im = ax.imshow(plot_mat, cmap=cmap, aspect="auto")
         ax.set_xticks(range(len(mat_t.columns)))
@@ -1464,6 +1499,40 @@ def spatialLeePlot(
                 if not np.isnan(v):
                     ax.text(j, i, f"{v:.2f}", ha="center", va="center",
                             color="black", fontsize=7)
+
+        # R parity (visualization.R:8504-8512): a coloured strip below
+        # the heatmap encodes the column groups (one colour per
+        # ``colnames(mat)`` level) via ``ComplexHeatmap::HeatmapAnnotation``.
+        # ``color.use`` defaults to ``scPalette(NCOL(mat))`` upstream.
+        if color_use is None:
+            from ._palette import scPalette as _scPalette
+            anno_colors = list(_scPalette(len(mat_t.columns)))
+        else:
+            anno_colors = list(color_use)[: len(mat_t.columns)]
+        from matplotlib.patches import Rectangle as _Rectangle
+        # ``imshow`` with default ``origin='upper'`` returns
+        # ``ax.get_ylim() = (n_rows - 0.5, -0.5)`` — i.e. ``ymin > ymax``.
+        # The "below the heatmap" position is therefore the *larger*
+        # numeric y; preserve the existing inversion by extending only
+        # the bottom of the axis (the first element returned by
+        # ``get_ylim``) rather than re-issuing ``set_ylim`` with a
+        # different orientation.
+        ylo, yhi = ax.get_ylim()             # ylo = n_rows - 0.5, yhi = -0.5
+        n_rows = plot_mat.shape[0]
+        bar_h = max(0.04 * n_rows, 0.04)
+        bar_y0 = ylo                         # immediately below the last row
+        for j in range(len(mat_t.columns)):
+            ax.add_patch(_Rectangle(
+                (j - 0.5, bar_y0),
+                1.0, bar_h,
+                facecolor=anno_colors[j % len(anno_colors)],
+                edgecolor="none",
+                clip_on=False,
+            ))
+        # Extend only the lower limit (numerically larger) so the
+        # ``origin='upper'`` axis inversion is preserved.
+        ax.set_ylim(bar_y0 + bar_h, yhi)
+
         cb = fig.colorbar(im, ax=ax, fraction=0.04, shrink=0.6)
         cb.set_label("Cooccurrence")
         title = (title_name or "") + "Spatial co-occurrence (Lee statistic)"
@@ -1550,7 +1619,7 @@ def _local_gi(
 def spatialGiPlot(
     adata: ad.AnnData,
     slot_name: str = "netP",
-    signaling_name: Optional[str] = None,
+    signaling_name: Optional[Union[str, int, Sequence[Union[str, int]]]] = None,
     do_binary: bool = True,
     group_highlight: Optional[Sequence] = None,
     measure: Sequence[str] = ("indeg", "outdeg"),
@@ -1620,23 +1689,49 @@ def spatialGiPlot(
         )
     centr_cell = cc[slot_name]["centr.cell"]
     # Flat schema: {values, centr_names, node_names, signaling_names}.
+    # R parity: ``signaling.name`` accepts a single string, a single integer
+    # 1-based index, OR a vector of either (the tutorial's
+    # ``idx.Paracrine <- which(chat@LR$LRsig$annotation == "Secreted Signaling")``
+    # is exactly this multi-LR vector usage).  We mirror all three forms.
     sig_names_all = centr_signaling_names(centr_cell)
     if signaling_name is None:
-        signaling_keys = list(sig_names_all)
+        signaling_keys: List[str] = list(sig_names_all)
+    elif isinstance(signaling_name, (str, bytes)):
+        signaling_keys = [str(signaling_name)]
     elif isinstance(signaling_name, (int, np.integer)):
         signaling_keys = [sig_names_all[int(signaling_name) - 1]]
     else:
-        signaling_keys = [signaling_name]
+        # Sequence of strings or 1-based integer indices.
+        signaling_keys = []
+        for s in signaling_name:
+            if isinstance(s, (int, np.integer)):
+                signaling_keys.append(sig_names_all[int(s) - 1])
+            else:
+                signaling_keys.append(str(s))
 
-    # Sum scores across signalings (mirrors apply(centr,c(1,2),sum))
+    # Build the per-LR (measure, cell) contribution.  R binarises
+    # ``centr.cell[measure, , signaling]`` *before* summing across the LR
+    # axis (visualization.R:8641-8648):
+    #
+    #     if (do.binary) { centr[centr > 0] <- 1 }
+    #     centr.sum <- apply(centr, c(1, 2), sum, simplify = T)
+    #
+    # The previous Python order (sum-then-binarise) collapsed the entire
+    # (measure × cell × LR) tensor down to a 0/1 indicator per spot
+    # (``centr_sum > 0``), which has only two distinct values — far less
+    # information than R's per-spot count of nonzero-contributing LRs.
+    # That difference cascades into completely different Getis-Ord Gi
+    # values and therefore a completely different ``SecretedHotspot``
+    # categorical downstream.  Mirror R's order: binarise per LR, then
+    # sum.
     n_cells = coords.shape[0]
     centr_sum = np.zeros((len(measure), n_cells), dtype=float)
     for s in signaling_keys:
         for k, m in enumerate(measure):
-            centr_sum[k, :] += centr_value(centr_cell, m, s)
-
-    if do_binary:
-        centr_sum = (centr_sum > 0).astype(float)
+            v = centr_value(centr_cell, m, s)
+            if do_binary:
+                v = (v > 0).astype(float)
+            centr_sum[k, :] += v
 
     # Pre-compute Gi statistic + p-values for every measure (always
     # needed: even ``method='normal'`` persists them into ``adata.obs``).
@@ -1652,6 +1747,22 @@ def spatialGiPlot(
     # → returns a long-form DataFrame and skips plotting entirely.  We
     # additionally persist the columns into ``adata.obs`` to mirror the
     # outer ``object@meta`` mutation in R (visualization.R:8741-8744).
+    #
+    # The R reference builds the persistence key from
+    # ``feature.name = plot.title %||% paste0("Hotspots of ", signaling.name, "...")``
+    # then ``make.names()``; when ``signaling.name`` is a vector (e.g.
+    # ``idx.Paracrine``) the user always supplies ``plot.title`` so the
+    # key stays scalar.  Match the same precedence here so multi-LR
+    # calls don't end up with awful list-printout obs keys.
+    def _obs_base(measure_name_i: str) -> str:
+        if plot_title is not None:
+            return f"Getis.Ord.Gi.{plot_title}".replace(" ", ".")
+        if isinstance(signaling_name, (list, tuple, np.ndarray)) and len(signaling_keys) > 1:
+            tag = f"{len(signaling_keys)}_signalings"
+        else:
+            tag = signaling_keys[0] if signaling_keys else "all"
+        return f"Getis.Ord.Gi.{measure_name_i}.{tag}".replace(" ", ".")
+
     if method == "computation":
         df_records = []
         for i, m in enumerate(measure):
@@ -1670,7 +1781,7 @@ def spatialGiPlot(
                     "feature_name": feature_name,
                 })
             # Persist into adata.obs (R's make.names() prefix).
-            base = (f"Getis.Ord.Gi.{measure_name[i]}.{signaling_name}").replace(" ", ".")
+            base = _obs_base(measure_name[i])
             adata.obs[base] = G_all[i]
             adata.obs[base + ".p"] = pvals_all[i]
         return pd.DataFrame.from_records(df_records)
@@ -1680,7 +1791,7 @@ def spatialGiPlot(
     # visualization.R:8741-8744 (applies in *every* mode, including
     # 'scoring' which colours by raw score instead of Gi).
     for i, m in enumerate(measure):
-        base = (f"Getis.Ord.Gi.{measure_name[i]}.{signaling_name}").replace(" ", ".")
+        base = _obs_base(measure_name[i])
         adata.obs[base] = G_all[i]
         adata.obs[base + ".p"] = pvals_all[i]
 

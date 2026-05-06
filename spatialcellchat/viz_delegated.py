@@ -28,6 +28,7 @@ import scanpy as sc
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 
+from ._anndata import DATA_SLOT_TO_LAYER, resolve_data_matrix
 from .analysis_topics import extractEnrichedLR
 
 __all__ = [
@@ -43,6 +44,33 @@ def _resolve_group_by(adata: ad.AnnData, group_by: Optional[str]) -> Optional[st
             if k in adata.obs.columns:
                 return k
     return group_by
+
+
+def _slot_to_scanpy_layer(adata: ad.AnnData, slot_name: str) -> Optional[str]:
+    """Translate a chat slot name to a scanpy ``layer=`` kwarg.
+
+    R parity: ``methods::slot(object, slot.name)`` is the canonical read
+    in :func:`plotGeneExpression`.  Here we forward to scanpy, whose
+    ``layer=None`` reads ``adata.X`` (R's ``chat@data``) and an explicit
+    layer key reads ``adata.layers[layer]``.
+
+    Returns ``None`` for ``slot_name="data"`` (use ``adata.X``); otherwise
+    the canonical layer key from :data:`DATA_SLOT_TO_LAYER`.  Falls
+    through to ``None`` (= ``adata.X``) when the canonical layer is
+    absent — same pragmatic fallback as :func:`resolve_data_matrix` so a
+    test fixture without subsetData still works.
+    """
+    if slot_name == "data":
+        return None
+    if slot_name not in DATA_SLOT_TO_LAYER:
+        raise ValueError(
+            f"Unknown slot_name {slot_name!r}; expected one of "
+            f"{sorted({'data'} | DATA_SLOT_TO_LAYER.keys())}."
+        )
+    layer_key = DATA_SLOT_TO_LAYER[slot_name]
+    if layer_key in adata.layers:
+        return layer_key
+    return None
 
 
 def _subset_idents(
@@ -83,6 +111,7 @@ def dotPlot(
     color_heatmap: Optional[str] = None,
     standard_scale: Optional[Literal["var", "group"]] = None,
     swap_axes: Optional[bool] = None,
+    slot_name: str = "data.signaling",
     **kwargs: Any,
 ) -> Figure:
     """Dot plot of gene expression by cell group.
@@ -159,6 +188,13 @@ def dotPlot(
 
     kwargs.setdefault("show", False)
     kwargs.setdefault("return_fig", True)
+    # R: barPlot/dotPlot/StackedVlnPlot read from the Seurat object
+    # built off ``chat@data.signaling`` in
+    # :func:`plotGeneExpression`.  Forward the canonical layer name to
+    # scanpy so post-ALRA values are used by default.
+    layer_key = _slot_to_scanpy_layer(adata_use, slot_name)
+    if layer_key is not None:
+        kwargs.setdefault("layer", layer_key)
     fig_or_obj = sc.pl.dotplot(
         adata_use, var_names=list(features), groupby=group_by,
         cmap=use_cmap, standard_scale=ss,
@@ -222,6 +258,7 @@ def StackedVlnPlot(
     median_size: float = 1.0,
     group_by: Optional[str] = None,
     swap_axes: bool = False,
+    slot_name: str = "data.signaling",
     **kwargs: Any,
 ) -> Figure:
     """Stacked violin plot of gene expression by cell group.
@@ -268,6 +305,9 @@ def StackedVlnPlot(
 
     kwargs.setdefault("show", False)
     kwargs.setdefault("return_fig", True)
+    layer_key = _slot_to_scanpy_layer(adata_use, slot_name)
+    if layer_key is not None:
+        kwargs.setdefault("layer", layer_key)
     fig_or_obj = sc.pl.stacked_violin(
         adata_use, var_names=list(features), groupby=group_by,
         swap_axes=swap_axes,
@@ -357,6 +397,7 @@ def _barPlot(
     trim: float = 0.1,
     x_lab_rot: bool = False,
     ncol: int = 1,
+    slot_name: str = "data.signaling",
     **kwargs: Any,
 ) -> Figure:
     """Internal barplot mirror of R's ``barPlot`` (visualization.R:4112).
@@ -376,7 +417,14 @@ def _barPlot(
     feat_list = [f for f in features if f in adata.var_names]
     if not feat_list:
         raise ValueError("No features in adata.var_names")
-    X = adata.X.toarray() if hasattr(adata.X, "toarray") else np.asarray(adata.X)
+    # R: barPlot reads from the Seurat ``@data`` slot of the object built
+    # off ``chat@data.signaling`` in :func:`plotGeneExpression`.  Route
+    # through :func:`resolve_data_matrix` so we honour ``slot_name`` (and
+    # therefore the ALRA-imputed values when present).
+    data_gxc = resolve_data_matrix(adata, slot_name)
+    # ``data_gxc`` is genes × cells; transpose to cells × genes for the
+    # downstream ``X[mask, col]`` indexing.
+    X = data_gxc.to_numpy(dtype=float).T
 
     def _agg(values: np.ndarray) -> float:
         v = values[~np.isnan(values)]
@@ -431,11 +479,12 @@ def plotGeneExpression(
     type: Literal["violin", "dot", "bar"] = "violin",
     group_by: Optional[str] = None,
     color_use: Optional[Sequence[str]] = None,
+    slot_name: str = "data.signaling",
     **kwargs: Any,
 ) -> Figure:
     """Show ligand/receptor gene expression for one or more signaling pathways.
 
-    Mirrors R's :func:`plotGeneExpression` (visualization.R:3883):
+    Mirrors R's :func:`plotGeneExpression` (visualization.R:6280):
 
     - When ``features`` is set, it overrides ``signaling`` (with a warning
       if both are provided).
@@ -444,6 +493,13 @@ def plotGeneExpression(
     - ``type='violin'`` dispatches to :func:`StackedVlnPlot`,
       ``type='dot'`` to :func:`dotPlot`,
       ``type='bar'`` to the internal barplot (R: ``barPlot``).
+
+    R reads the expression matrix from ``chat@data.signaling`` (the
+    Seurat object built at ``visualization.R:6295`` is constructed
+    directly from that slot).  The Python port honours the same
+    semantic via the ``slot_name`` parameter, defaulting to
+    ``"data.signaling"`` so post-:func:`preProcessing` (ALRA) values
+    are used.
 
     Parameters
     ----------
@@ -496,16 +552,18 @@ def plotGeneExpression(
         return StackedVlnPlot(
             adata, features=genes_present,
             group_by=group_by, color_use=color_use,
+            slot_name=slot_name,
             **kwargs,
         )
     if type == "dot":
         return dotPlot(
             adata, features=genes_present,
             group_by=group_by, color_use=color_use or ("#F8766D", "#00BFC4"),
+            slot_name=slot_name,
             **kwargs,
         )
     # type == "bar"
     return _barPlot(
         adata, features=genes_present, group_by=group_by,
-        color_use=color_use, **kwargs,
+        color_use=color_use, slot_name=slot_name, **kwargs,
     )

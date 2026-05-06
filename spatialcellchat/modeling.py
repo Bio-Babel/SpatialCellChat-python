@@ -31,6 +31,7 @@ import sparse as _sparse
 from scipy import sparse
 
 from ._anndata import cellchat_dict as _ensure_uns
+from ._anndata import resolve_data_matrix
 from ._expr import (
     computeExpr_LR,
     computeExpr_agonist,
@@ -60,7 +61,7 @@ __all__ = [
 def _get_data_use(adata: ad.AnnData, raw_use: bool, layer: Optional[str]) -> pd.DataFrame:
     """Return a (genes x cells) DataFrame with row-named gene index.
 
-    R's :func:`computeCommunProb`::
+    Direct port of R's :func:`computeCommunProb` data-loading branch::
 
         if (raw.use) {
             data <- object@data.signaling
@@ -71,37 +72,40 @@ def _get_data_use(adata: ad.AnnData, raw_use: bool, layer: Optional[str]) -> pd.
             data.use <- data/max(data)
         }
 
-    The Python port treats the live ``adata.X`` as ``data.signaling`` when
-    ``raw_use=True`` and an alternative layer (``"data.project"``) when
-    ``raw_use=False``. Either way, the matrix is rescaled by its global
-    maximum.
+    The Python port routes both branches through
+    :func:`resolve_data_matrix` so the user-facing slot names map onto the
+    canonical AnnData layers (``"data_signaling"`` / ``"data_project"``)
+    without silent fall-through to ``adata.X``.  ``layer`` overrides the
+    canonical lookup when the caller wants a non-default store.
     """
-    if raw_use:
-        X = adata.X if layer is None else adata.layers[layer]
-    else:
-        if layer is None:
-            if "data.project" not in adata.layers:
-                raise ValueError(
-                    "computeCommunProb(raw_use=False) requires a 'data.project' layer "
-                    "(write it via projectData or pass `layer='...'` explicitly)"
-                )
-            X = adata.layers["data.project"]
+    if layer is not None:
+        # Caller-supplied explicit override (e.g. a dataset-specific layer).
+        block = adata.layers[layer]
+        if sparse.issparse(block):
+            arr = np.asarray(block.todense(), dtype=float)
         else:
-            X = adata.layers[layer]
-
-    if sparse.issparse(X):
-        max_val = float(X.max()) if X.nnz > 0 else 1.0
-        X_dense = (X / max_val).toarray().T  # genes x cells
+            arr = np.asarray(block, dtype=float)
+        if arr.shape == (adata.n_obs, adata.n_vars):
+            arr = arr.T
+        df = pd.DataFrame(
+            arr,
+            index=pd.Index(adata.var_names.astype(str)),
+            columns=pd.Index(adata.obs_names.astype(str)),
+        )
     else:
-        arr = np.asarray(X, dtype=float)
-        max_val = float(arr.max()) if arr.size > 0 else 1.0
-        X_dense = (arr / max_val).T  # genes x cells
+        slot = "data.signaling" if raw_use else "data.project"
+        # ``raw_use=False`` requires the projection layer to have been
+        # written by :func:`projectData` — mirror R's ``object@data.project``
+        # precondition by using ``require_layer=True``.
+        df = resolve_data_matrix(adata, slot, require_layer=not raw_use)
 
-    return pd.DataFrame(
-        X_dense,
-        index=pd.Index(adata.var_names.astype(str)),
-        columns=pd.Index(adata.obs_names.astype(str)),
-    )
+    # R rescales by the global maximum so the per-cell expression sits in
+    # ``[0, 1]`` before the Hill function is applied.
+    arr = df.to_numpy(dtype=float, copy=True)
+    max_val = float(arr.max()) if arr.size > 0 else 1.0
+    if max_val > 0:
+        arr = arr / max_val
+    return pd.DataFrame(arr, index=df.index, columns=df.columns)
 
 
 def _get_idents(adata: ad.AnnData, group_by: Optional[str]) -> pd.Categorical:
@@ -337,9 +341,13 @@ def computeCommunProb(
         ``"cellchat_idents"`` if present, else ``"active_ident"``,
         else ``"cell.type"``.
     layer : str, optional
-        Layer name to use as the expression matrix; defaults to
-        ``adata.X`` (or the ``"data.project"`` layer when
-        ``raw_use=False``).
+        Layer name to use as the expression matrix.  Defaults to the
+        canonical R-mirrored store: ``adata.layers["data_signaling"]``
+        (R's ``chat@data.signaling`` — ALRA-imputed by
+        :func:`preProcessing`) when ``raw_use=True``, or
+        ``adata.layers["data_project"]`` (R's ``chat@data.project`` —
+        written by :func:`projectData`) when ``raw_use=False``.  Pass
+        an explicit layer name to override.
 
     Returns
     -------

@@ -126,9 +126,9 @@ def test_projectData_writes_layer() -> None:
     )
     A.layers["data_signaling"] = A.X.copy()
     pp.projectData(A, adj_df, alpha=0.5, normalizeAdjMatrix="rows")
-    assert "projected" in A.layers
+    assert "data_project" in A.layers
     r = pd.read_csv(R_DUMP / "proj_full.csv", index_col=0).values
-    py = np.asarray(A.layers["projected"]).T
+    py = np.asarray(A.layers["data_project"]).T
     assert _diff(py, r) < 1e-9
 
 
@@ -168,4 +168,4 @@ def test_projectData_dataframe_adj_picks_index() -> None:
     A.layers["data_signaling"] = A.X.copy()
     # Force rename the var to ensure DataFrame index is used
     pp.projectData(A, adj_df, alpha=0.5, normalizeAdjMatrix="columns")
-    assert A.layers["projected"].shape == (A.n_obs, A.n_vars)
+    assert A.layers["data_project"].shape == (A.n_obs, A.n_vars)

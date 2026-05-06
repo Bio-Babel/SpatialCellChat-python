@@ -39,6 +39,7 @@ from matplotlib.figure import Figure
 from scipy import sparse
 
 from ._anndata import cellchat_dict as _ensure_uns
+from ._anndata import resolve_data_matrix
 from ._palette import scPalette
 from ._themes import _BREWER_SUBSET, generate_RedsBlues_colormap
 from ._utils import triMean
@@ -311,16 +312,26 @@ def barPlot(
     x_lab_rot: Union[bool, float] = False,
     ncol: int = 1,
     size_text: int = 10,
+    slot_name: str = "data.signaling",
     **kwargs: Any,
 ) -> Figure:
     """Bar plot of average gene expression per cell group.
 
-    Direct port of R's :func:`barPlot` (``visualization.R:6533``). Reads
-    counts from ``adata.X`` (or ``adata.layers[layer]``), groups cells by
-    ``group_by`` (defaults to ``adata.obs['active_ident']`` or
-    ``'cellchat_idents'``), optionally splits by ``split_by``, and for
-    each gene in ``features`` plots one bar per group (or per
-    group × condition when ``split_by`` is given).
+    Direct port of R's :func:`barPlot` (``visualization.R:6533``).  R
+    reads from the Seurat ``@data`` slot of the object passed in;
+    :func:`plotGeneExpression` builds that Seurat object from
+    ``chat@data.signaling`` (R: visualization.R:6295), so the canonical
+    Python source for the same call path is
+    ``adata.layers["data_signaling"]``.  By default this function
+    therefore reads R's ``chat@data.signaling`` slot via
+    :func:`spatialcellchat._anndata.resolve_data_matrix` (so post-ALRA
+    values are used when :func:`preProcessing` has run); pass an
+    explicit ``layer`` or ``slot_name`` to override.
+
+    Groups cells by ``group_by`` (defaults to
+    ``adata.obs['active_ident']`` or ``'cellchat_idents'``), optionally
+    splits by ``split_by``, and for each gene in ``features`` plots one
+    bar per group (or per group × condition when ``split_by`` is given).
 
     Parameters
     ----------
@@ -338,11 +349,18 @@ def barPlot(
     trim : float, default ``0.1``
         Trim parameter for ``truncatedMean``.
     layer : str, optional
-        Layer in ``adata.layers`` to read instead of ``adata.X``.
+        Layer in ``adata.layers`` to read.  When set, takes precedence
+        over ``slot_name``.  Default ``None`` ⇒ resolve via
+        ``slot_name``.
     x_lab_rot : bool or float, default ``False``
     ncol : int, default ``1``
         Number of subplot columns.
     size_text : int, default ``10``
+    slot_name : str, default ``"data.signaling"``
+        R-style slot name resolved via
+        :func:`spatialcellchat._anndata.resolve_data_matrix`.  Mirrors
+        R's :func:`plotGeneExpression` flow which builds its Seurat
+        object from ``chat@data.signaling``.
     **kwargs
         Forwarded to :func:`barplot_internal`.
 
@@ -392,14 +410,19 @@ def barPlot(
 
     var_idx = pd.Index(adata.var_names.astype(str))
     feat_idx = [var_idx.get_loc(f) for f in features]
-    if layer is None:
-        X = adata.X
-    else:
+    if layer is not None:
+        # Direct override — bypass slot resolution and pull from the
+        # explicitly named layer (caller knows what they want).
         X = adata.layers[layer]
-    if sparse.issparse(X):
-        data_full = np.asarray(X[:, feat_idx].toarray(), dtype=float)
+        if sparse.issparse(X):
+            data_full = np.asarray(X[:, feat_idx].toarray(), dtype=float)
+        else:
+            data_full = np.asarray(X[:, feat_idx], dtype=float)
     else:
-        data_full = np.asarray(X[:, feat_idx], dtype=float)
+        # Default: read R's ``slot_name`` slot.  ``resolve_data_matrix``
+        # returns genes × cells; transpose & subset to (cells × features).
+        data_gxc = resolve_data_matrix(adata, slot_name)
+        data_full = data_gxc.iloc[feat_idx, :].to_numpy(dtype=float).T
 
     # Build the long-form ``df``
     if split_by is not None:

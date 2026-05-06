@@ -59,7 +59,8 @@ The Python port replaces the R `SpatialCellChat` S4 class with `anndata.AnnData`
 | R `SpatialCellChat@` slot | AnnData |
 |---|---|
 | `data.raw` / `data` | `adata.layers["counts"]` / `adata.X` (normalised) |
-| `data.scale` / `data.project` | `adata.layers["scaled"]` / `adata.layers["projected"]` |
+| `data.signaling` | `adata.layers["data_signaling"]` (`subsetData` / `preProcessing`) |
+| `data.scale` / `data.project` | `adata.layers["data_scale"]` / `adata.layers["data_project"]` |
 | `images` | `adata.uns["spatial"][library_id]` (scanpy/squidpy Visium schema) |
 | `meta` / `idents` | `adata.obs` / `adata.obs["cellchat_idents"]` (Categorical) |
 | `dr[["umap"]]` / `dr[["spatial"]]` | `adata.obsm["X_umap"]` / `adata.obsm["spatial"]` |

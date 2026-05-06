@@ -31,6 +31,7 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap, Normalize
 from matplotlib.figure import Figure
 
 from ._anndata import get_idents_levels as _get_idents_levels
+from ._anndata import resolve_data_matrix
 from ._palette import scPalette, ggPalette
 from ._themes import _BREWER_PALETTES, _BREWER_SUBSET, _brewer_pal
 from ._text_repel import repel_text
@@ -1432,10 +1433,14 @@ def doHeatmap(
     """Cell-by-feature expression heatmap (Seurat-style ``DoHeatmap`` port).
 
     Mirrors :func:`doHeatmap` (R: ``visualization.R:9212``). Reads the
-    ``slot`` matrix (``"scale.data"`` -> ``layers["scale_data"]``,
-    ``"data"`` -> ``layers["data"]``, otherwise ``X``) and draws a
-    cell × feature heatmap. A coloured group bar runs along the top
-    encoding ``group_by``.
+    ``slot`` matrix via
+    :func:`spatialcellchat._anndata.resolve_data_matrix` after mapping
+    the Seurat-style ``slot`` names onto the chat-slot vocabulary
+    (``"scale.data"`` → ``chat@data.scale`` →
+    ``adata.layers["data_scale"]``; ``"data"`` → ``chat@data`` →
+    ``adata.X``; ``"counts"`` → ``chat@data.raw`` →
+    ``adata.layers["counts"]``).  Draws a cell × feature heatmap with
+    a coloured group bar along the top encoding ``group_by``.
 
     Parameters
     ----------
@@ -1495,13 +1500,22 @@ def doHeatmap(
             cell_idx = np.array([name_index[c] for c in cells], dtype=int)
         cell_names = [adata.obs_names[i] for i in cell_idx]
 
-    # Resolve expression matrix
-    if slot == "scale.data" and "scale_data" in adata.layers:
-        X = np.asarray(adata.layers["scale_data"])
-    elif slot == "data" and "data" in adata.layers:
-        X = np.asarray(adata.layers["data"])
-    else:
-        X = np.asarray(adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X)
+    # Resolve expression matrix.  Map Seurat-style slot names to the
+    # canonical chat-slot vocabulary (Seurat ``slot="scale.data"`` ≡
+    # chat ``@data.scale``; ``slot="data"`` ≡ chat ``@data``;
+    # ``slot="counts"`` ≡ chat ``@data.raw``) and route through
+    # :func:`resolve_data_matrix` so the AnnData-canonical layer keys
+    # (``"data_scale"`` / ``"counts"`` / …) stay in one place.
+    _SEURAT_TO_CHAT = {
+        "scale.data": "data.scale",
+        "data":       "data",
+        "counts":     "data.raw",
+    }
+    chat_slot = _SEURAT_TO_CHAT.get(slot, slot)
+    # ``resolve_data_matrix`` returns genes × cells; ``X`` here is
+    # consumed downstream as cells × genes (``X[cell_idx, feat_idx]``),
+    # so transpose back to AnnData orientation.
+    X = resolve_data_matrix(adata, chat_slot).to_numpy(dtype=float).T
 
     feat_idx = [list(adata.var_names).index(f) for f in feature_list]
     expr = X[np.ix_(cell_idx, feat_idx)]

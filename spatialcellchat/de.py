@@ -33,6 +33,7 @@ from scipy.stats import mannwhitneyu, norm
 import anndata as ad
 
 from ._anndata import cellchat_dict as _ensure_uns
+from ._anndata import resolve_data_matrix
 
 __all__ = [
     "identifyOverExpressedGenes",
@@ -240,9 +241,13 @@ def identifyOverExpressedGenes(
     Parameters
     ----------
     adata : anndata.AnnData
-        Cells × genes AnnData with already-normalised expression in ``adata.X``
-        (matches the R reference's ``object@data.signaling``). For ``moransi``
-        and ``meringue`` branches, ``adata.obsm["spatial"]`` must hold 2-D
+        Cells × genes AnnData.  By default the function reads R's
+        ``chat@data.signaling`` slot via
+        :func:`spatialcellchat._anndata.resolve_data_matrix`, which
+        prefers ``adata.layers["data_signaling"]`` (the ALRA-imputed
+        values written by :func:`preProcessing`) and falls back to
+        ``adata.X`` only when no layer is present.  For ``moransi`` and
+        ``meringue`` branches, ``adata.obsm["spatial"]`` must hold 2-D
         spot coordinates. For ``wilcox`` the ident vector is taken from
         ``adata.obs["active_ident"]`` when ``group_by`` is ``None``.
     do_grid : bool, default ``False``
@@ -363,21 +368,14 @@ def identifyOverExpressedGenes(
             "selection_method must be one of 'wilcox', 'moransi', 'meringue'"
         )
 
-    # Build the genes × cells data matrix the R branch operates on
+    # Build the genes × cells data matrix the R branch operates on.
+    # R: ``X <- object@data.signaling`` (utilities.R:1183).  After
+    # :func:`preProcessing` the canonical store of that slot is
+    # ``adata.layers["data_signaling"]`` (ALRA-imputed); the helper
+    # falls back to ``adata.X`` only when no layer is present (test
+    # fixtures) so single-step AnnDatas still work.
     if data_use is None:
-        X = adata.X
-        if sp.issparse(X):
-            data_full = pd.DataFrame(
-                np.asarray(X.todense(), dtype=float).T,
-                index=list(adata.var_names),
-                columns=list(adata.obs_names),
-            )
-        else:
-            data_full = pd.DataFrame(
-                np.asarray(X, dtype=float).T,
-                index=list(adata.var_names),
-                columns=list(adata.obs_names),
-            )
+        data_full = resolve_data_matrix(adata, "data.signaling")
     else:
         data_full = data_use
 
