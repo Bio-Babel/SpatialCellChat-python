@@ -350,9 +350,10 @@ def test_spatial_layer_robust_scalef_detection():
     assert scaled[:, 1].max() <= H * 1.10
 
 
-def test_spatial_layer_falls_back_to_lowres_when_hires_missing():
-    """When only ``images['lowres']`` is bundled, requesting ``"hires"``
-    must return the lowres image with its companion lowres scalef."""
+def test_spatial_layer_strict_errors_on_missing_image_key():
+    """Strict mode (scverse parity): explicit ``image_key`` must exist;
+    otherwise the function raises ``KeyError`` with the available keys
+    instead of silently substituting another image."""
     rng = np.random.default_rng(0)
     coords = rng.uniform(0.0, 5000.0, size=(10, 2))
     adata = ad.AnnData(
@@ -371,9 +372,39 @@ def test_spatial_layer_falls_back_to_lowres_when_hires_missing():
             },
         }
     }
-    img_out, sf_out, _ = _spatial_layer(adata, lib_id="slice1", image_key="hires")
+    with pytest.raises(KeyError, match="hires"):
+        _spatial_layer(adata, lib_id="slice1", image_key="hires")
+    # The default ("lowres") and an explicit None must still work.
+    img_out, sf_out, _ = _spatial_layer(adata, lib_id="slice1")
     assert img_out is not None
     assert sf_out == pytest.approx(0.04)
+    none_out, sf_none, coords_none = _spatial_layer(
+        adata, lib_id="slice1", image_key=None
+    )
+    assert none_out is None
+    assert sf_none == 1.0
+    np.testing.assert_array_equal(coords_none, coords)
+
+
+def test_spatial_layer_strict_errors_on_missing_lib_id():
+    """Strict mode: an explicitly-passed ``lib_id`` that isn't in
+    ``adata.uns['spatial']`` must raise instead of silently returning
+    no image."""
+    rng = np.random.default_rng(0)
+    adata = ad.AnnData(
+        X=np.zeros((4, 1)),
+        obs=pd.DataFrame(index=[f"c{i}" for i in range(4)]),
+        var=pd.DataFrame(index=["g0"]),
+        obsm={"spatial": rng.uniform(0.0, 100.0, size=(4, 2))},
+    )
+    adata.uns["spatial"] = {
+        "slice1": {
+            "images": {"lowres": rng.uniform(0.0, 1.0, size=(50, 50, 3))},
+            "scalefactors": {"tissue_lowres_scalef": 0.5},
+        }
+    }
+    with pytest.raises(KeyError, match="my_slice"):
+        _spatial_layer(adata, lib_id="my_slice")
 
 
 def test_lee_pair_matches_R_spdep_lee():

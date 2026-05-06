@@ -13,7 +13,7 @@ Sub-agent 6d will extend this module — see the H3 marker comment below.
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,16 +36,15 @@ __all__ = [
 def _spatial_layer(
     adata: ad.AnnData,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> tuple:
     """Pull background image, scale factor, and image-pixel coordinates.
 
-    Mirrors the convention used throughout R's ``visualization.R`` — the
-    spatial coordinates stored in ``adata.obsm["spatial"]`` are full-resolution
-    pixel positions; the high-/low-res image used for plotting is downscaled
-    by ``tissue_hires_scalef`` (or ``tissue_lowres_scalef``). To overlay the
-    spots on the background image we therefore multiply each spot's
-    full-resolution pixel coordinate by the same scale factor.
+    The spatial coordinates stored in ``adata.obsm["spatial"]`` are
+    full-resolution pixel positions; the high-/low-res image used for
+    plotting is downscaled by ``tissue_<image_key>_scalef``.  To overlay
+    spots on the background image we multiply each spot's coordinate by
+    that scale factor.
 
     Parameters
     ----------
@@ -53,69 +52,88 @@ def _spatial_layer(
         Object holding ``obsm["spatial"]`` and (optionally) the
         scanpy/squidpy-style ``uns["spatial"][lib_id]`` block.
     lib_id : str, default ``"slice1"``
-        Library identifier — the key under ``adata.uns["spatial"]``.
-    image_key : str, default ``"hires"``
-        Which image to pull (``"hires"`` or ``"lowres"``). The companion
-        scale factor is ``tissue_<image_key>_scalef``.
+        Library identifier — the key under ``adata.uns["spatial"]``.  If
+        ``adata.uns["spatial"]`` exists but does not contain ``lib_id``
+        the function raises :class:`KeyError`.
+    image_key : str or None, default ``"lowres"``
+        Which image to pull (``"hires"`` or ``"lowres"`` — typical
+        scanpy/squidpy-Visium keys).  Strict semantics:
+
+        * ``None`` — skip the tissue background entirely (returns no
+          image, identity scalefactor; mirrors
+          ``sc.pl.spatial(img_key=None)``).
+        * any string — must be a key in
+          ``adata.uns["spatial"][lib_id]["images"]``; otherwise
+          :class:`KeyError` is raised with the available keys.
+
+        The default changed from ``"hires"`` to ``"lowres"`` because the
+        bundled :func:`load_visium_psoriasis` fixture (and most
+        Visium-style snapshots that ship a single image) ship only the
+        lowres frame.
 
     Returns
     -------
     tuple
         ``(image, scalefactor, scaled_coords)`` where
-        - ``image`` is a NumPy array (H × W × C) or ``None`` if ``uns["spatial"]``
-          is missing,
-        - ``scalefactor`` is the float multiplier applied to spot coordinates,
-        - ``scaled_coords`` is an ``(n_obs, 2)`` array of image-pixel positions
-          (= ``obsm["spatial"] * scalefactor``).
+        - ``image`` is a NumPy array (H × W × C) when an image is
+          available, or ``None`` when ``image_key=None`` or the input
+          adata has no ``uns["spatial"]`` block at all (test/non-Visium
+          fixture).
+        - ``scalefactor`` is the float multiplier applied to spot
+          coordinates,
+        - ``scaled_coords`` is an ``(n_obs, 2)`` array of image-pixel
+          positions (= ``obsm["spatial"] * scalefactor``).
+
+    Raises
+    ------
+    KeyError
+        Raised when the requested ``lib_id`` or ``image_key`` is not
+        present in an otherwise-populated spatial uns block.
     """
     coords = np.asarray(adata.obsm["spatial"], dtype=float)
+
+    if image_key is None:
+        return None, 1.0, coords
 
     if "spatial" not in adata.uns:
         return None, 1.0, coords
 
     sp = adata.uns["spatial"]
     if lib_id not in sp:
-        return None, 1.0, coords
+        raise KeyError(
+            f"adata.uns['spatial'] has no library_id {lib_id!r}; "
+            f"available: {sorted(sp.keys())!r}. Pass lib_id=<key> "
+            f"explicitly, or image_key=None to skip the tissue "
+            f"background."
+        )
 
     block = sp[lib_id]
     images = block.get("images") or {}
     sfs = block.get("scalefactors") or {}
 
-    # ── locate the image ────────────────────────────────────────────
-    img = None
-    chosen_key = image_key
-    if image_key in images:
-        img = np.asarray(images[image_key])
-    else:
-        # Some bundled adatas only ship one image (e.g. lowres) — fall
-        # back to whichever resolution IS present.  Mirrors the
-        # forgiving R behaviour where ``object@images$image`` is
-        # whatever was stored.
-        for fb_key in ("hires", "lowres"):
-            if fb_key in images:
-                img = np.asarray(images[fb_key])
-                chosen_key = fb_key
-                break
+    if image_key not in images:
+        raise KeyError(
+            f"adata.uns['spatial'][{lib_id!r}]['images'] has no key "
+            f"{image_key!r}; available: {sorted(images.keys())!r}. "
+            f"Pass image_key=<key> explicitly, or image_key=None to "
+            f"skip the tissue background."
+        )
 
-    sf_named = float(sfs.get(f"tissue_{chosen_key}_scalef", 1.0))
+    img = np.asarray(images[image_key])
+    sf_named = float(sfs.get(f"tissue_{image_key}_scalef", 1.0))
 
-    if img is None:
-        return None, sf_named, coords * sf_named
-
-    # ── pick a scalefactor that places the spots inside the image ───
-    # Some adatas (notably the SpatialCellChat tutorial dataset) store
-    # the lowres-resolution image at the "hires" key while keeping the
-    # genuine ``tissue_hires_scalef``; applying that scalef leaves the
-    # spots ~3x outside the actual image bounds.  Pick whichever
-    # scalefactor projects ``coords`` inside the stored image's pixel
-    # rectangle.  ``coords`` is in scanpy/squidpy convention —
-    # ``[:, 0]`` is x (column, width), ``[:, 1]`` is y (row, height).
+    # Some adatas store an image with a different resolution than its
+    # canonical key suggests (e.g. a lowres-sized image filed under
+    # ``"hires"`` while the ``tissue_hires_scalef`` value remains the
+    # genuine high-res factor).  Pick whichever scalefactor projects
+    # ``coords`` inside the stored image's pixel rectangle.  ``coords``
+    # is in scanpy/squidpy convention — ``[:, 0]`` is x (column, width),
+    # ``[:, 1]`` is y (row, height).
     H, W = img.shape[:2]
     x_ext = float(coords[:, 0].max())
     y_ext = float(coords[:, 1].max())
 
     def _fits(sf: float) -> bool:
-        # 10% slack accommodates spots near the tissue edge.
         return (x_ext * sf) <= W * 1.10 and (y_ext * sf) <= H * 1.10
 
     sf_pick = sf_named

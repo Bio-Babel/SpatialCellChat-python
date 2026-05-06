@@ -350,7 +350,7 @@ def spatialDimPlot(
     ncol: int = 1,
     byrow: bool = False,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Spatial scatter plot of cell groups (with optional cell-type pies).
 
@@ -556,7 +556,7 @@ def spatialFeaturePlot(
     show_legend: bool = True,
     show_legend_combined: bool = False,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Spatial feature (gene/metadata) plot.
 
@@ -872,7 +872,7 @@ def spatialVisual_scoring(
     show_legend: bool = True,
     show_legend_combined: bool = False,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Spatial scatter plot of network centrality scores.
 
@@ -1072,7 +1072,7 @@ def spatialTopicPlot(
     show_legend: bool = True,
     show_legend_combined: bool = False,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Spatial scatter plot of cell-topic embeddings.
 
@@ -1633,7 +1633,7 @@ def spatialGiPlot(
     nohighlight_alpha: float = 0.65,
     show_colorscale: bool = True,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Union[Figure, pd.DataFrame]:
     """Hotspots (Getis-Ord Gi/Gi*) of in/out-degree centrality.
 
@@ -2048,7 +2048,7 @@ def netVisual_CommunField(
     plot_title_name: Optional[str] = None,
     plot_title_text_size: int = 8,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Per-spot communication-field arrows over a spatial scatter.
 
@@ -2316,7 +2316,7 @@ def netVisual_CommunFieldGrid(
     legend_text_size: int = 8,
     title_name: Optional[str] = None,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Gridded communication-flow arrows over the spatial scatter.
 
@@ -2589,7 +2589,7 @@ def netVisual_CommunFlow(
     legend_text_size: int = 8,
     title_name: Optional[str] = None,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Streamlines of the gridded communication field.
 
@@ -2750,7 +2750,7 @@ def netVisual_CommunFieldZoomIn(
     plot_title_name: Optional[str] = None,
     plot_title_text_size: int = 8,
     lib_id: str = "slice1",
-    image_key: str = "hires",
+    image_key: Optional[str] = "lowres",
 ) -> Figure:
     """Side-by-side full + zoomed-in communication-field view.
 

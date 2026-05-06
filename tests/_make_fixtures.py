@@ -40,7 +40,7 @@ def build_tiny_visium(out: Path) -> None:
     img = np.full((600, 595, 3), 200, dtype="uint8")
     adata.uns["spatial"] = {
         "slice1": {
-            "images": {"hires": img},
+            "images": {"hires": img, "lowres": img},
             "scalefactors": {
                 "spot_diameter_fullres": 30.0,
                 "fiducial_diameter_fullres": 50.0,
