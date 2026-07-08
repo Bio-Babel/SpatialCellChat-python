@@ -1,0 +1,158 @@
+id: spatialcellchat.netVisual_TopicSignaling
+import_path: spatialcellchat.viz_heatmap.netVisual_TopicSignaling
+kind: function
+signature: >-
+  netVisual_TopicSignaling(adata: ad.AnnData, pattern: str = "incoming",
+  slot_name: str = "net", topics: Optional[Sequence[int]] = None, topic_key:
+  str = "Topic_", nfeatures: int = 30, nTop: int = 10, feature_cat: str =
+  "LR-pair", col: Tuple[str, str] = ("black", "black"), ncol: Optional[int] =
+  None, combine: bool = True, ylabel: Optional[str] = None, balanced: bool =
+  False, text_nudge_x: float = -8.0, text_size: float = 3.0, point_size: float
+  = 2.0, line_size: float = 1.0) -> Figure
+purpose: Per-topic ranking plot of the top-loading L-R pairs / ligands / pathways.
+description: >
+  Direct port of R's netVisual_TopicSignaling (visualization.R:4887). Reads
+  `uns['cellchat'][slot_name]['topic'][pattern]['signaling']` (a
+  features x topics loading matrix/DataFrame written by
+  identifyCellTopics/extractTopicSignaling); raises if that pattern slot is
+  missing. `topics` (1-based) selects which topic columns to plot, one
+  subplot per topic in a grid sized by `ncol` (auto: 1/2/3/4 columns based
+  on topic count). For each topic, the top `nfeatures` features by
+  |loading| (or, when balanced=True, an equal split of the most-positive
+  and most-negative loadings) are ranked by |loading| descending; when
+  feature_cat is "ligand" or "signaling" the LR-pair feature names are
+  mapped through `uns['cellchat']['DB']['interaction']`
+  (ligand/receptor/pathway_name columns) and loadings are averaged per
+  ligand or per pathway; for "LR-pair" the raw feature names are relabelled
+  to their pretty `interaction_name_2` form when present in that table.
+  Each subplot draws a grey rank-vs-|loading| line, open-circle markers for
+  the top `nTop` features (coloured by `col[0]`/`col[1]` for
+  negative/positive loadings), and repelled text labels for those points.
+  Pure reader; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object providing uns["cellchat"][slot_name]["topic"][pattern]["signaling"] and, for feature_cat in {"ligand","signaling"}, uns["cellchat"]["DB"]["interaction"].
+  - name: pattern
+    type: str
+    required: false
+    default: "incoming"
+    description: '"incoming" or "outgoing". Raises ValueError for any other value.'
+  - name: slot_name
+    type: str
+    required: false
+    default: "net"
+    description: uns["cellchat"] sub-dict carrying the "topic" dict (typically "net").
+  - name: topics
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 1-based topic (column) indices to render. Defaults to all topics.
+  - name: topic_key
+    type: str
+    required: false
+    default: "Topic_"
+    description: Prefix used to build each subplot title as f"{topic_key}{topic_index}".
+  - name: nfeatures
+    type: int
+    required: false
+    default: 30
+    description: Number of features per topic kept (by |loading|, or balanced pos/neg) before ranking/plotting the full rank-vs-|loading| curve.
+  - name: nTop
+    type: int
+    required: false
+    default: 10
+    description: Number of top-ranked features labelled with markers + repelled text per subplot.
+  - name: feature_cat
+    type: str
+    required: false
+    default: "LR-pair"
+    description: '"LR-pair", "ligand", or "signaling" (pathway). Raises ValueError for any other value.'
+  - name: col
+    type: Tuple[str, str]
+    required: false
+    default: ("black", "black")
+    description: (negative-loading colour, positive-loading colour) for the top-nTop markers and labels.
+  - name: ncol
+    type: Optional[int]
+    required: false
+    default: null
+    description: Subplot grid column count. Auto-selected from the number of topics when None (1 for a single topic, else 2/3/4 by topic count).
+  - name: combine
+    type: bool
+    required: false
+    default: true
+    description: Reserved for API parity; subplots are always combined into a single Figure in this implementation.
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: y-axis label applied to every subplot.
+  - name: balanced
+    type: bool
+    required: false
+    default: false
+    description: When True (and nfeatures > 1), select an equal split of the most-positive and most-negative loadings instead of the top-|loading| features.
+  - name: text_nudge_x
+    type: float
+    required: false
+    default: -8.0
+    description: x-offset applied to the anchor point used for repelled label placement of the top-nTop features.
+  - name: text_size
+    type: float
+    required: false
+    default: 3.0
+    description: Base label font-size scale (rendered fontsize = text_size * 2.5).
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Base marker size scale for the top-nTop points (rendered s = point_size * 20.0).
+  - name: line_size
+    type: float
+    required: false
+    default: 1.0
+    description: Line width of the grey rank-vs-|loading| curve.
+returns: >-
+  A new matplotlib.figure.Figure with one subplot per selected topic,
+  each showing a rank-vs-|loading| curve with the top nTop features
+  marked and labelled. Does not modify adata.
+mutates: >-
+  execution_class=pure_function; reads
+  adata.uns['cellchat'][slot_name]['topic'][pattern] (and optionally
+  adata.uns['cellchat']['DB']['interaction']) only, does not mutate adata;
+  returns_kind=new_object
+requires:
+  - uns.cellchat.net.topic.incoming
+  - uns.cellchat.net.topic.outgoing
+writes: []
+examples:
+  - 'scc.netVisual_TopicSignaling(sub, pattern="incoming", ncol=topic_k // 2)'
+  - 'scc.netVisual_TopicSignaling(sub, pattern="outgoing", feature_cat="ligand", nTop=5)'
+  - 'scc.netVisual_TopicSignaling(sub, pattern="incoming", topics=[1, 2], balanced=True)'
+failure_fixes:
+  - when: "uns['cellchat'][slot_name]['topic'][pattern] is missing"
+    suggest:
+      - "Run identifyCellTopics / extractTopicSignaling(adata) first so uns['cellchat'][slot_name]['topic'][pattern]['signaling'] is populated."
+    explanation: >-
+      netVisual_TopicSignaling raises
+      ValueError(f"adata.uns['cellchat'][{slot_name!r}]['topic'][{pattern!r}]
+      is missing.") when that slot is absent.
+  - when: "pattern is not 'incoming' or 'outgoing'"
+    suggest:
+      - "Pass pattern='incoming' or pattern='outgoing'."
+    explanation: >-
+      netVisual_TopicSignaling raises ValueError("pattern must be
+      'incoming' or 'outgoing'.") for any other value.
+  - when: "feature_cat is not 'LR-pair', 'ligand', or 'signaling'"
+    suggest:
+      - "Pass feature_cat='LR-pair', 'ligand', or 'signaling'."
+    explanation: >-
+      netVisual_TopicSignaling raises ValueError("feature_cat must be
+      'LR-pair', 'ligand', or 'signaling'.") for any other value.
+related:
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.extractTopicSignaling
+  - spatialcellchat.netVisual_TopicComposition

@@ -1,0 +1,59 @@
+id: spatialcellchat.ligand_receptor_db_query
+title: Load and filter the CellChatDB ligand-receptor database
+description: >
+  Load the bundled CellChatDB for a species and filter it down to the
+  interaction categories (and/or specific pathways/genes) relevant to a
+  spatial CCC analysis. Produces a `db_use` dict that is registered on an
+  AnnData's `uns['cellchat']['DB']` before running
+  spatial_ccc_inference_lowres / spatial_ccc_inference_highres, or used
+  standalone to look up ligand-receptor pairs, pathways, or gene sets.
+task_tags:
+  - lookup-ligand-receptor-database
+  - query-cellchatdb
+when_to_use:
+  - >-
+    Need to inspect or filter CellChatDB (which L-R pairs exist for a
+    pathway, which genes back a complex, which interaction categories are
+    available) — with or without going on to run the full inference
+    pipeline.
+when_not_to_use:
+  - >-
+    A pre-filtered `db_use` is already available (e.g. reused from a prior
+    run), or the goal is the full communication-probability inference
+    itself — go straight to spatial_ccc_inference_lowres / _highres in
+    that case.
+inputs:
+  - name: species
+    kind: str
+    description: '"human", "mouse", or "zebrafish".'
+    requirements:
+      - Must be one of the three species bundled under spatialcellchat/resources/db/.
+steps:
+  - symbol: spatialcellchat.load_db
+    purpose: Load the full bundled CellChatDB for the requested species.
+    args:
+      species: $inputs.species
+    notes:
+      - Returns a fresh dict with keys "interaction"/"complex"/"cofactor"/"geneInfo"; not attached to any AnnData yet.
+  - symbol: spatialcellchat.subsetDB
+    purpose: Filter the interaction table to the categories used for spatial CCC (Secreted Signaling, ECM-Receptor, Cell-Cell Contact by default).
+    args:
+      search: '["Secreted Signaling", "ECM-Receptor", "Cell-Cell Contact"]'
+      key: annotation
+      non_protein: false
+    notes:
+      - Consumes the CellChatDB dict returned by the previous step as its first positional argument (a plain Python value, not a persistent uns/obs slot — there is no adata involved in this recipe).
+      - The result (`db_use`) is what downstream steps/workflows register as adata.uns['cellchat']['DB'].
+  - symbol: spatialcellchat.searchPair
+    purpose: "Optional: look up the L-R pairs belonging to a specific pathway or ligand within the filtered database."
+    args:
+      key: pathway_name
+      matching_exact: true
+      pair_only: true
+    notes:
+      - Optional step; only needed when the goal is inspecting one pathway's pairs rather than building a db_use for the inference pipeline.
+      - Consumes the previous step's db_use["interaction"] table directly as pairLR_use (plain value passing, not a tracked slot).
+templates: []
+outputs:
+  - "db_use: filtered CellChatDB dict ({interaction, complex, cofactor, geneInfo}), ready to register as adata.uns['cellchat']['DB']."
+  - "pairLR (optional): the subset of db_use['interaction'] matching a specific pathway/ligand, from searchPair."

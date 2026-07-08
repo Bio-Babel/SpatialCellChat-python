@@ -1,0 +1,132 @@
+id: spatialcellchat.computeEnrichmentScore
+import_path: spatialcellchat.analysis_topics.computeEnrichmentScore
+kind: function
+signature: >-
+  computeEnrichmentScore(df: pd.DataFrame, measure: Literal["ligand",
+  "signaling", "LR-pair"] = "ligand", species: Literal["mouse", "human"] =
+  "mouse", color_use: Optional[Sequence[str]] = None, color_name: str =
+  "Dark2", n_color: int = 8, scale: Tuple[float, float] = (4.0, 0.8),
+  min_freq: float = 0.0, max_words: int = 200, random_order: bool = False,
+  rot_per: float = 0.0, return_data: bool = False, seed: int = 1, db:
+  Optional[Dict[str, pd.DataFrame]] = None) -> Optional[pd.DataFrame]
+purpose: Compute per-ligand differential-signaling enrichment scores from a netMappingDEG output table.
+description: >
+  Direct port of R's computeEnrichmentScore (analysis.R:3337); R also renders
+  a wordcloud::wordcloud plot from the result, which is out of scope here (a
+  separate visualization helper owns that). `df` is expected to be the long
+  table produced by netMappingDEG, with columns interaction_name,
+  ligand.logFC, receptor.logFC, ligand.pct.1, ligand.pct.2, receptor.pct.1,
+  receptor.pct.2. For each unique interaction_name, rows with any NA are
+  dropped, and an enrichment score ES = mean(|ligand.logFC| * |receptor.logFC|
+  * |ligand.pct.2 - ligand.pct.1| * |receptor.pct.2 - receptor.pct.1|) is
+  computed (0 if no rows remain after NA-dropping). The per-pair scores are
+  joined against CellChatDB's interaction table (ligand/receptor/pathway_name
+  columns, resolved via `species`/`db`) and summed per ligand into a
+  {"ligand", "total"} summary. Mirrors R's contract exactly: returns None
+  (R's invisible(NULL)) unless return_data=True, in which case the summary
+  DataFrame is returned; the visual parameters (color_use, color_name,
+  n_color, scale, min_freq, max_words, random_order, rot_per, seed) are
+  carried through for the plot helper only and do not affect the returned
+  data.
+parameters:
+  - name: df
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: >-
+      Long table from netMappingDEG with columns interaction_name,
+      ligand.logFC, receptor.logFC, ligand.pct.1, ligand.pct.2, receptor.pct.1,
+      receptor.pct.2.
+  - name: measure
+    type: 'Literal["ligand", "signaling", "LR-pair"]'
+    required: false
+    default: ligand
+    description: Validated against the three allowed values; the returned data is always the per-ligand summary.
+  - name: species
+    type: 'Literal["mouse", "human"]'
+    required: false
+    default: mouse
+    description: Species used to resolve the default CellChatDB when `db` is not supplied.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: color_name
+    type: str
+    required: false
+    default: Dark2
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: n_color
+    type: int
+    required: false
+    default: 8
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: scale
+    type: Tuple[float, float]
+    required: false
+    default: (4.0, 0.8)
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: min_freq
+    type: float
+    required: false
+    default: 0.0
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: max_words
+    type: int
+    required: false
+    default: 200
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: random_order
+    type: bool
+    required: false
+    default: false
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: rot_per
+    type: float
+    required: false
+    default: 0.0
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: return_data
+    type: bool
+    required: false
+    default: false
+    description: If True, return the per-ligand {"ligand", "total"} summary DataFrame instead of None.
+  - name: seed
+    type: int
+    required: false
+    default: 1
+    description: Visual parameter carried through for the plot helper; does not affect the returned data.
+  - name: db
+    type: Optional[Dict[str, pandas.DataFrame]]
+    required: false
+    default: null
+    description: Override CellChatDB; must have an "interaction" DataFrame indexed by interaction_name.
+returns: >-
+  None when return_data=False (mirrors R's invisible(NULL)); otherwise a
+  pandas.DataFrame with columns "ligand" and "total" (summed enrichment score
+  per ligand). No AnnData is involved or mutated — the function operates
+  purely on the input DataFrame.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.computeEnrichmentScore(deg_df, measure='ligand', species='mouse', return_data=True)"
+  - "scc.computeEnrichmentScore(deg_df, species='human')"
+failure_fixes:
+  - when: "measure is not 'ligand', 'signaling', or 'LR-pair'"
+    suggest:
+      - "Pass measure='ligand', measure='signaling', or measure='LR-pair'."
+    explanation: >-
+      computeEnrichmentScore raises ValueError("`measure` must be one of
+      'ligand', 'signaling', 'LR-pair'.").
+  - when: "species is not 'mouse' or 'human'"
+    suggest:
+      - "Pass species='mouse' or species='human', or supply an explicit `db` override."
+    explanation: >-
+      computeEnrichmentScore raises ValueError("`species` must be 'mouse' or
+      'human'.").
+related:
+  - spatialcellchat.extractEnrichedLR
+  - spatialcellchat.extractTopicSignaling

@@ -1,0 +1,73 @@
+id: spatialcellchat.extractGeneSubsetFromPair
+import_path: spatialcellchat.database.extractGeneSubsetFromPair
+kind: function
+signature: >-
+  def extractGeneSubsetFromPair(pairLR: pd.DataFrame, object: ad.AnnData | None = None,
+  complex_input: pd.DataFrame | None = None, geneInfo: pd.DataFrame | None = None,
+  combined: bool = True) -> list[str] | dict[str, list[str]]:
+purpose: Extract the signaling gene names implied by an L-R pair table's ligand/receptor columns.
+description: >
+  Requires `pairLR` to contain `ligand` and `receptor` columns. The complex
+  and gene-info lookup tables are supplied either explicitly via
+  `complex_input`/`geneInfo`, or read from an AnnData's CellChat state when
+  `object` is given (`object.uns["cellchat"]["DB"]["complex"]` /
+  `["geneInfo"]`; Python-port equivalent of R's `object@DB$complex` /
+  `object@DB$geneInfo` — this only reads that slot, it never writes it).
+  Deduplicated ligand and receptor symbol lists are each expanded through
+  extractGeneSubset. If `combined=True` (default), returns the deduplicated
+  union of expanded ligand and receptor genes as one list; if `False`,
+  returns `{"geneL": [...], "geneR": [...]}` with the two lists kept
+  separate.
+parameters:
+  - name: pairLR
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: L-R pair table containing at least `ligand` and `receptor` columns.
+  - name: object
+    type: anndata.AnnData | None
+    required: false
+    default: null
+    description: >-
+      A CellChat-state AnnData; when provided, `complex`/`geneInfo` are read
+      (not written) from `object.uns["cellchat"]["DB"]`.
+  - name: complex_input
+    type: pandas.DataFrame | None
+    required: false
+    default: null
+    description: Complex table, used when `object` is None.
+  - name: geneInfo
+    type: pandas.DataFrame | None
+    required: false
+    default: null
+    description: Gene-info table, used when `object` is None.
+  - name: combined
+    type: bool
+    required: false
+    default: 'True'
+    description: 'If True, return one flat list; if False, return {"geneL": [...], "geneR": [...]}.'
+returns: >
+  Either a new list of unique gene symbols (`combined=True`) or a new dict
+  `{"geneL": [...], "geneR": [...]}` (`combined=False`), derived from the
+  ligand/receptor columns of `pairLR` expanded through complex subunits.
+mutates: 'execution_class=pure_function; no in-place mutation of `pairLR`, `complex_input`, `geneInfo`, or `object` (when `object` is given, only reads `object.uns["cellchat"]["DB"]`, never assigns into it); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.extractGeneSubsetFromPair(pairLR, complex_input=db["complex"], geneInfo=db["geneInfo"])'
+  - 'scc.extractGeneSubsetFromPair(pairLR, complex_input=db["complex"], geneInfo=db["geneInfo"], combined=False)'
+  - 'scc.extractGeneSubsetFromPair(pairLR, object=adata)'
+failure_fixes:
+  - when: ValueError "The input data frame must contain columns named `ligand` and `receptor`"
+    suggest:
+      - pass a `pairLR` table with those two columns (e.g. the output of searchPair).
+  - when: ValueError "Either `object` or `complex_input` and `geneInfo` should be provided!"
+    suggest:
+      - pass `object=` or both `complex_input=` and `geneInfo=`.
+  - when: ValueError "object.uns['cellchat']['DB'] is missing..."
+    suggest:
+      - attach a DB to the AnnData first (e.g. `adata.uns["cellchat"]["DB"] = scc.subsetDB(scc.load_db(species))`), or pass `complex_input=`/`geneInfo=` explicitly instead of `object=`.
+related:
+  - spatialcellchat.searchPair
+  - spatialcellchat.extractGeneSubset
+  - spatialcellchat.load_db

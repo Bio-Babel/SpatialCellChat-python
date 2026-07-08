@@ -1,0 +1,171 @@
+id: spatialcellchat.netVisual_embedding
+import_path: spatialcellchat.viz_embedding.netVisual_embedding
+kind: function
+signature: >-
+  netVisual_embedding(adata: ad.AnnData, slot_name: str = "netP", type_: str
+  = "functional", color_use: Optional[Sequence[str]] = None,
+  pathway_labeled: Optional[Sequence[str]] = None, top_label: float = 1.0,
+  pathway_remove: Optional[Sequence[str]] = None, pathway_remove_show: bool
+  = True, dot_size: Tuple[float, float] = (2.0, 6.0), label_size: float =
+  2.0, dot_alpha: float = 0.5, xlabel: str = "Dim 1", ylabel: str = "Dim
+  2", title: Optional[str] = None, font_size: float = 10.0,
+  font_size_title: float = 12.0, do_label: bool = True, show_legend: bool =
+  True, show_axes: bool = True) -> Figure
+purpose: 2-D manifold scatter of signaling pathways, positioned by functional or structural similarity, coloured by cluster and sized by overall communication probability.
+description: >
+  Mirrors R's netVisual_embedding (visualization.R:4152). type_ must be
+  "functional" or "structural" (else ValueError). Delegates to the shared
+  helper _build_embedding_df(adata, slot_name, type_, comparison_name="single"),
+  which requires adata.uns['cellchat'] to exist ("adata.uns['cellchat'] is
+  missing." otherwise), adata.uns['cellchat'][slot_name] to exist, and
+  reads its ['similarity'][type_] sub-dict, raising ValueError (mentioning
+  computeNetSimilarity) if that sub-dict is absent; from it reads
+  ['dr']['single'] (2-D coordinates; raises mentioning netEmbedding if
+  missing) and ['group']['single'] (cluster assignment; raises mentioning
+  netClustering if missing). Pathways with a similarity-matrix column sum
+  of exactly 1.0 (isolates) are auto-detected and excluded from the
+  plotted set unless pathway_remove is explicitly given, and are annotated
+  as "Isolate pathways: ..." text when pathway_remove_show=True. Point
+  size encodes each pathway's summed communication probability (normalised
+  to its max across kept pathways) via dot_size; colour encodes cluster
+  group (from color_use or ggPalette). Labels are drawn for all points
+  when pathway_labeled is None and do_label=True, else restricted to the
+  pathway_labeled subset (repelled via repel_text). top_label is reserved
+  for R parity (used only for merged objects in R) and has no effect here.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with adata.uns['cellchat'][slot_name]['similarity'][type_]['dr']['single'] and ['group']['single'] populated (written by computeNetSimilarity + netEmbedding + netClustering).
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot whose ['similarity'] sub-dict is read.
+  - name: type_
+    type: str
+    required: false
+    default: functional
+    description: Similarity type key ("functional" or "structural"); any other value raises ValueError.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cluster colour palette; defaults to ggPalette(n_groups) when None.
+  - name: pathway_labeled
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict repelled text labels to this pathway subset; all points are labelled when None (and do_label=True).
+  - name: top_label
+    type: float
+    required: false
+    default: 1.0
+    description: Reserved for R parity (only meaningful for merged objects in R); no effect in this single-dataset implementation.
+  - name: pathway_remove
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit isolate-pathway list to annotate/exclude; auto-detected from the similarity matrix (column sum == 1.0) when None.
+  - name: pathway_remove_show
+    type: bool
+    required: false
+    default: true
+    description: 'When True and pathway_remove is nonempty, draws an "Isolate pathways: ..." text annotation.'
+  - name: dot_size
+    type: Tuple[float, float]
+    required: false
+    default: [2.0, 6.0]
+    description: (min, max) marker-size range mapped from normalised communication probability.
+  - name: label_size
+    type: float
+    required: false
+    default: 2.0
+    description: Base font size multiplier for repelled pathway labels and the isolate-pathway annotation.
+  - name: dot_alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Marker face alpha.
+  - name: xlabel
+    type: str
+    required: false
+    default: Dim 1
+    description: X-axis label.
+  - name: ylabel
+    type: str
+    required: false
+    default: Dim 2
+    description: Y-axis label.
+  - name: title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Optional plot title; no title is drawn when None.
+  - name: font_size
+    type: float
+    required: false
+    default: 10.0
+    description: Axis label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 12.0
+    description: Title font size.
+  - name: do_label
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw repelled pathway-name labels.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw the cluster-colour legend.
+  - name: show_axes
+    type: bool
+    required: false
+    default: true
+    description: When False, turns off the axes frame/ticks entirely.
+returns: A matplotlib.figure.Figure with a single scatter Axes, one point per signaling pathway positioned in the 2-D embedding.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'][slot_name]
+  only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.similarity.functional.dr.single
+  - uns.cellchat.netP.similarity.functional.group.single
+writes: []
+examples:
+  - "scc.netVisual_embedding(adata, type_='functional')"
+  - "scc.netVisual_embedding(adata, type_='structural', pathway_labeled=['TGFb', 'WNT'])"
+  - "scc.netVisual_embedding(adata, pathway_remove=['ISOLATE_PW'], pathway_remove_show=True)"
+failure_fixes:
+  - when: "type_ is not 'functional' or 'structural'"
+    suggest:
+      - "Pass type_='functional' or type_='structural'."
+    explanation: >-
+      Raises ValueError("type_ must be 'functional' or 'structural'.")
+      (checked in test_netVisual_embedding_invalid_type_raises).
+  - when: "adata.uns['cellchat'] is missing"
+    suggest:
+      - "Run the CellChat pipeline (computeCommunProb etc.) first to populate adata.uns['cellchat']."
+    explanation: "Raises ValueError(\"adata.uns['cellchat'] is missing.\") from _ensure_cellchat."
+  - when: "similarity[type_] is missing"
+    suggest:
+      - "Run computeNetSimilarity(adata, type_='functional') (or 'structural') first."
+    explanation: "Raises ValueError(f\"similarity[{type_!r}] missing; run computeNetSimilarity.\")."
+  - when: "similarity[type_]['dr']['single'] is missing"
+    suggest:
+      - "Run netEmbedding() after computeNetSimilarity()."
+    explanation: "Raises ValueError mentioning \"run netEmbedding\"."
+  - when: "similarity[type_]['group']['single'] is missing"
+    suggest:
+      - "Run netClustering() after netEmbedding()."
+    explanation: "Raises ValueError mentioning \"run netClustering\"."
+related:
+  - spatialcellchat.computeNetSimilarity
+  - spatialcellchat.netEmbedding
+  - spatialcellchat.netClustering
+  - spatialcellchat.netVisual_embeddingZoomIn
+  - spatialcellchat.netVisual_embeddingPairwise

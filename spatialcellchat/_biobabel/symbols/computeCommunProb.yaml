@@ -1,0 +1,193 @@
+id: spatialcellchat.computeCommunProb
+import_path: spatialcellchat.modeling.computeCommunProb
+kind: function
+signature: >-
+  computeCommunProb(adata: ad.AnnData, LR_use: Optional[pd.DataFrame] = None,
+  db: Optional[Dict[str, pd.DataFrame]] = None, raw_use: bool = True, Kh: float
+  = 0.5, n: float = 1.0, distance_use: bool = True, tol: Optional[float] =
+  None, interaction_range: float = 250.0, scale_distance: float = 0.01,
+  use_AGAN: bool = True, contact_dependent: bool = True, contact_range: float
+  = 10.0, contact_dependent_forced: bool = False, *, group_by: Optional[str] =
+  None, layer: Optional[str] = None) -> ad.AnnData
+purpose: Compute the cell-level communication probability for every L-R pair.
+description: >
+  Direct port of R's computeCommunProb (modeling.R:29-319). For every L-R
+  pair, the cell-cell probability is Hill(L_i * R_j; Kh, n) * P_spatial(d_ij)
+  * f_ago(cofactor; Kh, n) * f_ant(cofactor; Kh, n), where L_i / R_j are the
+  geometric-mean-aggregated ligand/receptor expression per cell, P_spatial is
+  the inverse-distance weight from createPspatialFrom_dspatial, and f_ago /
+  f_ant are agonist / antagonist Hill multipliers. Pairs annotated
+
+  "Cell-Cell Contact" are additionally multiplied by the binary adj.contact
+  mask. Builds data.use (genes x cells, scaled by the global max) from either
+  the raw signaling layer or the projected layer, resolves the ident factor,
+  computes cell-cell spatial distance and contact adjacency via
+  computeCellDistance, derives nLR1 / all.contact.dependent / all.diffusible
+  from the LR annotation composition (forcing contact-dependence when
+  contact_dependent_forced=True, or when every LR pair is "Cell-Cell
+  Contact"), then for each LR pair builds a sparse outer-product L^T R matrix,
+  applies the Hill function, multiplies by P.spatial (and the contact mask for
+  contact-dependent pairs), and optionally by agonist/antagonist factors.
+  Results are stacked into a 3-D sparse array.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Spatial AnnData. Must have obsm["spatial"] (spatial coordinates) and
+      uns["cellchat"]["spatial.factors"] with keys "ratio" and "tol".
+  - name: LR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: >-
+      Subset of L-R pairs to use. Defaults to the
+      uns["cellchat"]["LR"]["LRsig"] table.
+  - name: db
+    type: Optional[Dict[str, pandas.DataFrame]]
+    required: false
+    default: null
+    description: >-
+      CellChatDB dict ("interaction", "complex", "cofactor", "geneInfo").
+      Defaults to adata.uns["cellchat"]["DB"].
+  - name: raw_use
+    type: bool
+    required: false
+    default: true
+    description: Use the raw (data.signaling) layer instead of the projected (data.project) one.
+  - name: Kh
+    type: float
+    required: false
+    default: 0.5
+    description: "Hill EC50 (R: Kh)."
+  - name: n
+    type: float
+    required: false
+    default: 1.0
+    description: "Hill coefficient (R: n)."
+  - name: distance_use
+    type: bool
+    required: false
+    default: true
+    description: >-
+      Whether to weight communications by 1/d. When False the result is a
+      binary connectivity weight bounded by interaction_range.
+  - name: tol
+    type: Optional[float]
+    required: false
+    default: null
+    description: >-
+      Distance tolerance, in microns. Defaults to the "tol" field of
+      adata.uns["cellchat"]["spatial.factors"].
+  - name: interaction_range
+    type: float
+    required: false
+    default: 250.0
+    description: "Maximum interaction range, in microns (R: interaction.range)."
+  - name: scale_distance
+    type: float
+    required: false
+    default: 0.01
+    description: >-
+      Distance scaling factor; chosen so the minimum scaled distance falls in
+      [1, 2]. If the scaled minimum distance is below 1, a ValueError is
+      raised suggesting a larger value.
+  - name: use_AGAN
+    type: bool
+    required: false
+    default: true
+    description: Whether to multiply by agonist / antagonist factors.
+  - name: contact_dependent
+    type: bool
+    required: false
+    default: true
+    description: >-
+      Whether Cell-Cell Contact annotated pairs are restricted to
+      contact_range.
+  - name: contact_range
+    type: float
+    required: false
+    default: 10.0
+    description: Cell-cell contact threshold, in microns.
+  - name: contact_dependent_forced
+    type: bool
+    required: false
+    default: false
+    description: When True every L-R pair is treated as contact-dependent.
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: >-
+      Column of adata.obs used as the ident factor. Defaults to
+      "cellchat_idents" if present, else "active_ident", else "cell.type".
+  - name: layer
+    type: Optional[str]
+    required: false
+    default: null
+    description: >-
+      Layer name to use as the expression matrix. Defaults to
+      adata.layers["data_signaling"] when raw_use=True, or
+      adata.layers["data_project"] when raw_use=False.
+returns: >-
+  The mutated adata (same object). Writes adata.uns["cellchat"]["net"]["prob.cell"]
+  (sparse.COO of shape (nC, nC, nLR)), adata.uns["cellchat"]["net"]["tmp"] (dict with
+  "prob.cell" as a dict of per-pair CSC matrices, plus dense "Lavg"/"Ravg"),
+  adata.uns["cellchat"]["net"]["dimnames"] and ["meta"], adata.uns["cellchat"]["options"]["parameter"]
+  (all call parameters plus derived nLR, nLR1, all.contact.dependent, all.diffusible), and
+  adata.uns["cellchat"]["images"]["result.computeCellDistance"] (d.spatial, adj.contact).
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['net'] (prob.cell, tmp, dimnames,
+  meta), adata.uns['cellchat']['options']['parameter'], and adata.uns['cellchat']['images']['result.computeCellDistance']
+  in place; returns_kind=same_object
+requires:
+  - uns.cellchat.spatial.factors
+  - uns.cellchat.LR.LRsig
+  - uns.cellchat.DB
+writes:
+  - uns.cellchat.net.prob.cell
+  - uns.cellchat.net.tmp.prob.cell
+  - uns.cellchat.net.tmp.Lavg
+  - uns.cellchat.net.tmp.Ravg
+  - uns.cellchat.net.dimnames
+  - uns.cellchat.net.meta
+  - uns.cellchat.options.parameter
+  - uns.cellchat.images.result.computeCellDistance
+examples:
+  - >-
+    scc.computeCommunProb(sub, distance_use=True, scale_distance=0.2,
+    contact_dependent=True, interaction_range=250, contact_range=10)
+  - >-
+    modeling.computeCommunProb(adata, Kh=0.5, n=1.0, distance_use=True,
+    interaction_range=250.0, scale_distance=1.5, contact_range=10.0)
+  - "modeling.computeCommunProb(adata, group_by='cellchat_idents', scale_distance=5.0, contact_dependent_forced=False)"
+failure_fixes:
+  - when: "adata.obsm['spatial'] is missing"
+    suggest:
+      - "Set adata.obsm['spatial'] to the spot/cell spatial coordinates before calling computeCommunProb."
+    explanation: >-
+      computeCommunProb raises ValueError("computeCommunProb requires
+      adata.obsm['spatial']") when the spatial coordinates are absent.
+  - when: "uns['cellchat']['spatial.factors'] is missing"
+    suggest:
+      - "Set adata.uns['cellchat']['spatial.factors'] = {'ratio': ..., 'tol': ...} before computeCommunProb."
+    explanation: >-
+      computeCommunProb raises ValueError requiring
+      uns['cellchat']['spatial.factors'] with keys 'ratio' and 'tol'.
+  - when: "uns['cellchat']['LR']['LRsig'] is missing and LR_use is not passed"
+    suggest:
+      - "Run identifyOverExpressedInteractions() first, or pass LR_use= explicitly."
+    explanation: >-
+      computeCommunProb raises ValueError("computeCommunProb requires
+      uns['cellchat']['LR']['LRsig']; run identifyOverExpressedInteractions()
+      first or pass LR_use=") when LR_use is None and the LRsig table is absent.
+  - when: "scale_distance is too small (scaled minimum distance < 1)"
+    suggest:
+      - "Increase scale_distance to a value slightly smaller than the suggested threshold in the error message."
+    explanation: >-
+      computeCommunProb raises ValueError("Please increase the value of
+      `scale_distance` and use a value that is slightly smaller than ...")
+      when distance_use=True and the scaled minimum non-zero distance is < 1.
+related:
+  - spatialcellchat.identifyOverExpressedInteractions

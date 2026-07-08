@@ -1,0 +1,38 @@
+id: spatialcellchat.cellchat_object_state
+name: The Spatial CellChat object lives in adata.uns['cellchat']
+description: >-
+  A Spatial CellChat "object" is not a separate variable — it is the nested
+  dict adata.uns['cellchat'], created on demand by
+  spatialcellchat._anndata.cellchat_dict(adata) and progressively populated as
+  the pipeline runs. There is exactly ONE such object per AnnData (there is no
+  named-experiment namespace like hdWGCNA's wgcna_name). Every function's
+  requires/writes contract is a statement about which slots of this dict it
+  reads and which it produces. The main slots are: DB (the loaded
+  ligand-receptor database: interaction/complex/geneInfo), LR.LRsig (the
+  L-R pairs selected for the run), spatial.factors (the spatial
+  distance/contact model inputs), net (cell-group-level results: prob, pval,
+  prob.cell, tmp, topic, plus count/weight after aggregateNet), netP
+  (the pathway-level aggregation derived from net), pca, misc.grid.object, and
+  options.parameter. Because it is a plain dict on the AnnData, the object is
+  carried with the data and survives save/load of the AnnData.
+category: state-management
+invariants:
+  - The object is adata.uns['cellchat'], get-or-created by cellchat_dict(adata); there is one per AnnData, so running a second independent analysis on the same AnnData overwrites the first — use a separate AnnData instead.
+  - Inference is strictly ordered by slot dependency; the L-R database (uns.cellchat.DB) and, for spatial inference, spatial.factors must exist before computeCommunProb, which writes uns.cellchat.net.prob.cell before aggregateNet reads and aggregates uns.cellchat.net.
+  - net (ligand-receptor-pair level) and netP (signaling-pathway level) are distinct slots; computeCommunProbPathway derives netP from net, and downstream functions read whichever the slot_name argument selects ('net' vs 'netP').
+  - A KeyError on adata.uns['cellchat'][...] means an upstream step has not run — the missing slot names the prerequisite (follow the symbol's requires list or the workflow step order).
+mental_model: >-
+  For R users: this replaces the R S4 CellChat object and its slots
+  (@DB, @LR, @net, @netP, @options, @images) — instead of `cellchat@net`
+  you read adata.uns['cellchat']['net']. There is no object variable to pass
+  around; the AnnData carries the object.
+  For Python users: think of adata.uns['cellchat'] as a nested dict that the
+  pipeline fills in stages — each function reads earlier slots and writes
+  later ones, which is exactly what the requires/writes fields on each symbol
+  encode. computeCommunProb -> aggregateNet -> computeCommunProbPathway ->
+  netAnalysis_computeCentrality is the backbone that populates net and netP.
+  General: if a function complains a slot is missing, you skipped a step;
+  check the requires list of that symbol or follow one of the
+  spatial_ccc_inference workflows in order.
+related_concepts:
+  - spatialcellchat.cell_group_identity_resolution

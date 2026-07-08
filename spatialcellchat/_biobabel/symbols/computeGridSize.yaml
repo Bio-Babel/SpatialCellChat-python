@@ -1,0 +1,107 @@
+id: spatialcellchat.computeGridSize
+import_path: spatialcellchat.spatial.computeGridSize
+kind: function
+signature: >-
+  computeGridSize(coordinates: Union[np.ndarray, pd.DataFrame, ad.AnnData],
+  cellsize: Optional[float] = None, grid_resolution: Optional[float] = None,
+  spatial_factors: Optional[Dict[str, float]] = None, do_plot: bool = False,
+  what: Literal["polygons", "corners", "centers"] = "polygons", square: bool
+  = True) -> Dict[str, Union[float, int]]
+purpose: Auto-pick (or validate) a spatial grid cell-size from the minimum cell-cell distance.
+description: >
+  Direct port of R's computeGridSize (spatial.R:200). When cellsize is None,
+  the default is the minimum pairwise cell-cell Euclidean distance
+  (diagonal masked out); otherwise the supplied cellsize is used as-is.
+  The proposed new cell-size is newcellsize = cellsize * grid_resolution
+  (grid_resolution defaults to 2.0), and spot.size = round(newcellsize *
+  ratio, 4), where ratio comes from spatial_factors["ratio"] (defaulting to
+  1.0 if absent). When coordinates is an AnnData and spatial_factors is not
+  passed explicitly, ratio is read from
+  adata.uns["cellchat"]["spatial.factors"] if present. When do_plot=True,
+  the function additionally builds the candidate grid (via the shared
+  _make_grid_within geopandas/shapely helper) purely to report
+  n_grids (total grid cells), n_assigned_grids (grids containing >= 1
+  spot) and all_spots_assigned (bool); R's do_plot=TRUE instead renders a
+  ggplot summary, which this Python port intentionally skips (do_plot is
+  accepted only for signature parity — plotting itself is left to
+  scanpy/matplotlib elsewhere). When coordinates is an AnnData, the
+  returned dict is additionally stashed under
+  uns["cellchat"]["spatial"]["computeGridSize"].
+parameters:
+  - name: coordinates
+    type: Union[numpy.ndarray, pandas.DataFrame, anndata.AnnData]
+    required: true
+    default: null
+    description: >-
+      (n, 2) coordinate matrix, or an AnnData whose obsm["spatial"] holds
+      those coordinates.
+  - name: cellsize
+    type: Optional[float]
+    required: false
+    default: null
+    description: >-
+      Cell-size in coordinate units (R: cellsize). Defaults to the minimum
+      pairwise cell-cell distance when None.
+  - name: grid_resolution
+    type: Optional[float]
+    required: false
+    default: null
+    description: "Multiplier applied to cellsize to get newcellsize (R: grid.resolution); defaults to 2.0 when None."
+  - name: spatial_factors
+    type: "Optional[Dict[str, float]]"
+    required: false
+    default: null
+    description: >-
+      Mapping with key "ratio" used to convert the new cell-size to
+      microns (spot.size). When coordinates is an AnnData and this is not
+      passed, defaults to adata.uns["cellchat"]["spatial.factors"] if
+      present, else an empty dict (ratio treated as 1.0).
+  - name: do_plot
+    type: bool
+    required: false
+    default: false
+    description: >-
+      When True, also builds the candidate grid to report n_grids,
+      n_assigned_grids and all_spots_assigned. Plotting itself is skipped
+      in this Python port (accepted only for signature parity with R).
+  - name: what
+    type: 'Literal["polygons", "corners", "centers"]'
+    required: false
+    default: polygons
+    description: "Grid-cell geometry kind passed through to the grid-construction helper when do_plot=True (R: what)."
+  - name: square
+    type: bool
+    required: false
+    default: true
+    description: "Whether the candidate grid (when do_plot=True) is square (True) or hexagonal (False) (R: square)."
+returns: >-
+  A new dict {"cellsize": <input or computed default>, "newcellsize":
+  cellsize * grid_resolution, "spot.size": round(newcellsize * ratio, 4)},
+  plus (only when do_plot=True) "n_grids", "n_assigned_grids" and
+  "all_spots_assigned".
+mutates: >-
+  execution_class=builder (only when coordinates is an anndata.AnnData);
+  mutates adata.uns['cellchat']['spatial']['computeGridSize'] in place;
+  returns_kind=new_object (the returned dict is always a new object; when
+  coordinates is a plain ndarray/DataFrame there is no mutation at all —
+  execution_class=pure_function in that case)
+requires:
+  - obsm.spatial
+writes:
+  - uns.cellchat.spatial.computeGridSize
+examples:
+  - "res = computeGridSize(coords, do_plot=False)"
+  - "res = computeGridSize(coords, cellsize=100.0, grid_resolution=1.5, spatial_factors={'ratio': 0.5}, do_plot=False)"
+  - "res = computeGridSize(adata, cellsize=100.0, do_plot=False)"
+failure_fixes:
+  - when: "coordinates does not coerce to a two-column (n, 2) matrix"
+    suggest:
+      - "Pass an (n, 2) array/DataFrame of x/y coordinates, or an AnnData with a two-column obsm['spatial']."
+    explanation: >-
+      computeGridSize (via the shared _coords_to_array helper) raises
+      ValueError("Please check the input 'coordinates' and make sure it is
+      a two column matrix.") when the coerced array is not 2-D with exactly
+      2 columns.
+related:
+  - spatialcellchat.makeGridSpatialCellChat
+  - spatialcellchat.computeCellDistance

@@ -1,0 +1,95 @@
+id: spatialcellchat.spatialCCCDistPlot
+import_path: spatialcellchat.viz_spatial.spatialCCCDistPlot
+kind: function
+signature: >-
+  spatialCCCDistPlot(adata: ad.AnnData, signaling_type: str = "both",
+  interaction_range: float = 250.0, contact_range: float = 10.0, tol:
+  Optional[float] = None, density_alpha: float = 0.5) -> Figure
+purpose: Density plot of pairwise cell-cell spatial distances, split into Secreted (interaction-range) and Contact (contact-range) panels.
+description: >
+  Mirrors R's spatialCCCDistPlot (visualization.R:21). Looks for a cached
+  computeCellDistance result at
+  uns["cellchat"]["spatial"]["result.computeCellDistance"]; if present, uses
+  its "d.spatial" (secreted-range distances) and "adj.contact" (binary
+  contact adjacency) matrices directly. If absent, it recomputes by calling
+  spatialcellchat.spatial.computeCellDistance(coordinates=adata,
+  interaction_range=interaction_range, contact_range=contact_range,
+  ratio=<uns["cellchat"]["spatial"]["spatial.factors"]["ratio"] or 1.0>,
+  tol=<tol or contact_range/2>). Because computeCellDistance is called with
+  the AnnData itself (not a bare coordinate array), and computeCellDistance's
+  own contract writes obsp["spatial_distances"], obsp["spatial_connectivities"],
+  and uns["cellchat"]["spatial"]["computeCellDistance"] (note: no "result."
+  prefix) as a side effect when given an AnnData, spatialCCCDistPlot is NOT
+  purely read-only on this fallback path — it indirectly mutates adata. This
+  cross-function behavior is inferred from computeCellDistance's own
+  contract (spatialcellchat.computeCellDistance) rather than re-verified
+  against spatial.py in this pass (spatial.py was out of scope for this
+  annotation task); it is flagged here as likely rather than independently
+  confirmed. Also note the key-name mismatch between the read path
+  ("result.computeCellDistance") and the write path
+  ("computeCellDistance") means the fallback recompute is never actually
+  cached for a subsequent call — every call without a pre-populated
+  "result.computeCellDistance" entry recomputes from scratch. Nonzero
+  "d.spatial" / masked "d.spatial * adj.contact" entries feed a Gaussian KDE
+  (scipy.stats.gaussian_kde) per panel; a panel with fewer than 2 distinct
+  values falls back to drawing a single vertical line at that value.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] coordinates and, optionally, a cached computeCellDistance result under uns["cellchat"]["spatial"]["result.computeCellDistance"].
+  - name: signaling_type
+    type: str
+    required: false
+    default: both
+    description: '"both", "Secreted", or "Contact"; selects which density panel(s) to draw. Any other value raises ValueError.'
+  - name: interaction_range
+    type: float
+    required: false
+    default: 250.0
+    description: Maximum interaction distance in microns, used both as the x-axis limit and (on the recompute path) forwarded to computeCellDistance.
+  - name: contact_range
+    type: float
+    required: false
+    default: 10.0
+    description: Maximum contact distance in microns, forwarded to computeCellDistance on the recompute path.
+  - name: tol
+    type: Optional[float]
+    required: false
+    default: null
+    description: Distance tolerance forwarded to computeCellDistance; defaults to contact_range / 2 (or the cached spatial.factors.tol) when None.
+  - name: density_alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Fill opacity for the KDE density polygons.
+returns: A new matplotlib.figure.Figure with one axis (single-panel mode) or two axes ("both" mode), each a KDE density plot of pairwise cell distances.
+mutates: >-
+  execution_class=builder (conditional); when
+  uns["cellchat"]["spatial"]["result.computeCellDistance"] is absent, this
+  function calls spatialcellchat.spatial.computeCellDistance(adata, ...)
+  which — per that function's own contract — mutates
+  adata.obsp["spatial_distances"], adata.obsp["spatial_connectivities"], and
+  adata.uns["cellchat"]["spatial"]["computeCellDistance"] in place as a side
+  effect (see description; not independently re-verified against spatial.py
+  in this pass). When the cache is present, this function is
+  execution_class=pure_function (reads only). returns_kind=new_object in
+  both cases (a Figure is always returned; adata is never returned).
+requires:
+  - obsm.spatial
+writes:
+  - obsp.spatial_distances
+  - obsp.spatial_connectivities
+  - uns.cellchat.spatial.computeCellDistance
+examples:
+  - 'scc.spatialCCCDistPlot(adata, signaling_type="both")'
+  - 'scc.spatialCCCDistPlot(adata, signaling_type="Secreted", interaction_range=300.0)'
+failure_fixes:
+  - when: signaling_type is not "both", "Secreted", or "Contact"
+    suggest:
+      - Pass signaling_type="both", "Secreted", or "Contact".
+    explanation: "Raises ValueError(\"signaling_type must be one of 'both','Secreted','Contact'.\")."
+related:
+  - spatialcellchat.computeCellDistance
+  - spatialcellchat.spatialLeePlot

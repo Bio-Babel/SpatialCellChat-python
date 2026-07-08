@@ -1,0 +1,244 @@
+id: spatialcellchat.netVisual_individual
+import_path: spatialcellchat.viz_network.netVisual_individual
+kind: function
+signature: >-
+  netVisual_individual(adata: ad.AnnData, signaling: str, signaling_name:
+  Optional[str] = None, pairLR_use: Optional[Union[pd.DataFrame,
+  Sequence[str]]] = None, color_use: Optional[Sequence[str]] = None,
+  vertex_receiver: Optional[Sequence[int]] = None, sources_use:
+  Optional[Sequence] = None, targets_use: Optional[Sequence] = None, top:
+  float = 1.0, remove_isolate: bool = False, vertex_weight: Union[float,
+  Sequence[float]] = 1.0, vertex_weight_max: Optional[float] = None,
+  vertex_size_max: Optional[float] = None, vertex_label_cex: float = 0.8,
+  weight_scale: bool = True, edge_weight_max: Optional[float] = None,
+  edge_width_max: float = 8.0, layout: str = "circle", height: float = 5.0,
+  thresh: float = 0.05, alpha_image: float = 0.15, point_size: float = 1.5,
+  group: Optional[Dict[str, str]] = None, cell_order: Optional[Sequence[str]]
+  = None, small_gap: float = 1.0, big_gap: float = 10.0, scale: bool = False,
+  reduce: float = -1.0, show_legend: bool = False, legend_pos_x: float =
+  20.0, legend_pos_y: float = 20.0, n_col: Optional[int] = None) ->
+  Union[List[Figure], Figure]
+purpose: Render one network panel per individual L-R pair within a signaling pathway (instead of aggregating them).
+description: >
+  Direct port of R's netVisual_individual (visualization.R:1419). Resolves
+  the L-R pairs of `signaling` from adata.uns['cellchat']['LR']['LRsig']
+  via searchPair(key='pathway_name', pair_only=False), reads
+  adata.uns['cellchat']['net']['prob'] (zeroing entries where
+  net['pval'] > thresh when present), optionally restricts further to
+  `pairLR_use` (a DataFrame with an interaction_name column, or a plain
+  sequence of pair names — raises if the intersection is empty), keeps
+  only pairs with nonzero total probability (raises
+  "There is no significant communication of {signaling}" if none survive),
+  then for EACH surviving pair renders one panel via the layout's
+  raw-matrix renderer (netVisual_circle / netVisual_spatial /
+  netVisual_chord_cell_internal, titled with the pair's
+  interaction_name_2), or via the internal _hierarchy_combined helper for
+  layout="hierarchy" (requires vertex_receiver, raises otherwise). For
+  layout in {"circle","spatial","chord"} the per-pair Figures are returned
+  as a list; for layout="hierarchy" they are instead composited into a
+  single tall Figure (one row of source/target panels per L-R pair) to
+  mirror R's single recordedplot return. Reads adata.uns['cellchat'] (and
+  adata.obsm['spatial'] for layout="spatial") only; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns['cellchat']['net']['prob'] and uns['cellchat']['LR']['LRsig'] populated.
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Pathway name to look up in the LR table's pathway_name column.
+  - name: signaling_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Kept for R-argument parity; individual-pair panels use each pair's own interaction_name_2 as title, not this value.
+  - name: pairLR_use
+    type: Optional[Union[pandas.DataFrame, Sequence[str]]]
+    required: false
+    default: null
+    description: Restrict to these L-R pairs — a DataFrame with an "interaction_name" column, or a plain sequence of pair names.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colours forwarded to the chosen layout's renderer.
+  - name: vertex_receiver
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 0-based target-group indices; required when layout="hierarchy" (raises otherwise).
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these source cell groups.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these target cell groups.
+  - name: top
+    type: float
+    required: false
+    default: 1.0
+    description: Keep only edge weights >= the (1-top) quantile, per pair.
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop cell groups with no surviving edges, per pair.
+  - name: vertex_weight
+    type: Union[float, Sequence[float]]
+    required: false
+    default: 1.0
+    description: Per-group vertex size driver; None defaults to per-group cell counts.
+  - name: vertex_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Normalisation max for vertex_weight.
+  - name: vertex_size_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Max vertex marker scale factor.
+  - name: vertex_label_cex
+    type: float
+    required: false
+    default: 0.8
+    description: Vertex label font-size scale.
+  - name: weight_scale
+    type: bool
+    required: false
+    default: true
+    description: Scale edge width by weight/edge_weight_max instead of weight directly.
+  - name: edge_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Edge-width normalisation max shared across all surviving pairs; defaults to the max per-pair probability.
+  - name: edge_width_max
+    type: float
+    required: false
+    default: 8.0
+    description: Maximum additional edge linewidth contribution.
+  - name: layout
+    type: str
+    required: false
+    default: circle
+    description: 'One of "circle", "hierarchy", "spatial", "chord" (raises ValueError otherwise).'
+  - name: height
+    type: float
+    required: false
+    default: 5.0
+    description: Per-panel figure height (inches) used by the hierarchy-layout composite.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold; net['prob'] entries with pval > thresh are zeroed before pair selection.
+  - name: alpha_image
+    type: float
+    required: false
+    default: 0.15
+    description: Background image/spot opacity (layout="spatial" only).
+  - name: point_size
+    type: float
+    required: false
+    default: 1.5
+    description: Background spot marker size (layout="spatial" only).
+  - name: group
+    type: Optional[Dict[str, str]]
+    required: false
+    default: null
+    description: Cell-group -> higher-level group mapping forwarded to layout="chord".
+  - name: cell_order
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit sector display order forwarded to layout="chord".
+  - name: small_gap
+    type: float
+    required: false
+    default: 1.0
+    description: Chord sector gap (degrees), layout="chord" only.
+  - name: big_gap
+    type: float
+    required: false
+    default: 10.0
+    description: Chord wrap-around gap (degrees), layout="chord" only.
+  - name: scale
+    type: bool
+    required: false
+    default: false
+    description: Row-normalise chord sector arc lengths, layout="chord" only.
+  - name: reduce
+    type: float
+    required: false
+    default: -1.0
+    description: Chord minimum-link-width pruning threshold, layout="chord" only.
+  - name: show_legend
+    type: bool
+    required: false
+    default: false
+    description: Draw a legend, layout="chord" only.
+  - name: legend_pos_x
+    type: float
+    required: false
+    default: 20.0
+    description: Chord legend x offset.
+  - name: legend_pos_y
+    type: float
+    required: false
+    default: 20.0
+    description: Chord legend y offset.
+  - name: n_col
+    type: Optional[int]
+    required: false
+    default: null
+    description: Kept for R-argument parity (grid layout hint for the returned list of per-pair figures); not applied by this function itself.
+returns: >-
+  For layout in {"circle","spatial","chord"}: a list of
+  matplotlib.figure.Figure, one per surviving L-R pair. For
+  layout="hierarchy": a single composite matplotlib.figure.Figure with one
+  row of source/target panels per surviving L-R pair.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net'],
+  ['LR']['LRsig'], and (layout="spatial") adata.obsm['spatial'] only; does
+  not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "scc.netVisual_individual(sub, signaling='TNF', layout='circle')"
+  - "scc.netVisual_individual(sub, signaling='TNF', pairLR_use=['TNF_TNFRSF1A'], layout='chord')"
+  - "scc.netVisual_individual(sub, signaling='TNF', layout='hierarchy', vertex_receiver=[0, 1])"
+failure_fixes:
+  - when: "layout is not one of 'circle','hierarchy','spatial','chord'"
+    suggest:
+      - "Pass one of the supported layout values."
+    explanation: "Raises ValueError(f\"Unknown layout: {layout}\")."
+  - when: "layout='hierarchy' but vertex_receiver is None"
+    suggest:
+      - "Pass vertex_receiver= (0-based target-group indices) when layout='hierarchy'."
+    explanation: "Raises ValueError(\"vertex_receiver required for hierarchy layout\")."
+  - when: "pairLR_use restricts to pairs with no overlap with the pathway's significant pairs"
+    suggest:
+      - "Verify the pair names against subsetCommunication(adata) or the pathway's LRsig entries."
+    explanation: >-
+      Raises ValueError("There is no significant communication for the
+      input L-R pairs!").
+  - when: "no L-R pair of `signaling` survives thresholding"
+    suggest:
+      - "Lower thresh, or verify the pathway via subsetCommunication."
+    explanation: "Raises ValueError(f\"There is no significant communication of {signaling}\")."
+related:
+  - spatialcellchat.netVisual
+  - spatialcellchat.netVisual_aggregate
+  - spatialcellchat.netVisual_circle
+  - spatialcellchat.netVisual_spatial
+  - spatialcellchat.netVisual_chord_cell_internal

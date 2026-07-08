@@ -1,0 +1,96 @@
+id: spatialcellchat.filterCommunication
+import_path: spatialcellchat.modeling.filterCommunication
+kind: function
+signature: >-
+  filterCommunication(adata: ad.AnnData, min_cells: Optional[int] = 10,
+  min_links: Optional[int] = 5, min_cells_sr: Optional[int] = 5) -> ad.AnnData
+purpose: "In-place: zero-out cell-cell communications failing min-count thresholds."
+description: >
+  Direct port of R's filterCommunication (modeling.R:1709). Requires
+  uns["cellchat"]["net"] to exist, and specifically requires
+  net["prob.cell"] (raises otherwise, instructing the caller to run
+
+  computeCommunProb first). If min_cells is not None and net["prob"] is
+  present, cell groups with fewer than min_cells cells are excluded by
+  zeroing both matching rows and columns of net["prob"] across all LR pairs
+  (and setting the corresponding net["pval"] entries to 1 if net["pval"]
+  exists); this branch is silently skipped when net["prob"] is missing. The
+  cell-level branch operates on net["tmp"]["prob.cell"] (dict of per-LR-pair
+  CSC matrices keyed by pair name): if min_links is given, any pair whose
+  matrix has 0 < nnz < min_links is replaced by an all-zero matrix; if
+  min_cells_sr is given, any pair (among those with nnz above the min_links
+  floor, or nnz>0 if min_links is None) whose binarized matrix has fewer
+  than min_cells_sr distinct senders (nonzero rows) or receivers (nonzero
+  columns) is likewise replaced by an all-zero matrix. If both min_links and
+  min_cells_sr are None, the function returns immediately after validating
+  net['prob.cell'] exists, without further mutation. Finally
+  net["prob.cell"] (the stacked 3-D sparse array) is rebuilt from the
+  (possibly zeroed) per-pair dict.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"]["net"] populated (specifically net["prob.cell"] / net["tmp"]["prob.cell"]).
+  - name: min_cells
+    type: Optional[int]
+    required: false
+    default: 10
+    description: >-
+      If not None, cell-group-level communications involving any group with
+      fewer than min_cells cells are zeroed in net["prob"] (both axes);
+      skipped when net["prob"] is missing.
+  - name: min_links
+    type: Optional[int]
+    required: false
+    default: 5
+    description: >-
+      Drop (zero out) L-R pairs whose prob.cell matrix has fewer than
+      min_links non-zero entries (but more than zero).
+  - name: min_cells_sr
+    type: Optional[int]
+    required: false
+    default: 5
+    description: >-
+      Drop (zero out) L-R pairs whose prob.cell matrix has fewer than
+      min_cells_sr distinct sender cells or fewer than min_cells_sr distinct
+      receiver cells.
+returns: >-
+  The mutated adata (same object). Updates
+  adata.uns["cellchat"]["net"]["prob"]/["pval"] (min_cells branch, when
+  present) and adata.uns["cellchat"]["net"]["tmp"]["prob.cell"] /
+  ["prob.cell"] (rebuilt 3-D sparse array) for the per-pair filtering
+  branches.
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['net'] (prob, pval, tmp.prob.cell,
+  prob.cell) in place; returns_kind=same_object
+requires:
+  - uns.cellchat.net
+  - uns.cellchat.net.prob.cell
+writes:
+  - uns.cellchat.net.prob
+  - uns.cellchat.net.pval
+  - uns.cellchat.net.tmp.prob.cell
+  - uns.cellchat.net.prob.cell
+examples:
+  - "scc.filterCommunication(sub, min_cells=None, min_links=10, min_cells_sr=10)"
+  - "scc.filterCommunication(sub, min_cells=10, min_links=None, min_cells_sr=None)"
+  - "modeling.filterCommunication(adata, min_cells=None, min_links=huge_min, min_cells_sr=None)"
+failure_fixes:
+  - when: "uns['cellchat']['net'] is missing"
+    suggest:
+      - "Run computeCommunProb() first."
+    explanation: >-
+      filterCommunication raises ValueError("filterCommunication requires
+      uns['cellchat']['net']") when net is absent.
+  - when: "net['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb() first to compute the cell-level communication probability."
+    explanation: >-
+      filterCommunication raises ValueError("filterCommunication: please run
+      computeCommunProb to compute the communication probability/strength
+      between any interacting individual cells") when net['prob.cell'] is
+      absent.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.filterProbability

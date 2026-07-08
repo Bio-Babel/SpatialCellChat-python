@@ -1,0 +1,53 @@
+id: spatialcellchat.computeExpr_coreceptor
+import_path: spatialcellchat._expr.computeExpr_coreceptor
+kind: function
+signature: "computeExpr_coreceptor(cofactor_input: pd.DataFrame, data_use: ArrayLike, pairLRsig: pd.DataFrame, type: Literal[\"A\", \"I\"] = \"A\") -> np.ndarray"
+purpose: "Per-cell co-receptor multiplicative factor for each L-R pair; a port of computeExpr_coreceptor (modeling.R:2316)."
+description: >
+  Selects pairLRsig's `co_A_receptor` (type="A") or `co_I_receptor`
+  (type="I") column as the per-pair co-receptor name; raises ValueError
+  for any other `type`. For each pair with a non-blank co-receptor,
+  resolves its `cofactor*` subunit names from cofactor_input, intersects
+  them with data_use's row index, and computes
+  prod(1 + data_use[present_subunits, :], axis=0). Pairs without a
+  co-receptor (or whose cofactor row is entirely absent from data_use)
+  return an all-ones row.
+parameters:
+  - name: cofactor_input
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB cofactor frame, indexed by cofactor name with cofactor* columns.
+  - name: data_use
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Genes-by-cells expression matrix (row-named).
+  - name: pairLRsig
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: L-R interaction table with co_A_receptor / co_I_receptor string columns (empty/NaN = no co-receptor).
+  - name: type
+    type: "Literal[\"A\", \"I\"]"
+    required: false
+    default: "A"
+    description: "\"A\" selects co_A_receptor (co-activation); \"I\" selects co_I_receptor (co-inhibition)."
+returns: >
+  A numpy.ndarray of shape (n_LR_pairs, n_cells); all-ones rows for pairs
+  without a resolvable co-receptor.
+mutates: "execution_class=pure_function; no in-place mutation of `cofactor_input`, `data_use`, or `pairLRsig`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeExpr_coreceptor(cofactor_input, data_use, pairLRsig, type='A')"
+  - "computeExpr_coreceptor(cofactor_input, data_use, pairLRsig, type='I')"
+failure_fixes:
+  - when: 'ValueError: "''arg'' should be one of ''A'', ''I''"'
+    suggest:
+      - pass type='A' or type='I'.
+  - when: 'ValueError: computeExpr_coreceptor requires a row-named data_use'
+    suggest:
+      - pass data_use as a pandas.DataFrame indexed by gene symbol.
+related:
+  - spatialcellchat.computeCommunProb

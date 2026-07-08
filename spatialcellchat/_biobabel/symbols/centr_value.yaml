@@ -1,0 +1,74 @@
+id: spatialcellchat.centr_value
+import_path: spatialcellchat._centrality.centr_value
+kind: function
+signature: >-
+  centr_value(centr_dict: dict, measure: str, signaling: Optional[str] =
+  None) -> np.ndarray
+purpose: Extract a centrality-measure vector (optionally for one signaling pathway) from a flat centrality dict.
+description: >
+  R-mirror of R's obj@netP$centr["indeg", , signaling] 3-D indexing, adapted
+  to the flat schema written by netAnalysis_computeCentrality:
+  {"values": ndarray(n_measure, n_nodes, n_signal), "centr_names": [...],
+  "node_names": [...], "signaling_names": [...]}. Looks up the row index of
+  `measure` in centr_dict["centr_names"]; if `signaling` is None, returns
+  the full (n_nodes, n_signal) slice for that measure; otherwise also looks
+  up the column index of `signaling` in centr_dict["signaling_names"] and
+  returns the 1-D (n_nodes,) vector at [measure_idx, :, signaling_idx].
+parameters:
+  - name: centr_dict
+    type: dict
+    required: true
+    default: null
+    description: >-
+      The flat schema dict produced by netAnalysis_computeCentrality
+      (either slot["centr"] for do_group=True or slot["centr.cell"] for
+      do_group=False).
+  - name: measure
+    type: str
+    required: true
+    default: null
+    description: >-
+      One of the centrality measure names (e.g. "indeg", "outdeg",
+      "flowbet", "info"); must be present in centr_dict["centr_names"].
+  - name: signaling
+    type: Optional[str]
+    required: false
+    default: null
+    description: Signaling pathway / LR-pair name. When None, returns the (n_nodes, n_signal) matrix for `measure` instead of a single 1-D vector.
+returns: >-
+  A view into centr_dict["values"]: a 1-D (n_nodes,) array when `signaling`
+  is given, else a 2-D (n_nodes, n_signal) array.
+mutates: >-
+  execution_class=pure_function; read-only lookup over centr_dict, no
+  mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'centr_cell = sub.uns["cellchat"]["net"]["centr.cell"]; scc.centr_value(centr_cell, "indeg", "CXCL_CXCR4")'
+  - 'scc.centr_value(centr_cell, "outdeg")'
+failure_fixes:
+  - when: "centr_dict is not a dict"
+    suggest:
+      - "Pass the flat schema dict written by netAnalysis_computeCentrality (e.g. adata.uns['cellchat']['net']['centr.cell'])."
+    explanation: >-
+      centr_value raises TypeError("centr_value expects a dict with the flat
+      schema {values, centr_names, node_names, signaling_names}; got
+      {type(centr_dict).__name__}") otherwise.
+  - when: "centr_dict is a dict but lacks 'values' or 'centr_names' keys (e.g. a legacy nested {signaling: {measure: array}} layout)"
+    suggest:
+      - "Re-generate centr_dict via netAnalysis_computeCentrality (flat schema), or if this is the legacy nested layout, index it directly instead of calling centr_value."
+    explanation: >-
+      centr_value raises TypeError with a detailed message naming the
+      offending keys and pointing at the flat-schema requirement (truncating
+      the key dump for large legacy dicts).
+  - when: "measure is not in centr_dict['centr_names']"
+    suggest:
+      - "Pass one of the measure names actually present in centr_dict['centr_names'] (e.g. 'outdeg_unweighted', 'indeg', 'page_rank', or the full 11-measure set if degree_only=False was used)."
+    explanation: 'centr_value raises KeyError(f"Centrality measure {measure!r} not in centr_names={names!r}") otherwise.'
+  - when: "signaling is given but not in centr_dict['signaling_names']"
+    suggest:
+      - "Pass a signaling / LR-pair name present in centr_dict['signaling_names'] (see centr_signaling_names())."
+    explanation: 'centr_value raises KeyError(f"Signaling {signaling!r} not in signaling_names={sig_names!r}") otherwise.'
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.centr_signaling_names

@@ -1,0 +1,200 @@
+id: spatialcellchat.spatialGiPlot
+import_path: spatialcellchat.viz_spatial.spatialGiPlot
+kind: function
+signature: >-
+  spatialGiPlot(adata: ad.AnnData, slot_name: str = "netP", signaling_name:
+  Optional[Union[str, int, Sequence[Union[str, int]]]] = None, do_binary: bool
+  = True, group_highlight: Optional[Sequence] = None, measure: Sequence[str] =
+  ("indeg", "outdeg"), measure_name: Sequence[str] = ("incoming", "outgoing"),
+  plot_title: Optional[str] = None, n: int = 12, method: str = "normal",
+  gstar: bool = False, p_value: Optional[float] = None, point_size: float =
+  2.0, nohighlight_alpha: float = 0.65, show_colorscale: bool = True, lib_id:
+  str = "slice1", image_key: Optional[str] = "lowres") -> Union[Figure,
+  pd.DataFrame]
+purpose: Plot (or compute) local Getis-Ord Gi/Gi* hotspots of per-cell in/out-degree signaling centrality on the tissue.
+description: >
+  Mirrors R's spatialGiPlot (visualization.R:8582). Reads
+  adata.uns["cellchat"][slot_name]["centr.cell"] (the flat
+  {values, centr_names, node_names, signaling_names} schema written by
+  netAnalysis_computeCentrality(do_group=False)) and resolves signaling_name
+  (a single name, a 1-based index, or a sequence of either — e.g. an
+  annotation-derived vector of LR/pathway names) into a set of signaling
+  keys. For each requested `measure` ("indeg"/"outdeg"), the per-cell
+  centrality values for every selected signaling key are optionally
+  binarised (do_binary=True, applied per-LR before summing — matching R's
+  order) then summed across signaling keys into one per-cell score vector.
+  A local Getis-Ord Gi (or Gi* when gstar=True) statistic and its p-value
+  are computed from that score vector and adata.obsm["spatial"] coordinates
+  via the internal _local_gi helper, for every entry of `measure`.
+
+  method="computation" returns a long-form DataFrame (x, y, score,
+  statistic_G, "Pr(z != E(Gi))", measure, feature_name) and skips plotting;
+  method="normal"/"scoring"/"density" render a matplotlib Figure (one panel
+  per measure); method="3d" returns a plotly Figure; method="contour" is not
+  implemented (raises NotImplementedError, unlike R which uses plotly for
+  it). In every mode (including method="computation"), the per-spot Gi and
+  Gi p-value are ALSO persisted into adata.obs under a dynamically built
+  column-name pair per measure: `Getis.Ord.Gi.<plot_title>` /
+  `Getis.Ord.Gi.<plot_title>.p` when plot_title is given (the tutorial's
+  pattern — one scalar plot_title per multi-LR call), else
+  `Getis.Ord.Gi.<measure_name_i>.<tag>` / `...p` where <tag> is the single
+  resolved signaling key or "<N>_signalings" / "all". Because the exact obs
+  column name depends on plot_title/signaling_name/measure_name at call
+  time, it is NOT declared as a fixed `writes` slot below (a fabricated
+  fixed slot id would not match the real dynamic key) — downstream code
+  must read back the same plot_title/measure_name it passed in to know the
+  written obs column names (see the tutorial's
+  `sub.obs["Getis.Ord.Gi.Secreted.Signaling"]` /
+  `sub.obs["Getis.Ord.Gi.Secreted.Signaling.p"]` usage after calling with
+  `plot_title="Secreted Signaling"`).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object with obsm["spatial"] and
+      uns["cellchat"][slot_name]["centr.cell"] populated by
+      netAnalysis_computeCentrality(do_group=False).
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Which uns["cellchat"] slot to read centr.cell from ("net" for LR pairs, "netP" for pathways).
+  - name: signaling_name
+    type: "Optional[Union[str, int, Sequence[Union[str, int]]]]"
+    required: false
+    default: null
+    description: >-
+      Signaling key(s) to sum over: a name, a 1-based index into the
+      resolved signaling-name list, or a sequence of either. None uses all
+      signaling names in centr.cell.
+  - name: do_binary
+    type: bool
+    required: false
+    default: true
+    description: Binarise each signaling key's per-cell centrality (value > 0) before summing across signaling keys.
+  - name: group_highlight
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Kept for R-argument parity; not read by the plotting body beyond styling.
+  - name: measure
+    type: Sequence[str]
+    required: false
+    default: '("indeg", "outdeg")'
+    description: Centrality measures to plot/persist, one panel/obs-column-pair each ("indeg" -> incoming, "outdeg" -> outgoing).
+  - name: measure_name
+    type: Sequence[str]
+    required: false
+    default: '("incoming", "outgoing")'
+    description: Display/obs-key labels for `measure`; overwritten to "incoming"/"outgoing" internally when measure is "indeg"/"outdeg".
+  - name: plot_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: >-
+      Figure title and, when given, the base for the persisted obs column
+      names (`Getis.Ord.Gi.<plot_title>` / `...p`). Recommended whenever
+      signaling_name is a multi-entry sequence.
+  - name: n
+    type: int
+    required: false
+    default: 12
+    description: Number of nearest neighbors used by the local Gi statistic.
+  - name: method
+    type: str
+    required: false
+    default: normal
+    description: >-
+      One of "normal" (color by Gi), "scoring" (color by raw per-spot
+      score), "computation" (return a DataFrame, no plot), "density"
+      (KDE of |Gi|). "3d" returns a plotly Figure. "contour" raises
+      NotImplementedError (Tier-2 deviation from the R plotly-based mode).
+  - name: gstar
+    type: bool
+    required: false
+    default: false
+    description: Use Gi* (includes self) instead of Gi.
+  - name: p_value
+    type: Optional[float]
+    required: false
+    default: null
+    description: Significance threshold used only to choose filled vs. open marker symbols in the "3d" mode.
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Marker size scale.
+  - name: nohighlight_alpha
+    type: float
+    required: false
+    default: 0.65
+    description: Kept for R-argument parity; not read by the plotting body.
+  - name: show_colorscale
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw the colorbar.
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image entirely.
+returns: >-
+  method="computation": a pandas.DataFrame with one row per (cell, measure)
+  holding x, y, score, statistic_G, "Pr(z != E(Gi))", measure, feature_name.
+  method="3d": a plotly.graph_objects.Figure. Otherwise: a
+  matplotlib.figure.Figure with one panel per entry of `measure`. In every
+  mode, adata.obs gains two columns per measure (Gi value and Gi p-value)
+  under a dynamically named key — see description.
+mutates: >-
+  execution_class=builder; mutates adata.obs in place (adds a Gi-value and
+  Gi-p-value column per requested measure, under a call-parameter-dependent
+  dynamic name) in every mode, including method="computation"; does not
+  mutate adata.uns; returns_kind=new_object (returns a new Figure/DataFrame,
+  not adata)
+requires:
+  - obsm.spatial
+  - uns.cellchat.net.centr.cell
+  - uns.cellchat.netP.centr.cell
+writes: []
+examples:
+  - >-
+    scc.spatialGiPlot(sub, plot_title="Incoming hotspot scores of secreted
+    signaling", slot_name="net", signaling_name=LR_paracrine,
+    measure=("indeg",), measure_name=("incoming",), point_size=1)
+  - >-
+    scc.spatialGiPlot(sub, slot_name="net", signaling_name=LR_paracrine,
+    measure=("indeg",), measure_name=("incoming",),
+    plot_title="Secreted Signaling", method="computation")
+failure_fixes:
+  - when: "method is not one of 'normal','scoring','computation','density','contour','3d'"
+    suggest:
+      - "Pass one of the supported method values."
+    explanation: >-
+      Raises ValueError("spatialGiPlot supports method ∈
+      {'normal','scoring','computation','density','contour','3d'} (got ...)").
+  - when: "uns['cellchat'][slot_name]['centr.cell'] is missing"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata, slot_name=slot_name, do_group=False) first."
+    explanation: >-
+      Raises ValueError("Please run `netAnalysis_computeCentrality` to
+      compute the network centrality scores!").
+  - when: "method='contour' is requested"
+    suggest:
+      - "Use method='density' or method='normal' instead; 'contour' is not implemented in this port."
+    explanation: >-
+      Tier-2 deviation: R's 'contour' mode depends on plotly and is not
+      ported; this raises NotImplementedError.
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.centr_value
+  - spatialcellchat.centr_signaling_names
+  - spatialcellchat.spatialLeePlot
+  - spatialcellchat.spatialDimPlot

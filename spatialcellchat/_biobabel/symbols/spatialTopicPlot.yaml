@@ -1,0 +1,165 @@
+id: spatialcellchat.spatialTopicPlot
+import_path: spatialcellchat.viz_spatial.spatialTopicPlot
+kind: function
+signature: >-
+  spatialTopicPlot(adata: ad.AnnData, topics: Optional[Sequence] = None,
+  slot_name: str = "net", pattern: str = "incoming", topics_key: str =
+  "Topic_", color_heatmap: Union[str, Sequence[str]] = "Reds", n_colors: int
+  = 8, direction: int = 1, cutoff: Optional[float] = None, color_use:
+  Optional[Sequence[str]] = None, alpha: float = 1.0, point_size: float =
+  1.0, legend_size: float = 3.0, legend_text_size: int = 8, shape_by:
+  Union[int, str] = "o", ncol: Optional[int] = None, combine: bool = True,
+  show_legend: bool = True, show_legend_combined: bool = False, lib_id: str =
+  "slice1", image_key: Optional[str] = "lowres") -> Figure
+purpose: Spatial scatter plot of per-cell CCC-topic embedding scores.
+description: >
+  Direct port of R's spatialTopicPlot (visualization.R:6771). Reads the
+  per-cell topic embedding from
+  adata.uns['cellchat'][slot_name]['topic'][pattern]['cell'] (an (n_cells,
+  K) matrix written by identifyCellTopics when called with a single-value
+  topic_k), transposed to (K, n_cells) to match R. `topics` selects which
+  of the K topics to render — by 1-based integer index or by name
+  ("<topics_key><n>", e.g. "Topic_3"); None renders all K topics. Each
+  selected topic is drawn as its own continuous colour-mapped spatial
+  scatter panel (color_heatmap palette; values <= cutoff masked to NaN
+  when cutoff is given). Reads adata.obsm['spatial'] and (optionally)
+  uns["spatial"][lib_id] for the background tissue image; does not mutate
+  adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm['spatial'] and uns['cellchat'][slot_name]['topic'][pattern]['cell'] populated by identifyCellTopics.
+  - name: topics
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Topics to render — 1-based integer indices, topic name strings ("<topics_key><n>"), or None for all K topics.
+  - name: slot_name
+    type: str
+    required: false
+    default: net
+    description: Which uns["cellchat"] slot holds the topic block (matches the slot_name passed to identifyCellTopics).
+  - name: pattern
+    type: str
+    required: false
+    default: incoming
+    description: '"incoming" or "outgoing"; must match the pattern used when identifyCellTopics wrote the topic embedding (raises otherwise).'
+  - name: topics_key
+    type: str
+    required: false
+    default: "Topic_"
+    description: Prefix used to build display/lookup names for each topic index ("<topics_key><i+1>").
+  - name: color_heatmap
+    type: Union[str, Sequence[str]]
+    required: false
+    default: Reds
+    description: Named colormap or explicit hex colour sequence.
+  - name: n_colors
+    type: int
+    required: false
+    default: 8
+    description: Number of colormap anchor points.
+  - name: direction
+    type: int
+    required: false
+    default: 1
+    description: Colormap direction; -1 reverses the palette order.
+  - name: cutoff
+    type: Optional[float]
+    required: false
+    default: null
+    description: Values <= cutoff are masked to NaN before plotting.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Kept for R-argument parity; not read by this continuous-scatter implementation.
+  - name: alpha
+    type: float
+    required: false
+    default: 1.0
+    description: Marker opacity.
+  - name: point_size
+    type: float
+    required: false
+    default: 1.0
+    description: Marker size scale.
+  - name: legend_size
+    type: float
+    required: false
+    default: 3.0
+    description: Kept for R-argument parity.
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Colorbar font size.
+  - name: shape_by
+    type: Union[int, str]
+    required: false
+    default: o
+    description: Matplotlib marker style.
+  - name: ncol
+    type: Optional[int]
+    required: false
+    default: null
+    description: Panel grid columns; auto-selected from the topic count when None (1 for a single topic, 2 by default, 3 for >6, 4 for >9).
+  - name: combine
+    type: bool
+    required: false
+    default: true
+    description: Kept for R-argument parity; this implementation always returns one combined Figure.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Draw a colorbar on every panel.
+  - name: show_legend_combined
+    type: bool
+    required: false
+    default: false
+    description: Kept for R-argument parity.
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image entirely.
+returns: A new matplotlib.figure.Figure with one continuous colour-mapped spatial panel per selected topic.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm['spatial'],
+  uns['cellchat'][slot_name]['topic'][pattern], and uns["spatial"][lib_id];
+  does not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - uns.cellchat.net.topic.incoming
+  - uns.cellchat.net.topic.outgoing
+writes: []
+examples:
+  - >-
+    scc.spatialTopicPlot(sub, pattern="incoming", color_heatmap="Reds",
+    show_legend=False, point_size=1.3, ncol=topic_k // 2)
+  - "scc.spatialTopicPlot(sub, topics=[1, 3], pattern='outgoing')"
+failure_fixes:
+  - when: "pattern is not 'incoming' or 'outgoing'"
+    suggest:
+      - "Pass pattern='incoming' or pattern='outgoing'."
+    explanation: "Raises ValueError(\"pattern must be 'incoming' or 'outgoing'.\")."
+  - when: "uns['cellchat'][slot_name]['topic'][pattern] is missing"
+    suggest:
+      - "Run identifyCellTopics(adata, slot_name=slot_name, pattern=pattern, topic_k=(k,)) first, with a single-value topic_k."
+    explanation: >-
+      Raises a KeyError-style lookup failure when the topic block was
+      never written (e.g. identifyCellTopics was called with a multi-value
+      topic_k, which only writes tmp.suggestK, not topic.<pattern>).
+related:
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.netVisual_TopicComposition
+  - spatialcellchat.netVisual_TopicSignaling
+  - spatialcellchat.extractTopicSignaling

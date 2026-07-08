@@ -1,0 +1,44 @@
+id: spatialcellchat.showDatabaseCategory
+import_path: spatialcellchat.viz_basic.showDatabaseCategory
+kind: function
+signature: 'showDatabaseCategory(CellChatDB: Dict[str, pd.DataFrame], nrow: int = 1) -> Figure'
+purpose: Show a CellChatDB's composition as three pie charts (signaling-type annotation, heterodimer split, KEGG-vs-Literature evidence).
+description: >
+  Direct port of R's showDatabaseCategory (database.R:10). Builds three
+  (group, value) count tables from CellChatDB["interaction"] and
+  CellChatDB["geneInfo"], then renders each with pieChart on a
+  plt.subplots(nrow, ceil(3/nrow)) grid: (1) counts by "annotation", enumerating
+  only the three levels "Secreted Signaling", "ECM-Receptor", "Cell-Cell
+  Contact" (rows with other annotations, e.g. "Non-protein Signaling", are
+  not shown, matching R's factor(..., levels=c(...)) restriction); (2)
+  "Heterodimers" vs "Others" — an interaction is "Others" when both its
+  ligand and receptor are single Symbol entries in geneInfo["Symbol"],
+  otherwise "Heterodimers"; (3) "KEGG" vs "Literature" — KEGG when the
+  "evidence" column contains the substring "KEGG" (grepl-style), defaulting
+  to an all-empty evidence series if the column is absent. Spare grid axes
+  beyond the three pies are hidden.
+parameters:
+  - name: CellChatDB
+    type: Dict[str, pandas.DataFrame]
+    required: true
+    default: null
+    description: CellChatDB dict with at least "interaction" (columns include "annotation", "ligand", "receptor", optionally "evidence") and "geneInfo" (column "Symbol").
+  - name: nrow
+    type: int
+    required: false
+    default: 1
+    description: Number of rows for the 3-pie subplot grid; number of columns is ceil(3 / nrow).
+returns: A new matplotlib.figure.Figure containing the three pie-chart panels, laid out via plt.subplots() and fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; takes a CellChatDB dict directly (not
+  adata) and only reads its "interaction"/"geneInfo" DataFrames; does not
+  mutate the CellChatDB dict or any adata state; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.showDatabaseCategory(CellChatDB)'
+  - 'scc.showDatabaseCategory(CellChatDB, nrow=3)'
+failure_fixes: []
+related:
+  - spatialcellchat.pieChart
+  - spatialcellchat.load_db

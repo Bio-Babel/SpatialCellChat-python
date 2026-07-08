@@ -1,0 +1,48 @@
+# Auto-generated stub for spatialcellchat.modeling_avg.computeAvgCommunProb_LR_Visium_Sum.
+# Review and fill: purpose, mutates, requires, writes, examples, failure_fixes, related.
+id: spatialcellchat.computeAvgCommunProb_LR_Visium_Sum
+import_path: spatialcellchat.modeling_avg.computeAvgCommunProb_LR_Visium_Sum
+kind: function
+signature: "computeAvgCommunProb_LR_Visium_Sum(prob: sparse.spmatrix, cell_type_proportion: np.ndarray, cell_type_onehot: Optional[np.ndarray] = None) -> np.ndarray"
+purpose: Compute the Visium-resolution SUM of communication probabilities aggregated to cell-type level.
+description: >
+  Pure-array helper (R: computeAvgCommunProb_LR_Visium_Sum, modeling.R:823)
+  used internally by computeAvgCommunProb_Visium's per-LR loop for
+  avg_type="sum". For low-resolution Visium spots, each spot carries a
+  *proportion* of each cell type (from cell-type decomposition) rather than
+  a hard group assignment. The cell-type-pair communication strength is
+  computed as cell_type_proportion^T @ prob @ cell_type_proportion (a
+  proportion-weighted sum, not restricted to a hard partition). No
+  expression-frequency or min-cells filtering is applied here (unlike the
+  non-Visium _LR_Sum variant) -- filtering for Visium is only via the
+  spot/cell-type overlap implicit in the proportions plus the colocalization
+  mask applied by the caller. Does not read or write adata/uns state;
+  operates purely on its array arguments.
+parameters:
+  - name: prob
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: "(nC, nC) spot-level communication probability matrix for one ligand-receptor pair (R's prob.cell_[[i]])."
+  - name: cell_type_proportion
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: "(nC, nTypes) matrix of cell-type proportions per spot (R's cell.type.decomposition)."
+  - name: cell_type_onehot
+    type: numpy.ndarray
+    required: false
+    default: null
+    description: Placeholder kept for signature parity with computeAvgCommunProb_LR_Visium_Avg; unused by this function.
+returns: >
+  A dense (nTypes, nTypes) numpy.ndarray of cell-type-level communication
+  probability sums.
+mutates: "execution_class=pure; no mutation of adata or any input array; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeAvgCommunProb_LR_Visium_Sum(prob_cell_i, cell_type_proportion=decomp, cell_type_onehot=None)"
+failure_fixes: []
+related:
+  - spatialcellchat.computeAvgCommunProb_Visium
+  - spatialcellchat.computeAvgCommunProb_LR_Visium_Avg

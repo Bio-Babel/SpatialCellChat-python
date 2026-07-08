@@ -44,6 +44,8 @@ dependencies = [
 dev = ["pytest>=7.0", "pytest-cov", "ruff"]
 docs = ["mkdocs", "mkdocstrings[python]", "mkdocs-material", "mkdocs-jupyter"]
 
+[project.entry-points."biobabel.manifest"]
+spatialcellchat = "spatialcellchat._biobabel:get_manifest"
 [tool.hatch.build.targets.wheel]
 packages = ["spatialcellchat"]
 exclude = ["**/.ipynb_checkpoints", "**/__pycache__"]
@@ -60,3 +62,6 @@ filterwarnings = [
     "ignore:Tensorflow not installed:ImportWarning",
     "ignore:Some eigenvector centralities are nearly zero:RuntimeWarning",
 ]
+
+[tool.biobabel]
+contract_class = "analysis"

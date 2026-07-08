@@ -1,0 +1,56 @@
+id: spatialcellchat.scaleData
+import_path: spatialcellchat.preprocessing.scaleData
+kind: function
+signature: >-
+  scaleData(adata: ad.AnnData, do_center: bool = True, layer_in:
+  Optional[str] = None, layer_out: str = "data_scale") -> ad.AnnData
+purpose: Z-score standardise an expression matrix gene-by-gene, across cells.
+description: >
+  Direct port of R's scaleData (utilities.R:805). R transposes twice around
+  base::scale(), which scales by column; for an AnnData (cells x genes) this
+  is equivalent to standardising each gene (axis=0) over the cells. When
+  do_center=True, each gene's mean is subtracted and the centred values are
+  divided by the sample standard deviation (ddof=1, matching R's sd()).
+  When do_center=False, values are left uncentred but still divided by
+  sqrt(sum(x**2) / (n-1)), matching R's scale(center=FALSE, scale=TRUE)
+  semantics. Division by a zero standard deviation yields NaN, exactly as in
+  R (division errors are silenced with np.errstate).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object; the scaled matrix is written to a layer (adata.X is untouched).
+  - name: do_center
+    type: bool
+    required: false
+    default: true
+    description: Whether to mean-centre each gene before dividing by its standard deviation (R's do.center).
+  - name: layer_in
+    type: Optional[str]
+    required: false
+    default: null
+    description: Layer to read; defaults to adata.X.
+  - name: layer_out
+    type: str
+    required: false
+    default: '"data_scale"'
+    description: >-
+      Layer name that receives the scaled matrix. This is the canonical key
+      for R's chat@data.scale slot (see spatialcellchat._anndata.DATA_SLOT_TO_LAYER).
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData). The
+  scaled matrix is added as a new layer; adata.X is left unchanged.
+mutates: >-
+  execution_class=builder; mutates adata.layers[layer_out] in place (adata.X
+  is not modified); returns_kind=same_object
+requires: []
+writes:
+  - layers.data_scale
+examples:
+  - pp.scaleData(A, do_center=True, layer_in=None, layer_out="scaled")
+  - pp.scaleData(A, do_center=False, layer_out="data_scale")
+failure_fixes: []
+related:
+  - spatialcellchat.normalizeData
+  - spatialcellchat.runPCA

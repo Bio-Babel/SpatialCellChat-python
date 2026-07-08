@@ -1,0 +1,132 @@
+# Auto-generated stub for spatialcellchat.modeling_avg.computeAvgCommunProb_Visium.
+# Review and fill: purpose, mutates, requires, writes, examples, failure_fixes, related.
+id: spatialcellchat.computeAvgCommunProb_Visium
+import_path: spatialcellchat.modeling_avg.computeAvgCommunProb_Visium
+kind: function
+signature: "computeAvgCommunProb_Visium(adata: ad.AnnData, cell_type_decomposition: Union[np.ndarray, pd.DataFrame], avg_type: Literal['avg', 'sum'] = 'avg', group_by: Optional[str] = None, do_permutation: bool = True, nboot: int = 100, seed_use: int = 1, colocalization_use: bool = False, thresh_colo: float = 0.05) -> ad.AnnData"
+purpose: Compute group-level (cell-type-level) communication for low-resolution Visium spatial data using cell-type decomposition proportions.
+description: >
+  Mirrors R's computeAvgCommunProb_Visium (modeling.R:603). Used for
+  low-resolution spot-based platforms such as 10X Visium, where each spot
+  is a mixture of multiple cell types rather than a single cell; for
+  high-resolution platforms (Slide-seqV2, Stereo-seq, MERFISH) use
+  computeAvgCommunProb instead (per the package tutorial).
+
+  Differs from computeAvgCommunProb in that the per-spot aggregation uses a
+  *cell-type decomposition* matrix (rows are spots, columns are cell types,
+  entries are proportions summing to ~1 per spot) instead of a hard
+  per-cell group assignment. Validates that cell_type_decomposition's
+  columns match the resolved group factor's levels and (if a DataFrame)
+  that its row index matches adata.obs_names exactly, or (if a plain
+  ndarray) that its shape matches (n_obs, n_clusters).
+
+  Reads the precomputed per-LR sparse cell-cell (spot-cell) probability
+  matrices from adata.uns['cellchat']['net']['tmp']['prob.cell']. For each
+  LR pair with at least one nonzero spot-level link, dispatches to
+  computeAvgCommunProb_LR_Visium_Avg (avg_type="avg") or
+  computeAvgCommunProb_LR_Visium_Sum (avg_type="sum") to aggregate to a
+  (nTypes, nTypes) cell-type-level matrix, optionally zeroing out
+  colocalization-failing pairs (colocalization_use=True). Permutation
+  testing (do_permutation=True) shuffles the *columns* (cell-type identity)
+  of the decomposition matrix across nboot draws (rather than shuffling
+  per-cell group labels as computeAvgCommunProb does) to build an empirical
+  null and compute p-values, forcing p=1 wherever prob==0.
+
+  Writes the aggregated probability array, permutation p-values, LR
+  diagnostic counts, dimnames, the decomposition matrix itself, and the
+  call's parameters back into adata.uns['cellchat']; mutates and returns
+  the same AnnData object.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Spatial AnnData with computeCommunProb results stored in uns['cellchat']['net']['tmp']['prob.cell'].
+  - name: cell_type_decomposition
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: "(nC, nTypes) cell-type proportion matrix. If a DataFrame, column names must match the levels of the resolved group factor and row names must match adata.obs_names exactly; if a plain ndarray, its shape must be (adata.n_obs, n_clusters) (matching the number of group levels)."
+  - name: avg_type
+    type: "Literal['avg', 'sum']"
+    required: false
+    default: avg
+    description: Aggregation rule dispatched to computeAvgCommunProb_LR_Visium_Avg ("avg") or computeAvgCommunProb_LR_Visium_Sum ("sum").
+  - name: group_by
+    type: str
+    required: false
+    default: null
+    description: adata.obs column for the group factor, used only to derive the level order/names checked against cell_type_decomposition's columns; the actual aggregation is column-wise on cell_type_decomposition, not a hard per-cell assignment.
+  - name: do_permutation
+    type: bool
+    required: false
+    default: true
+    description: Whether to compute permutation-test p-values by shuffling the columns of cell_type_decomposition.
+  - name: nboot
+    type: int
+    required: false
+    default: 100
+    description: "Number of permutations (R: nboot)."
+  - name: seed_use
+    type: int
+    required: false
+    default: 1
+    description: "RNG seed for the permutation test (R: seed.use)."
+  - name: colocalization_use
+    type: bool
+    required: false
+    default: false
+    description: "Whether to mask out spatially-distant cell groups based on spatialcellchat.computeColocalization (R: colocalization.use). Requires adata.obsm['spatial'] when True."
+  - name: thresh_colo
+    type: float
+    required: false
+    default: 0.05
+    description: "Colocalization p-value threshold (R: thresh.colo)."
+returns: >
+  The same adata object (mutated in place) with
+  uns['cellchat']['net']['prob'] holding a (nGroup, nGroup, nLR) dense
+  array of cell-type-level communication probabilities, and
+  uns['cellchat']['net']['pval'] holding the same-shape permutation
+  p-values (None when do_permutation=False).
+mutates: "execution_class=builder; mutates adata.uns['cellchat']['net']['prob'], ['net']['pval'], ['net']['dimnames'], ['net']['tmp']['LRsig.CCC.counts'], ['net']['tmp']['LRsig.GGC.counts'], ['net']['tmp']['LRsig.use.idx'], ['net']['tmp']['cell.type.decomposition'], ['options']['parameter'], and (only when colocalization_use=True) ['images']['colocalization'] in place; returns_kind=same_object"
+requires:
+  - uns.cellchat.net.tmp.prob.cell
+writes:
+  - uns.cellchat.net.prob
+  - uns.cellchat.net.pval
+  - uns.cellchat.net.dimnames
+  - uns.cellchat.net.tmp.LRsig.CCC.counts
+  - uns.cellchat.net.tmp.LRsig.GGC.counts
+  - uns.cellchat.net.tmp.LRsig.use.idx
+  - uns.cellchat.net.tmp.cell.type.decomposition
+  - uns.cellchat.options.parameter
+  - uns.cellchat.images.colocalization
+examples:
+  - "scc.computeAvgCommunProb_Visium(sub, cell_type_decomposition=ctd, avg_type='avg', nboot=100, do_permutation=True)"
+  - "scc.computeAvgCommunProb_Visium(adata, cell_type_decomposition=decomp_df, avg_type='sum', do_permutation=False)"
+failure_fixes:
+  - when: 'RuntimeError: Please run `computeCommunProb` ...'
+    suggest:
+      - call spatialcellchat.computeCommunProb(adata, ...) first so it populates uns['cellchat']['net']['tmp']['prob.cell'].
+  - when: 'ValueError: cell groups'' names'
+    suggest:
+      - make cell_type_decomposition's DataFrame columns exactly match the group_by/active_ident factor's categories (same names, order does not matter but membership must).
+  - when: 'ValueError: cells'' names'
+    suggest:
+      - make cell_type_decomposition's DataFrame row index exactly match adata.obs_names (same cells, same order).
+  - when: 'ValueError: expected N columns'
+    suggest:
+      - when passing a plain ndarray, its column count must equal the number of group levels; reshape or subset cell_type_decomposition accordingly.
+  - when: 'ValueError: avg_type must be one of ''avg'', ''sum'''
+    suggest:
+      - pass avg_type='avg' or avg_type='sum'.
+  - when: 'ValueError: Each LR pair does not have any spot-level links/interactions'
+    suggest:
+      - every LR's prob.cell matrix is all-zero; rerun computeCommunProb with looser filtering or check the input expression data.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.computeAvgCommunProb_LR_Visium_Avg
+  - spatialcellchat.computeAvgCommunProb_LR_Visium_Sum
+  - spatialcellchat.computeAvgCommunProb
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.computeColocalization

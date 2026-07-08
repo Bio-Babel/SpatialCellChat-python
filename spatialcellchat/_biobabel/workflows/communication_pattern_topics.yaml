@@ -1,0 +1,65 @@
+id: spatialcellchat.communication_pattern_topics
+title: Identify and visualize recurring cell-cell-communication "topics" via NMF
+description: >
+  Decompose the per-cell (or per-spot) incoming or outgoing signaling
+  profile into a small number of recurring communication "topics" via
+  L1-regularised NMF, then visualize their spatial distribution, cell-type
+  composition, and top-loading L-R pairs. Mirrors the "CCC topic analysis"
+  section of the package tutorial.
+task_tags:
+  - identify-communication-topics
+when_to_use:
+  - >-
+    A spatial_ccc_inference_lowres / _highres run has already computed
+    per-cell L-R-pair network centrality (netAnalysis_computeCentrality
+    with do_group=False), and the goal is to summarise recurring
+    communication patterns across many cells/spots rather than inspect one
+    pathway at a time.
+when_not_to_use:
+  - >-
+    Per-cell centrality (uns['cellchat']['net']['centr.cell']) has not yet
+    been computed — run spatial_ccc_inference_lowres / _highres through its
+    netAnalysis_computeCentrality(do_group=False) step first.
+inputs:
+  - name: adata
+    kind: anndata.AnnData
+    description: AnnData with per-cell L-R-pair centrality already computed.
+    requirements:
+      - >-
+        Must already have uns.cellchat.net.centr.cell populated by
+        netAnalysis_computeCentrality(adata, slot_name="net",
+        do_group=False) (part of spatial_ccc_inference_lowres / _highres).
+  - name: topic_k
+    kind: int
+    description: Number of topics to fit (a single value; pass a range to identifyCellTopics separately first to cross-validate this choice via suggestK1).
+steps:
+  - symbol: spatialcellchat.identifyCellTopics
+    purpose: Fit an L1-regularised NMF decomposition of the per-cell incoming signaling profile into topic_k topics.
+    args:
+      adata: $inputs.adata
+      slot_name: net
+      pattern: incoming
+      topic_k: (topic_k,)
+    notes:
+      - Passing a single-value topic_k (as a 1-tuple) fits the topic embedding directly; passing a multi-value sequence instead cross-validates the rank choice via suggestK1 and writes no topic embedding.
+  - symbol: spatialcellchat.spatialTopicPlot
+    purpose: Spatial scatter of each topic's per-cell loading.
+    args:
+      adata: $inputs.adata
+      pattern: incoming
+      color_heatmap: Reds
+  - symbol: spatialcellchat.netVisual_TopicComposition
+    purpose: Cell-type composition of each topic, as a heatmap.
+    args:
+      adata: $inputs.adata
+      y_group: topicIn
+      cluster_rows: true
+  - symbol: spatialcellchat.netVisual_TopicSignaling
+    purpose: Top-loading L-R pairs / pathways ranked per topic.
+    args:
+      adata: $inputs.adata
+      pattern: incoming
+templates: []
+outputs:
+  - "uns.cellchat.net.topic.incoming: {cell, signaling, iter} — the fitted per-cell/per-LR-pair topic embedding."
+  - "Spatial, composition, and per-topic-ranking Figures from spatialTopicPlot / netVisual_TopicComposition / netVisual_TopicSignaling."

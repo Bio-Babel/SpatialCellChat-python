@@ -1,0 +1,161 @@
+id: spatialcellchat.netVisual_CommunFieldGrid
+import_path: spatialcellchat.viz_spatial.netVisual_CommunFieldGrid
+kind: function
+signature: >-
+  netVisual_CommunFieldGrid(adata: ad.AnnData, signaling: str, slot_name:
+  str = "netP", pattern: str = "incoming", cellsize: Optional[float] = None,
+  grid_resolution: Optional[float] = None, grid_field_mean: str = "median",
+  color_use: Optional[Sequence[str]] = None, point_size: float = 2.0,
+  image_alpha: float = 0.3, min_mag: float = 0.0, arrow_line_color: str =
+  "black", arrow_line_alpha: float = 0.9, arrow_angle: float = 22.5,
+  arrow_length: float = 0.5, legend_size: float = 2.0, legend_text_size: int
+  = 8, title_name: Optional[str] = None, lib_id: str = "slice1", image_key:
+  Optional[str] = "lowres") -> Figure
+purpose: Gridded (aggregated + smoothed) communication-field arrows overlaid on a spatial scatter of cell groups.
+description: >
+  Mirrors R's netVisual_CommunFieldGrid (visualization.R:5584). Reads the
+  per-spot 2-D vector field for signaling/pattern from
+  uns["cellchat"][slot_name]["field"][pattern] (written by
+  computeCommunField), aggregates it onto a uniform grid via the internal
+  _grid_aggregate helper (cell size = cellsize * grid_resolution; per-cell
+  median or sum of dx/dy, selected by grid_field_mean), then smooths the
+  gridded (u, v) field with the internal _barnes_interp helper (a port of
+  oce::interpBarnes) before drawing a matplotlib quiver plot of the smoothed
+  field over a spatial scatter of cell groups. When cellsize is None it
+  defaults to the minimum nearest-neighbour spot distance; grid_resolution
+  defaults to 2.0.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] and a computed communication field under uns["cellchat"][slot_name]["field"][pattern][signaling].
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Pathway or LR-pair name to look up in the field dict.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" (pathway-level) or "net" (LR-pair level) field container.'
+  - name: pattern
+    type: str
+    required: false
+    default: incoming
+    description: '"incoming" or "outgoing" direction; any other value raises ValueError.'
+  - name: cellsize
+    type: Optional[float]
+    required: false
+    default: null
+    description: Base grid cell size; defaults to the minimum nearest-neighbour spot distance when None.
+  - name: grid_resolution
+    type: Optional[float]
+    required: false
+    default: null
+    description: Multiplier applied to cellsize to get the aggregation cell size; defaults to 2.0 when None.
+  - name: grid_field_mean
+    type: str
+    required: false
+    default: median
+    description: 'Per-grid-cell aggregation statistic: "median" or "sum"; any other value raises ValueError.'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-ident-category colors; falls back to scPalette.
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Spot marker size.
+  - name: image_alpha
+    type: float
+    required: false
+    default: 0.3
+    description: Spot opacity.
+  - name: min_mag
+    type: float
+    required: false
+    default: 0.0
+    description: Minimum smoothed field-vector magnitude required to draw a grid-cell arrow.
+  - name: arrow_line_color
+    type: str
+    required: false
+    default: black
+    description: Arrow color.
+  - name: arrow_line_alpha
+    type: float
+    required: false
+    default: 0.9
+    description: Arrow opacity.
+  - name: arrow_angle
+    type: float
+    required: false
+    default: 22.5
+    description: Arrow head-width scaling factor.
+  - name: arrow_length
+    type: float
+    required: false
+    default: 0.5
+    description: Arrow head-length scaling factor.
+  - name: legend_size
+    type: float
+    required: false
+    default: 2.0
+    description: Legend marker scale.
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Legend font size.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: 'Figure title; defaults to "Outgoing/Incoming communication flow of {signaling}".'
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image.
+returns: A new matplotlib.figure.Figure with a spatial scatter of cell groups plus gridded, Barnes-smoothed quiver arrows.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"],
+  adata.obs (idents), and uns["cellchat"][slot_name]["field"][pattern]; does
+  not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - uns.cellchat.netP.field.incoming
+  - uns.cellchat.netP.field.outgoing
+writes: []
+examples:
+  - 'scc.netVisual_CommunFieldGrid(adata, signaling="PathA")'
+  - 'scc.netVisual_CommunFieldGrid(adata, signaling="PathA", grid_field_mean="sum")'
+failure_fixes:
+  - when: pattern is not "incoming" or "outgoing"
+    suggest:
+      - Pass pattern="incoming" or pattern="outgoing".
+    explanation: 'Raises ValueError("pattern must be ''incoming'' or ''outgoing''.").'
+  - when: grid_field_mean is not "median" or "sum"
+    suggest:
+      - Pass grid_field_mean="median" or grid_field_mean="sum".
+    explanation: "Raises ValueError(\"grid_field_mean must be 'median' or 'sum'.\")."
+  - when: uns["cellchat"][slot_name] or its ["field"][pattern][signaling] entry is missing
+    suggest:
+      - Run computeCommunField(adata, slot_name=...) before plotting.
+    explanation: >-
+      The internal _resolve_field helper raises ValueError("Please check the
+      input 'signaling' and make sure it has been computed via
+      `computeCommunField`.") when slot_name, the field block, the pattern,
+      or the signaling key is absent.
+related:
+  - spatialcellchat.computeCommunField
+  - spatialcellchat.netVisual_CommunField
+  - spatialcellchat.netVisual_CommunFlow

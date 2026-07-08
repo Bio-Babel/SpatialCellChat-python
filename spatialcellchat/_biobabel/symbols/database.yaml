@@ -1,0 +1,34 @@
+id: spatialcellchat.database
+import_path: spatialcellchat.database
+kind: object
+purpose: Submodule namespace for CellChatDB/PPI loaders and database query helpers.
+description: >
+  The `database` submodule itself, re-exported at the top level
+  (`spatialcellchat.database`) so callers can access it as a namespace
+  (e.g. `scc.database.load_db("human")`) in addition to the flattened
+  top-level names (`scc.load_db`, `scc.subsetDB`, ...). Its public surface
+  is `load_db`, `load_ppi`, `subsetDB`, `searchPair`, `extractGene`,
+  `extractGeneSubset`, `extractGeneSubsetFromPair`, `checkGeneSymbol`,
+  `updateCellChatDB`, plus the `DB_SPECIES` / `PPI_SPECIES` constant
+  tuples — each documented in its own symbols/<name>.yaml contract; this
+  entry documents the namespace object itself, not a callable.
+parameters: []
+returns: >-
+  The `spatialcellchat.database` module object; attribute access
+  (`database.load_db`, etc.) resolves to the functions documented under
+  their own symbol contracts.
+mutates: >-
+  execution_class=pure_function; a module object carries no call-time
+  behavior or mutation of its own; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.database.load_db("human")'
+  - 'from spatialcellchat import database; database.subsetDB(db, search=["Secreted Signaling"])'
+failure_fixes: []
+related:
+  - spatialcellchat.load_db
+  - spatialcellchat.load_ppi
+  - spatialcellchat.subsetDB
+  - spatialcellchat.searchPair
+  - spatialcellchat.updateCellChatDB

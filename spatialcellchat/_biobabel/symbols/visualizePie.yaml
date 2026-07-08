@@ -1,0 +1,77 @@
+id: spatialcellchat.visualizePie
+import_path: spatialcellchat.viz_spatial.visualizePie
+kind: function
+signature: >-
+  visualizePie(proportion: pd.DataFrame, spatial_location: pd.DataFrame,
+  colors: Optional[Sequence[str]] = None, radius: Optional[float] = None,
+  seed: Optional[int] = None) -> Figure
+purpose: Draw a spatial scatter-pie of per-spot cell-type (or topic) proportions.
+description: >
+  Direct port of R's visualizePie (visualization.R:6677), adapted from the
+  CARD package. Operates entirely on plain DataFrames — no AnnData
+  argument. `proportion` (rows = spots, columns = cell types) and
+  `spatial_location` (rows = spots; must contain either ("x","y") or
+  ("x_cent","y_cent") coordinate columns) must have matching row indices
+  (raises otherwise). Columns of `proportion` are naturally sorted
+  (gtools::mixedsort-equivalent, e.g. "T2" before "T10") before plotting.
+  Per-cell-type colours default to a 58-entry CARD palette (recycled via an
+  R-Mersenne-Twister-compatible sample when more cell types than palette
+  entries with no explicit `colors`, seeded by `seed` or 12345) or, when
+  there are more cell types than the base palette, an interpolated colour
+  ramp. `radius` defaults to a CARD-style area heuristic
+  (sqrt(bbox_area / n_spots)) when None. This is the internal rendering
+  primitive spatialDimPlot(proportion=...) delegates to; called directly it
+  is used stand-alone with any proportion-style matrix (cell-type
+  deconvolution, topic composition, etc.), not only CellChat state. Pure
+  function of its arguments; does not read or mutate any AnnData.
+parameters:
+  - name: proportion
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Per-spot proportions; rows = spots, columns = categories (e.g. cell types or topics), row index must match spatial_location's.
+  - name: spatial_location
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Per-spot coordinates; must contain ("x","y") or ("x_cent","y_cent") columns, row index must match proportion's exactly (raises ValueError otherwise).
+  - name: colors
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-category colours. None triggers the CARD candidate-palette sample (seeded) or an interpolated ramp when there are more categories than palette entries.
+  - name: radius
+    type: Optional[float]
+    required: false
+    default: null
+    description: Per-pie radius in data units; None triggers the CARD area-based heuristic (sqrt(bbox_area / n_spots)).
+  - name: seed
+    type: Optional[int]
+    required: false
+    default: null
+    description: RNG seed for the R-Mersenne-Twister-compatible palette sample; defaults to 12345 when None.
+returns: A new matplotlib.figure.Figure with one scatter-pie per spot, sliced by the (naturally sorted) proportion columns.
+mutates: >-
+  execution_class=pure_function; reads only its DataFrame arguments (no
+  AnnData involved); returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.visualizePie(cell_type_decomposition, spatial_location_df)"
+  - "scc.visualizePie(topic_composition_df, spatial_location_df, radius=5.0, seed=1)"
+failure_fixes:
+  - when: "proportion's row index does not exactly match spatial_location's"
+    suggest:
+      - "Reindex proportion and spatial_location to the same row order/index before calling."
+    explanation: >-
+      Raises ValueError("The rownames of proportion data does not match
+      with the rownames of spatial location data").
+  - when: "spatial_location has neither ('x','y') nor ('x_cent','y_cent') columns"
+    suggest:
+      - "Add x/y (or x_cent/y_cent) coordinate columns to spatial_location."
+    explanation: >-
+      Raises ValueError("spatial_location must contain either ('x','y') or
+      ('x_cent','y_cent') columns.").
+related:
+  - spatialcellchat.spatialDimPlot
+  - spatialcellchat.scPalette

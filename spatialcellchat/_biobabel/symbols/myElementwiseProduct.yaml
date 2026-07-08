@@ -1,0 +1,33 @@
+id: spatialcellchat.myElementwiseProduct
+import_path: spatialcellchat.myElementwiseProduct
+kind: function
+signature: 'myElementwiseProduct(SparseMat: ''sparse.spmatrix'', DenseVec: ''ArrayLike'')
+  -> ''sparse.csc_matrix'''
+purpose: Multiply a sparse matrix elementwise by ``outer(DenseVec, DenseVec)``.
+description: >
+  Direct port of R's myElementwiseProduct (modeling.R:419). Converts
+  SparseMat to COO form and, for each stored non-zero entry (i, j),
+  multiplies its value by DenseVec[i] * DenseVec[j] (i.e. the sparse
+  matrix is elementwise-multiplied against the outer product of DenseVec
+  with itself, without ever materialising the dense outer product).
+  Returns the result as a new CSC sparse matrix; implicit (unstored) zero
+  entries of SparseMat remain zero regardless of DenseVec.
+parameters:
+- name: SparseMat
+  type: sparse.spmatrix
+  required: true
+  default: null
+- name: DenseVec
+  type: ArrayLike
+  required: true
+  default: null
+mutates: "execution_class=pure_function; no in-place mutation of `SparseMat`; returns_kind=new_object"
+returns: sparse.csc_matrix
+requires: []
+writes: []
+examples:
+  - "myElementwiseProduct(SparseMat, DenseVec=np.array([0.5, 1.0, 2.0]))"
+  - "myElementwiseProduct(SparseMat, DenseVec=np.array([2.0, 3.0, 4.0, 5.0]))"
+failure_fixes: []
+related:
+  - spatialcellchat.computeCommunProb

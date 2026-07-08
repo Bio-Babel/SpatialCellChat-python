@@ -1,0 +1,74 @@
+id: spatialcellchat.scMatrixTruncation
+import_path: spatialcellchat.modeling.scMatrixTruncation
+kind: function
+signature: >-
+  scMatrixTruncation(Mat: sparse.spmatrix, cutoff: Optional[float] = None,
+  remain_cutoff_v: bool = True, repr: Literal["C", "T"] = "C") ->
+  sparse.spmatrix
+purpose: Truncate a sparse expression matrix to keep entries at or above a cutoff.
+description: >
+  Mirrors R's scMatrixTruncation (modeling.R:1932). Pure function: takes a
+  scipy sparse matrix (R's dgCMatrix / dgTMatrix) and, when cutoff is not
+  None, keeps only the non-zero entries satisfying value >= cutoff (when
+
+  remain_cutoff_v=True) or value > cutoff (when remain_cutoff_v=False),
+  dropping everything else; when cutoff is None the matrix is returned
+  (re-)cast to the requested storage format unchanged. Raises TypeError if
+  Mat is not a scipy sparse matrix, and ValueError if repr is not "C" or
+  "T". No adata / package-level state is touched — this is a standalone
+  sparse-matrix utility also used internally by filterProbability.
+parameters:
+  - name: Mat
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: Sparse matrix to truncate (R's dgCMatrix / dgTMatrix).
+  - name: cutoff
+    type: Optional[float]
+    required: false
+    default: null
+    description: >-
+      Truncation cutoff value. When None, the matrix is returned unchanged
+      (only re-cast to the requested repr).
+  - name: remain_cutoff_v
+    type: bool
+    required: false
+    default: true
+    description: >-
+      True keeps entries with value >= cutoff; False keeps entries with
+      value strictly > cutoff.
+  - name: repr
+    type: Literal["C", "T"]
+    required: false
+    default: "C"
+    description: >-
+      Output storage format: "C" returns a csc_matrix, "T" returns a
+      coo_matrix.
+returns: >-
+  A new scipy.sparse matrix in the requested storage format (csc_matrix for
+  repr="C", coo_matrix for repr="T") containing only the entries that pass
+  the cutoff test (or all original entries, re-cast, when cutoff is None).
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "modeling.scMatrixTruncation(M, cutoff=2.0, remain_cutoff_v=True)"
+  - "modeling.scMatrixTruncation(M, cutoff=0.5, repr='T')"
+  - "modeling.scMatrixTruncation(M, cutoff=None)"
+failure_fixes:
+  - when: "Mat is not a scipy sparse matrix (e.g. a plain numpy array)"
+    suggest:
+      - "Convert the input to a scipy.sparse matrix (e.g. scipy.sparse.csc_matrix(arr)) before calling scMatrixTruncation."
+    explanation: >-
+      scMatrixTruncation raises TypeError("Please use `dgCMatrix` or
+      `dgTMatrix` as a Matrix input!") when scipy.sparse.issparse(Mat) is
+      False.
+  - when: "repr is not 'C' or 'T'"
+    suggest:
+      - "Pass repr='C' for a csc_matrix result or repr='T' for a coo_matrix result."
+    explanation: >-
+      scMatrixTruncation raises ValueError("repr must be 'C' or 'T'") for
+      any other repr value.
+related:
+  - spatialcellchat.filterProbability

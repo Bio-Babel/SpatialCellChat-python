@@ -1,0 +1,60 @@
+id: spatialcellchat.load_visium_psoriasis
+import_path: spatialcellchat.datasets.load_visium_psoriasis
+kind: function
+signature: "load_visium_psoriasis() -> ad.AnnData"
+purpose: Load the bundled Visium human psoriatic-skin tutorial dataset.
+description: >
+  Loads the human psoriatic skin 10X Visium dataset packaged with the
+  original R SpatialCellChat tutorial (Castro-Perez et al., Nat. Commun.
+  2023) via anndata.read_h5ad(resolve_data_path("visium_human_psoriasis.h5ad")),
+  where resolve_data_path is the package's standard 3-tier data-file
+  resolver (the ~7.8 MB h5ad is downloaded on first use). The returned
+  AnnData has 905 spots x 33538 genes; adata.X holds raw integer counts
+  (range 0-7332) — the Python tutorial begins with normalisation
+  (scanpy.pp.normalize_total / log1p, or the package's normalizeData) on
+  this, mirroring the R workflow. adata.obs["active_ident"] is a
+  categorical with the 6 tutorial cell-type labels (FIB, ENDO, SM, EG,
+  Keratinocyte, Immune); adata.obsm["X_pca"], adata.obsm["X_umap"] and
+  adata.obsm["spatial"] hold pre-computed embeddings and image-pixel spot
+  coordinates; adata.uns["spatial"]["slice1"] follows the scanpy/squidpy
+  Visium schema (including "scalefactors" with spot_diameter_fullres,
+  used by the tutorial to compute uns["cellchat"]["spatial.factors"]).
+  If "predictions" is not already present in adata.obsm (i.e. not already
+  bundled in the h5ad), the function additionally reads a bundled 905x6
+  cell-type-deconvolution CSV
+  (resources/visium_psoriasis_cell_type_decomposition.csv), reindexes it to
+  adata.obs_names, and attaches it as adata.obsm["predictions"] (float
+  ndarray) with adata.uns["predictions_columns"] holding the column names —
+  reproducing the original tutorial's Seurat "predictions" assay. This
+  function takes no adata/coordinates argument: it is a data-loading entry
+  point that constructs and returns a brand-new AnnData; it never mutates
+  an existing object. Note: it is reached as
+  spatialcellchat.datasets.load_visium_psoriasis (or via
+  `from spatialcellchat.datasets import load_visium_psoriasis`); it is not
+  re-exported at the spatialcellchat top-level __all__ (only the bare
+  submodule name "datasets" is).
+parameters: []
+returns: >-
+  A new anndata.AnnData (905 obs x 33538 var) loaded from the bundled
+  Visium h5ad file: obs["active_ident"] (categorical, 6 levels),
+  obsm["X_pca"], obsm["X_umap"], obsm["spatial"], uns["spatial"]["slice1"]
+  (Visium scalefactors schema), and obsm["predictions"] /
+  uns["predictions_columns"] (905x6 cell-type-deconvolution matrix and its
+  column names, attached from the bundled resource CSV if not already
+  present in the h5ad). This is a fresh object each call; nothing from a
+  prior call or caller-supplied object is read or mutated.
+mutates: >-
+  execution_class=pure_function; loads and returns a new AnnData object;
+  returns_kind=new_object
+requires: []
+writes:
+  - obsm.predictions
+  - uns.predictions_columns
+examples:
+  - "adata = load_visium_psoriasis()"
+  - "from spatialcellchat.datasets import load_visium_psoriasis\nadata = load_visium_psoriasis()"
+  - "adata = datasets.load_visium_psoriasis()"
+failure_fixes: []
+related:
+  - spatialcellchat.normalizeData
+  - spatialcellchat.subsetData

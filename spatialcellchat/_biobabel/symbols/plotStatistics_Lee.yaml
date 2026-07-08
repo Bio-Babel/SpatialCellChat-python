@@ -1,0 +1,186 @@
+id: spatialcellchat.plotStatistics_Lee
+import_path: spatialcellchat.viz_basic.plotStatistics_Lee
+kind: function
+signature: >-
+  plotStatistics_Lee(x_labels: Union[np.ndarray, pd.Series,
+  sparse.spmatrix], y_labels: Union[np.ndarray, pd.Series, sparse.spmatrix],
+  coords: Optional[np.ndarray] = None, lw: Optional[Any] = None, x_levels:
+  Optional[Sequence[str]] = None, y_levels: Optional[Sequence[str]] = None,
+  cutoff: bool = True, cutoff_Lee: float = 0.0, type: Literal["heatmap",
+  "dot", "data"] = "heatmap", color_use: Optional[Sequence[str]] = None,
+  color_heatmap: str = "Reds", reverse_colorscale: bool = False, n_colors:
+  int = 6, dot_size: Tuple[float, float] = (1.0, 6.0), angle_x: float = 45.0,
+  xlabel: Optional[str] = None, ylabel: Optional[str] = None, title_name:
+  Optional[str] = None, legend_title: Optional[str] = None, font_size: int =
+  10, font_size_title: int = 10, x_lab_rot: float = 45.0, row_show:
+  Optional[Sequence[str]] = None, col_show: Optional[Sequence[str]] = None)
+  -> Union[Figure, pd.DataFrame]
+purpose: Compute and plot pairwise Lee's L spatial co-occurrence statistic between the columns of two label/feature matrices.
+description: >
+  Direct port of R's plotStatistics_Lee (visualization.R:8321). x_labels and
+  y_labels are each coerced via an internal helper: a 2-D array/DataFrame is
+  used as-is (columns become the compared variables); a 1-D numeric vector
+  becomes a single "dot"-mode column (forcing type="dot" regardless of the
+  type argument); a categorical/string vector is one-hot encoded
+  (model.matrix(~x-1) equivalent). Exactly one of coords ((n, 2) cell
+  coordinates, converted to an identity/self-loop sparse weights matrix,
+  mirroring R's mat2listw(diag(n))) or lw (a pre-built
+  libpysal.weights.W-like object) must be given (raises ValueError if
+  neither or both are given, or if coords is not 2 columns). For every
+  (x-column, y-column) pair, fits esda.lee.Spatial_Pearson(connectivity=W,
+  permutations=0) and reads its association_[0,1] entry. When cutoff=True,
+  entries <= cutoff_Lee are set to NaN. x_levels/y_levels reorder/subset
+  columns before plotting; row_show/col_show further subset the heatmap
+  branch. type="data" returns the raw (y x x) DataFrame directly.
+  type="heatmap" renders via seaborn.heatmap with annotated values.
+  type="dot" (or when either input was numeric) renders a long-form dot plot
+  with dot size proportional to the (non-NaN) cooccurrence value.
+parameters:
+  - name: x_labels
+    type: Union[numpy.ndarray, pandas.Series, scipy.sparse.spmatrix]
+    required: true
+    default: null
+    description: Categorical vector (one-hot encoded), numeric vector (forces type="dot"), or an (n, k) matrix of features.
+  - name: y_labels
+    type: Union[numpy.ndarray, pandas.Series, scipy.sparse.spmatrix]
+    required: true
+    default: null
+    description: Same coercion rules as x_labels.
+  - name: coords
+    type: Optional[numpy.ndarray]
+    required: false
+    default: null
+    description: (n, 2) cell/spot coordinates; mutually exclusive with lw, and exactly one of the two must be given.
+  - name: lw
+    type: Optional[Any]
+    required: false
+    default: null
+    description: Pre-computed spatial-weights object (libpysal.weights.W or an object exposing .sparse); mutually exclusive with coords.
+  - name: x_levels
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Reorder/subset the y-axis-facing columns of the cooccurrence matrix (matched against the coerced y column names).
+  - name: y_levels
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Reorder/subset the x-axis-facing rows of the cooccurrence matrix (matched against the coerced x column names).
+  - name: cutoff
+    type: bool
+    required: false
+    default: true
+    description: When True, set cooccurrence values <= cutoff_Lee to NaN before plotting/returning.
+  - name: cutoff_Lee
+    type: float
+    required: false
+    default: 0.0
+    description: Threshold used by the cutoff filter.
+  - name: type
+    type: 'Literal["heatmap", "dot", "data"]'
+    required: false
+    default: heatmap
+    description: Output mode; forced to "dot" whenever either input coerces to a numeric single-column ("dot" mode).
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-column annotation colours; defaults to scPalette(mat.shape[1]).
+  - name: color_heatmap
+    type: str
+    required: false
+    default: Reds
+    description: Named brewer-style palette resolved via _resolve_brewer + _color_ramp_palette for both the heatmap and dot colour scales.
+  - name: reverse_colorscale
+    type: bool
+    required: false
+    default: false
+    description: Reverse the interpolated colour ramp.
+  - name: n_colors
+    type: int
+    required: false
+    default: 6
+    description: Number of anchor colours sampled from color_heatmap.
+  - name: dot_size
+    type: Tuple[float, float]
+    required: false
+    default: (1.0, 6.0)
+    description: (min, max) marker-size mapping (scaled by 20) for the type="dot" branch, over the range of non-NaN proportions.
+  - name: angle_x
+    type: float
+    required: false
+    default: 45.0
+    description: Carried for parity with the R signature; the actual x tick-label rotation angle used is x_lab_rot.
+  - name: xlabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: Fallback name used for a numeric x_labels' single "dot"-mode column; also drives the heatmap y-axis label.
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: Fallback name used for a numeric y_labels' single "dot"-mode column.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Prefix prepended to the heatmap title "Spatial co-occurrence (Lee statistic)".
+  - name: legend_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Carried for parity with the R signature; not used by the current heatmap/dot rendering.
+  - name: font_size
+    type: int
+    required: false
+    default: 10
+    description: Tick-label font size.
+  - name: font_size_title
+    type: int
+    required: false
+    default: 10
+    description: Heatmap title font size.
+  - name: x_lab_rot
+    type: float
+    required: false
+    default: 45.0
+    description: X tick-label rotation angle (degrees) for both the heatmap and dot branches.
+  - name: row_show
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset/reorder heatmap rows (x-side levels); only applied in the "heatmap" branch.
+  - name: col_show
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset/reorder heatmap columns (y-side levels, and the matching color_use entries); only applied in the "heatmap" branch.
+returns: >-
+  A new matplotlib.figure.Figure for type="heatmap" or type="dot" (or when
+  either input forces dot mode); a pandas.DataFrame (y-levels x x-levels) of
+  raw Lee L values when type="data".
+mutates: >-
+  execution_class=pure_function; takes no adata argument — computes purely
+  from x_labels/y_labels/coords/lw and returns a new Figure or DataFrame;
+  does not touch adata.uns/obs/var; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.plotStatistics_Lee(x_labels, y_labels, coords=coords, type="heatmap")'
+  - 'scc.plotStatistics_Lee(x_numeric, y_labels, coords=coords)'
+  - 'scc.plotStatistics_Lee(x_labels, y_labels, coords=coords, type="data", cutoff=False)'
+failure_fixes:
+  - when: "coords has the wrong shape"
+    suggest:
+      - "Pass an (n, 2) array of cell coordinates."
+    explanation: 'plotStatistics_Lee raises ValueError("Please check your coordinates. It must be 2 columns.") when coords is not 2-D with exactly 2 columns.'
+  - when: "neither coords nor lw is given"
+    suggest:
+      - "Pass either coords= (an (n, 2) array) or lw= (a spatial weights object)."
+    explanation: 'plotStatistics_Lee raises ValueError("Please provide either coords or lw for Lee statistics.").'
+  - when: "both coords and lw are given"
+    suggest:
+      - "Pass only one of coords or lw, not both."
+    explanation: "plotStatistics_Lee raises ValueError(\"Please don't provide both coords and lw at the same time.\")."
+related: []

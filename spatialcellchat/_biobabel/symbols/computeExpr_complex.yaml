@@ -1,0 +1,51 @@
+id: spatialcellchat.computeExpr_complex
+import_path: spatialcellchat._expr.computeExpr_complex
+kind: function
+signature: "computeExpr_complex(complex_input: pd.DataFrame, data_use: np.ndarray, complex: Sequence[str]) -> np.ndarray"
+purpose: "Compute per-cell complex expression as the geometric mean of subunits; a port of computeExpr_complex (modeling.R:2222)."
+description: >
+  For each requested complex name, looks up its subunit gene symbols from
+  complex_input's `subunit_*` columns, drops blank/NA entries, resolves
+  them against data_use's row index (a DataFrame index, or a `_gene_index`
+  attribute on an anonymous array), and computes the column-wise geometric
+  mean of the corresponding data_use rows via geometricMean. A
+  single-subunit complex returns that subunit's row directly (matching R's
+  1-row-matrix branch of geometricMean). Raises KeyError if any subunit
+  symbol is absent from data_use's row index (R's "subscript out of
+  bounds"), or ValueError if an anonymous array lacks a `_gene_index`.
+parameters:
+  - name: complex_input
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB complex frame indexed by complex name with subunit_* columns.
+  - name: data_use
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: Genes-by-cells expression matrix. May also be passed as a pandas.DataFrame so subunit symbols can be resolved by row label.
+  - name: complex
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Names of complexes to compute; must be present in complex_input.index.
+returns: >
+  A numpy.ndarray of shape (len(complex), n_cells); row i is the
+  column-wise geometric mean of data_use over complex[i]'s non-empty
+  subunits.
+mutates: "execution_class=pure_function; no in-place mutation of `complex_input` or `data_use`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeExpr_complex(complex_input, data_use, ['CPX_AB', 'CPX_CDE'])"
+failure_fixes:
+  - when: 'KeyError: computeExpr_complex: subunit symbols not in data_use rows: [...]'
+    suggest:
+      - ensure every subunit gene symbol referenced by the requested complexes exists in data_use's row index.
+  - when: 'ValueError: computeExpr_complex requires a row-named data_use; either pass a DataFrame or attach a `_gene_index` attribute'
+    suggest:
+      - pass data_use as a pandas.DataFrame indexed by gene symbol.
+related:
+  - spatialcellchat.geometricMean
+  - spatialcellchat.computeExpr_LR
+  - spatialcellchat.computeCommunProb

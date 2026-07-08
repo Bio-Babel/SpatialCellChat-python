@@ -1,0 +1,133 @@
+id: spatialcellchat.netAnalysis_signalingRole_heatmap
+import_path: spatialcellchat.viz_heatmap.netAnalysis_signalingRole_heatmap
+kind: function
+signature: >-
+  netAnalysis_signalingRole_heatmap(adata: ad.AnnData, signaling:
+  Optional[Sequence[str]] = None, pattern: str = "outgoing", slot_name: str =
+  "netP", color_use: Optional[Sequence[str]] = None, color_heatmap: str =
+  "BuGn", title: Optional[str] = None, width: float = 10.0, height: float =
+  8.0, font_size: float = 8.0, font_size_title: float = 10.0, cluster_rows:
+  bool = False, cluster_cols: bool = False) -> Figure
+purpose: Outgoing / incoming / overall signaling-role heatmap across pathways and cell groups.
+description: >
+  Direct port of R's netAnalysis_signalingRole_heatmap (analysis.R:3118).
+  Reads centrality from `uns['cellchat'][slot_name]['centr']` (written by
+  netAnalysis_computeCentrality) as a (n_centrality_measures, K_groups,
+  N_pathways) array, transposing the "outdeg" and "indeg" slices to
+  (N_pathways, K_groups) outgoing/incoming matrices. `pattern` selects
+  outgoing, incoming, or their sum ("all"; raises ValueError for any other
+  value). When `signaling` is given, the pathway axis is rebuilt (missing
+  names become all-zero rows) in that exact order. Each row is
+  row-max-normalised (rows already at 0 map to NaN and render blank), then
+  plotted as a brewer-palette heatmap with a top bar of raw per-group
+  column sums (colored by color_use) and a right bar of
+  `-1/log(rowSum)`-transformed pathway strengths (non-finite / negative
+  transformed values are replaced with an evenly spaced series above the
+  finite max, ordered by the original row sum). A dedicated rotated
+  colorbar shows "Relative strength" with min/max rounded ticks. Pure
+  reader; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"][slot_name]["centr"] populated by netAnalysis_computeCentrality.
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset / reorder the pathway (row) axis; pathways absent from centr's signaling_names are inserted as all-zero rows.
+  - name: pattern
+    type: str
+    required: false
+    default: "outgoing"
+    description: '"outgoing", "incoming", or "all" (outgoing + incoming). Raises ValueError for any other value.'
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: uns["cellchat"] sub-dict providing the "centr" dict. Raises ValueError if slot_name is absent from uns["cellchat"].
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colours for the top bar / annotation strip. Defaults to scPalette(K_groups).
+  - name: color_heatmap
+    type: str
+    required: false
+    default: "BuGn"
+    description: RColorBrewer palette name driving the heatmap colormap.
+  - name: title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Appended to the auto-derived "{Outgoing|Incoming|Overall} signaling patterns" title as " - {title}".
+  - name: width
+    type: float
+    required: false
+    default: 10.0
+    description: Figure width in centimetres (converted to inches internally).
+  - name: height
+    type: float
+    required: false
+    default: 8.0
+    description: Figure height in centimetres (converted to inches internally).
+  - name: font_size
+    type: float
+    required: false
+    default: 8.0
+    description: Tick-label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Title font size.
+  - name: cluster_rows
+    type: bool
+    required: false
+    default: false
+    description: Reserved for row-clustering parity with ComplexHeatmap (not applied in this implementation).
+  - name: cluster_cols
+    type: bool
+    required: false
+    default: false
+    description: Reserved for column-clustering parity with ComplexHeatmap (not applied in this implementation).
+returns: >-
+  A new matplotlib.figure.Figure with the row-normalised
+  pathway x cell-group heatmap, a top per-group strength bar, a right
+  per-pathway strength bar, and a rotated "Relative strength" colorbar.
+  Does not modify adata.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'][slot_name] only,
+  does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.centr
+writes: []
+examples:
+  - "scc.netAnalysis_signalingRole_heatmap(sub, pattern='outgoing')"
+  - "scc.netAnalysis_signalingRole_heatmap(sub, pattern='incoming', color_heatmap='Reds')"
+  - "scc.netAnalysis_signalingRole_heatmap(sub, signaling=['TGFb', 'WNT'], pattern='all')"
+failure_fixes:
+  - when: "uns['cellchat']['netP']['centr'] (or the slot_name equivalent) is missing or empty"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata) before calling netAnalysis_signalingRole_heatmap."
+    explanation: >-
+      netAnalysis_signalingRole_heatmap raises ValueError("Please run
+      `netAnalysis_computeCentrality` to compute the network centrality
+      scores!") when uns['cellchat'][slot_name]['centr'] is missing/falsy.
+  - when: "pattern is not 'outgoing', 'incoming', or 'all'"
+    suggest:
+      - "Pass pattern='outgoing', 'incoming', or 'all'."
+    explanation: >-
+      netAnalysis_signalingRole_heatmap raises ValueError("pattern must be
+      'outgoing', 'incoming' or 'all'.") for any other value.
+  - when: "slot_name is not a key of uns['cellchat']"
+    suggest:
+      - "Pass slot_name='netP' (default) or another populated uns['cellchat'] key that carries a 'centr' dict."
+    explanation: >-
+      netAnalysis_signalingRole_heatmap raises ValueError(f"adata.uns['cellchat']['{slot_name}']
+      missing.") when slot_name is absent from uns['cellchat'].
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.netVisual_heatmap
+  - spatialcellchat.doHeatmap

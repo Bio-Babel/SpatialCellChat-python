@@ -1,0 +1,136 @@
+id: spatialcellchat.netVisual_embeddingZoomIn
+import_path: spatialcellchat.viz_embedding.netVisual_embeddingZoomIn
+kind: function
+signature: >-
+  netVisual_embeddingZoomIn(adata: ad.AnnData, slot_name: str = "netP",
+  type_: str = "functional", color_use: Optional[Sequence[str]] = None,
+  pathway_remove: Optional[Sequence[str]] = None, nCol: int = 1, dot_size:
+  Tuple[float, float] = (2.0, 6.0), label_size: float = 2.8, dot_alpha:
+  float = 0.5, xlabel: Optional[str] = None, ylabel: Optional[str] = None,
+  do_label: bool = True, show_legend: bool = False, show_axes: bool =
+  True) -> Figure
+purpose: Per-cluster "zoomed in" faceting of the netVisual_embedding manifold — one subplot per pathway cluster.
+description: >
+  Mirrors R's netVisual_embeddingZoomIn (visualization.R:4246). Builds the
+  same (x, y, Commun.Prob., labels, Groups) frame as netVisual_embedding
+  via _build_embedding_df(adata, slot_name, type_, comparison_name="single")
+  — same required uns.cellchat[slot_name].similarity[type_] sub-slots and
+  same raise conditions (adata.uns['cellchat'] missing;
+  similarity[type_] missing -> "run computeNetSimilarity"; ['dr']['single']
+  missing -> "run netEmbedding"; ['group']['single'] missing -> "run
+  netClustering"). Unlike netVisual_embedding, type_ is not itself
+  validated against {"functional","structural"} in this function (an
+  invalid type_ instead surfaces indirectly as a missing-similarity
+  ValueError from _build_embedding_df). Cluster IDs are derived from the
+  Groups column and rendered in natsorted (numeric-aware) order into a
+  nCol-column grid of subplots, one cluster per Axes, each showing only
+  that cluster's pathways as a scatter (sized by Commun.Prob., coloured by
+  cluster via color_use or ggPalette) with per-cluster repelled pathway
+  labels when do_label=True. Isolate-pathway auto-detection (via the
+  similarity matrix column-sum == 1.0 rule) still runs but pathway_remove
+  is not annotated on the figure in this function (no "Isolate pathways"
+  text is drawn, unlike netVisual_embedding).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with adata.uns['cellchat'][slot_name]['similarity'][type_]['dr']['single'] and ['group']['single'] populated (written by computeNetSimilarity + netEmbedding + netClustering).
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot whose ['similarity'] sub-dict is read.
+  - name: type_
+    type: str
+    required: false
+    default: functional
+    description: Similarity type key ("functional" or "structural"); not validated directly here, but an unrecognised key surfaces as a missing-similarity ValueError.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cluster colour palette; defaults to ggPalette(len(cluster_ids)) when None.
+  - name: pathway_remove
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit isolate-pathway list; auto-detected from the similarity matrix when None (not annotated on the figure by this function).
+  - name: nCol
+    type: int
+    required: false
+    default: 1
+    description: Number of subplot columns in the per-cluster grid.
+  - name: dot_size
+    type: Tuple[float, float]
+    required: false
+    default: [2.0, 6.0]
+    description: (min, max) marker-size range mapped from normalised communication probability.
+  - name: label_size
+    type: float
+    required: false
+    default: 2.8
+    description: Base font size multiplier for repelled pathway labels.
+  - name: dot_alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Marker face alpha.
+  - name: xlabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: X-axis label applied to every subplot when given; no label drawn when None.
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: Y-axis label applied to every subplot when given; no label drawn when None.
+  - name: do_label
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw per-cluster repelled pathway-name labels.
+  - name: show_legend
+    type: bool
+    required: false
+    default: false
+    description: Reserved for R parity; no legend is drawn per-subplot in this implementation regardless of value.
+  - name: show_axes
+    type: bool
+    required: false
+    default: true
+    description: When False, turns off the axes frame/ticks on every subplot.
+returns: A matplotlib.figure.Figure with a nCol-column grid of subplots, one per pathway cluster; unused grid cells are hidden.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'][slot_name]
+  only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.similarity.functional.dr.single
+  - uns.cellchat.netP.similarity.functional.group.single
+writes: []
+examples:
+  - "scc.netVisual_embeddingZoomIn(adata, type_='functional', nCol=2)"
+  - "scc.netVisual_embeddingZoomIn(adata, type_='functional', do_label=False, show_axes=False)"
+failure_fixes:
+  - when: "adata.uns['cellchat'] is missing"
+    suggest:
+      - "Run the CellChat pipeline (computeCommunProb etc.) first to populate adata.uns['cellchat']."
+    explanation: "Raises ValueError(\"adata.uns['cellchat'] is missing.\") from _ensure_cellchat."
+  - when: "similarity[type_] is missing"
+    suggest:
+      - "Run computeNetSimilarity(adata, type_='functional') (or 'structural') first."
+    explanation: "Raises ValueError(f\"similarity[{type_!r}] missing; run computeNetSimilarity.\")."
+  - when: "similarity[type_]['dr']['single'] is missing"
+    suggest:
+      - "Run netEmbedding() after computeNetSimilarity()."
+    explanation: "Raises ValueError mentioning \"run netEmbedding\"."
+  - when: "similarity[type_]['group']['single'] is missing"
+    suggest:
+      - "Run netClustering() after netEmbedding()."
+    explanation: "Raises ValueError mentioning \"run netClustering\"."
+related:
+  - spatialcellchat.computeNetSimilarity
+  - spatialcellchat.netEmbedding
+  - spatialcellchat.netClustering
+  - spatialcellchat.netVisual_embedding

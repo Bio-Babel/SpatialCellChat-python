@@ -1,0 +1,67 @@
+id: spatialcellchat.identifyOverExpressedLigandReceptor
+import_path: spatialcellchat.de.identifyOverExpressedLigandReceptor
+kind: function
+signature: >-
+  identifyOverExpressedLigandReceptor(adata: ad.AnnData, db: dict[str,
+  pd.DataFrame], *, features_name: str = "features", features:
+  Optional[Sequence[str]] = None) -> pd.DataFrame
+purpose: Rewrite the per-cluster over-expressed-gene markers table as ligand/receptor and complex symbols.
+description: >
+  Direct port of R's identifyOverExpressedLigandReceptor (utilities.R:1417).
+  Reads the markers.all table written by identifyOverExpressedGenes at
+  uns["cellchat"]["DE"]["<features_name>.info"] (optionally restricted to
+  `features` first). For each row, if the gene symbol appears directly in
+  db["interaction"]'s ligand or receptor columns, the row is kept as-is;
+  otherwise the gene's subunit-columns in db["complex"] are scanned, and one
+  copy of the row is emitted per complex whose subunit list contains that
+  gene (with the "features" cell rewritten to the complex name); rows that
+  match neither are dropped. The result is written into
+  uns["cellchat"]["DE"]["<features_name>.LR"].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object whose uns["cellchat"]["DE"]["<features_name>.info"] table was
+      populated by identifyOverExpressedGenes.
+  - name: db
+    type: dict[str, pandas.DataFrame]
+    required: true
+    default: null
+    description: CellChatDB dict; must contain "interaction" (ligand/receptor columns) and "complex" (subunit columns) keys.
+  - name: features_name
+    type: str
+    required: false
+    default: features
+    description: Key under uns["cellchat"]["DE"] whose "<features_name>.info" table is consumed.
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict the input markers table to these gene symbols before expansion.
+returns: >-
+  A pandas.DataFrame: the filtered/expanded markers table (one row per
+  direct ligand/receptor match or per matching complex). The same DataFrame
+  is also written into uns["cellchat"]["DE"]["<features_name>.LR"].
+mutates: >-
+  execution_class=builder; mutates
+  adata.uns['cellchat']['DE']['<features_name>.LR'] in place;
+  returns_kind=new_object (returns the expanded markers DataFrame, not adata
+  itself)
+requires:
+  - uns.cellchat.DE.features.info
+writes:
+  - uns.cellchat.DE.features.LR
+examples:
+  - 'de.identifyOverExpressedLigandReceptor(adata.copy(), db)'
+  - 'de.identifyOverExpressedLigandReceptor(adata.copy(), db, features=["TGFB1"])'
+failure_fixes:
+  - when: "uns['cellchat']['DE']['<features_name>.info'] is missing"
+    suggest:
+      - "Run identifyOverExpressedGenes(adata, ...) first so DE['<features_name>.info'] is populated."
+    explanation: >-
+      Raises ValueError("adata.uns['cellchat']['DE']['<features_name>.info']
+      missing — run identifyOverExpressedGenes() first").
+related:
+  - spatialcellchat.identifyOverExpressedGenes

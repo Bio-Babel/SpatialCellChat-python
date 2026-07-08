@@ -1,0 +1,40 @@
+id: spatialcellchat.thresholdedMean
+import_path: spatialcellchat.thresholdedMean
+kind: function
+signature: 'thresholdedMean(x: ''ArrayLike'', trim: ''float'' = 0.1, na_rm: ''bool''
+  = True) -> ''float'''
+purpose: Mean of ``x`` if the fraction of non-zero elements is at least ``trim``.
+description: >
+  Direct port of R's thresholdedMean (modeling.R:2591). Computes the
+  proportion of non-zero entries in x; if that proportion is below `trim`,
+  returns 0.0 instead of averaging. Otherwise returns the (optionally
+  NaN-aware) mean of x. Mirrors R's Matrix::nnzero NA-propagation
+  behaviour: if x contains any NaN, the non-zero-count comparison itself
+  is undefined in R ("missing value where TRUE/FALSE needed"), so this
+  port raises ValueError up front when any NaN is present, rather than
+  silently treating NaN as zero or dropping it before the threshold check.
+parameters:
+- name: x
+  type: ArrayLike
+  required: true
+  default: null
+- name: trim
+  type: float
+  required: false
+  default: 0.1
+- name: na_rm
+  type: bool
+  required: false
+  default: true
+mutates: "execution_class=pure_function; no in-place mutation of `x`; returns_kind=new_object"
+returns: float
+requires: []
+writes: []
+examples:
+  - "thresholdedMean(np.array([0, 0, 0, 0, 0, 1.0]), trim=0.1)"
+  - "thresholdedMean(np.array([2.0, 3.0, 4.0, 5.0, 0.0]), trim=0.5)"
+failure_fixes:
+  - when: 'ValueError: missing value where TRUE/FALSE needed'
+    suggest:
+      - thresholdedMean raises when `x` contains any NaN (mirrors R's Matrix::nnzero NA propagation); drop or impute NaNs in `x` before calling.
+related: []

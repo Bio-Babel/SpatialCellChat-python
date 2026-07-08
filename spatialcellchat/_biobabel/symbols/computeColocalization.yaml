@@ -1,0 +1,115 @@
+id: spatialcellchat.computeColocalization
+import_path: spatialcellchat.spatial.computeColocalization
+kind: function
+signature: >-
+  computeColocalization(coordinates: Union[np.ndarray, pd.DataFrame,
+  ad.AnnData], group: Union[Sequence, pd.Categorical, None] = None,
+  idents_use: Optional[Sequence] = None, symmetric: bool = True, nboot: int =
+  100, seed_use: int = 1, permutations: Optional[Dict[Tuple[int, int],
+  np.ndarray]] = None) -> pd.DataFrame
+purpose: Compute a permutation-based colocalisation (FDR-like) matrix between cell-group labels.
+description: >
+  Direct port of R's computeColocalization (spatial.R:660). group is
+  coerced to a pandas.Categorical. For every ordered pair (i, j) of
+  considered group labels: (1) compute the pairwise Euclidean distance
+  matrix from cells in label_i to cells in label_j; (2) reduce it to the
+  median of per-row mean distances (the observed statistic); (3) draw
+  nboot permutations of label_i's row-set by sampling (without
+  replacement) len(label_i) indices from the cells outside both labels
+  (R's data_nont) — using the caller-supplied permutations dict when given
+  (keyed by 1-based (i, j), letting tests reproduce R's exact
+  Mersenne-Twister draws bit-for-bit), else drawing fresh with
+  numpy.random.default_rng(seed_use) re-seeded per pair; (4) recompute the
+  same observed-statistic on each permuted draw and set
+  fdr[i, j] = (#permuted-medians <= observed) / nboot. When symmetric=True
+  (default) and there are >= 2 considered labels, the matrix is symmetrised
+  by taking the elementwise minimum of fdr[i, j] and fdr[j, i]. When
+  coordinates is an AnnData, its obsm["spatial"] supplies the coordinates
+  and the result DataFrame is additionally stashed under
+  uns["cellchat"]["spatial"]["computeColocalization"]. Note: R's set.seed /
+  Mersenne-Twister stream is not portable to numpy, so exact bit-parity
+  with R requires passing permutations= with R-dumped permutation matrices
+  (as the test suite does); otherwise numpy's own RNG stream is used.
+parameters:
+  - name: coordinates
+    type: Union[numpy.ndarray, pandas.DataFrame, anndata.AnnData]
+    required: true
+    default: null
+    description: >-
+      (n, 2) coordinate matrix, or an AnnData whose obsm["spatial"] holds
+      those coordinates.
+  - name: group
+    type: Union[Sequence, pandas.Categorical, None]
+    required: false
+    default: null
+    description: Per-cell group/ident labels (must be provided; raises if None).
+  - name: idents_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: "Restrict the output matrix to these idents (R: idents.use). Defaults to all observed levels of group."
+  - name: symmetric
+    type: bool
+    required: false
+    default: true
+    description: "Symmetrise the result by the per-pair elementwise minimum (R: symmetric)."
+  - name: nboot
+    type: int
+    required: false
+    default: 100
+    description: "Number of permutation draws per (i, j) pair (R: nboot)."
+  - name: seed_use
+    type: int
+    required: false
+    default: 1
+    description: >-
+      RNG seed (R: seed.use). Re-seeds numpy.random.default_rng per (i, j)
+      pair when drawing fresh permutations (only used if permutations= is
+      not supplied for that pair).
+  - name: permutations
+    type: "Optional[Dict[Tuple[int, int], numpy.ndarray]]"
+    required: false
+    default: null
+    description: >-
+      Pre-generated permutation index matrices keyed by 1-based (i, j),
+      shape (len(label_i), nboot), 1-based indices into the "outside both
+      labels" cell pool. Lets callers reproduce R-dumped permutations
+      bit-for-bit instead of drawing fresh ones.
+returns: >-
+  A new pandas.DataFrame, square (numCluster x numCluster) where numCluster
+  is len(idents_use) if given else the number of levels of group, indexed
+  and columned by the considered idents, holding the fraction of
+  permutation draws whose median distance statistic exceeds the observed
+  one (lower values indicate stronger spatial colocalisation).
+mutates: >-
+  execution_class=builder (only when coordinates is an anndata.AnnData);
+  mutates adata.uns['cellchat']['spatial']['computeColocalization'] in
+  place; returns_kind=new_object (the returned DataFrame is always a new
+  object; when coordinates is a plain ndarray/DataFrame there is no
+  mutation at all — execution_class=pure_function in that case)
+requires:
+  - obsm.spatial
+writes:
+  - uns.cellchat.spatial.computeColocalization
+examples:
+  - "res = computeColocalization(coords, group, nboot=50, seed_use=1, permutations=perms)"
+  - "res = computeColocalization(coords, group, symmetric=False, nboot=30, seed_use=1)"
+  - "res = computeColocalization(adata, adata.obs['active_ident'], nboot=5, seed_use=1)"
+failure_fixes:
+  - when: "group is None"
+    suggest:
+      - "Pass group= as a categorical/factor of per-cell labels."
+    explanation: >-
+      computeColocalization raises ValueError("Please input the `group` as
+      a factor!") when group is None.
+  - when: "coordinates does not coerce to a two-column (n, 2) matrix"
+    suggest:
+      - "Pass an (n, 2) array/DataFrame of x/y coordinates, or an AnnData with a two-column obsm['spatial']."
+    explanation: >-
+      computeColocalization (via the shared _coords_to_array helper) raises
+      ValueError("Please check the input 'coordinates' and make sure it is
+      a two column matrix.") when the coerced array is not 2-D with exactly
+      2 columns.
+related:
+  - spatialcellchat.computeCellDistance
+  - spatialcellchat.computeRegionDistance

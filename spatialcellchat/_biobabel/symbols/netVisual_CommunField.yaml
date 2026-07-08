@@ -1,0 +1,175 @@
+id: spatialcellchat.netVisual_CommunField
+import_path: spatialcellchat.viz_spatial.netVisual_CommunField
+kind: function
+signature: >-
+  netVisual_CommunField(adata: ad.AnnData, signaling: str, slot_name: str =
+  "netP", pattern: str = "incoming", zoom_to: int = 0, zoom_mode: bool =
+  True, anchor_x: float = 0.5, anchor_y: float = 0.5, color_use:
+  Optional[Sequence[str]] = None, point_size: float = 2.0, min_mag: float =
+  0.0, alpha_image: float = 0.2, arrow_angle: float = 15.0, arrow_length:
+  float = 0.6, arrow_size: float = 1.0, arrow_color: Optional[str] = None,
+  legend_size: float = 0.5, legend_text_size: int = 8, plot_title_name:
+  Optional[str] = None, plot_title_text_size: int = 8, lib_id: str =
+  "slice1", image_key: Optional[str] = "lowres") -> Figure
+purpose: Per-spot communication-direction-field arrows overlaid on a spatial scatter of cell groups.
+description: >
+  Mirrors R's netVisual_CommunField (visualization.R:5292). Reads the
+  per-spot 2-D vector field for signaling/pattern from
+  uns["cellchat"][slot_name]["field"][pattern] (written by
+  computeCommunField), passes it through _swap_field (a documented no-op
+  pass-through in this port — see audit M-VIZ-6 — because both
+  obsm["spatial"] and the computeCommunField output already share the same
+  XY frame), and draws one matplotlib scatter series per idents category
+  plus a quiver of arrows for spots whose field magnitude exceeds min_mag.
+  Supports an optional rectangular "zoom" grid: when zoom_to >= 1 the plot
+  area is split into (zoom_to + 1) x (zoom_to + 1) cells and the cell
+  containing (anchor_x, anchor_y) (fractional plot coordinates) is
+  highlighted (zoom_mode=True, brighter alpha) or isolated (zoom_mode=False,
+  all other spots dropped).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] and a computed communication field under uns["cellchat"][slot_name]["field"][pattern][signaling].
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Pathway or LR-pair name to look up in the field dict.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" (pathway-level) or "net" (LR-pair level) field container.'
+  - name: pattern
+    type: str
+    required: false
+    default: incoming
+    description: '"incoming" or "outgoing" direction; any other value raises ValueError.'
+  - name: zoom_to
+    type: int
+    required: false
+    default: 0
+    description: Number of extra grid subdivisions per axis (0 disables zooming); negative values raise ValueError.
+  - name: zoom_mode
+    type: bool
+    required: false
+    default: true
+    description: When True, highlight the anchored zoom cell in place; when False, drop all spots outside it.
+  - name: anchor_x
+    type: float
+    required: false
+    default: 0.5
+    description: Fractional x-position (0-1) selecting the zoom cell.
+  - name: anchor_y
+    type: float
+    required: false
+    default: 0.5
+    description: Fractional y-position (0-1) selecting the zoom cell.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-ident-category colors; falls back to scPalette.
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Spot marker size.
+  - name: min_mag
+    type: float
+    required: false
+    default: 0.0
+    description: Minimum field-vector magnitude required to draw an arrow at a spot.
+  - name: alpha_image
+    type: float
+    required: false
+    default: 0.2
+    description: Baseline spot opacity (raised slightly inside a highlighted zoom cell).
+  - name: arrow_angle
+    type: float
+    required: false
+    default: 15.0
+    description: Arrow head-width scaling factor for the quiver plot.
+  - name: arrow_length
+    type: float
+    required: false
+    default: 0.6
+    description: Arrow head-length scaling factor.
+  - name: arrow_size
+    type: float
+    required: false
+    default: 1.0
+    description: Inverse scale factor for arrow length (quiver scale=1/arrow_size).
+  - name: arrow_color
+    type: Optional[str]
+    required: false
+    default: null
+    description: Single color for all arrows; defaults to per-spot ident color when None.
+  - name: legend_size
+    type: float
+    required: false
+    default: 0.5
+    description: Legend marker scale.
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Legend font size.
+  - name: plot_title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: 'Figure title; defaults to "Outgoing/Incoming communication field of {signaling}".'
+  - name: plot_title_text_size
+    type: int
+    required: false
+    default: 8
+    description: Title font size.
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background ("lowres"/"hires"), or None to skip the image.
+returns: A new matplotlib.figure.Figure with a spatial scatter of cell groups plus quiver arrows for the communication field.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"],
+  adata.obs (idents), and uns["cellchat"][slot_name]["field"][pattern]; does
+  not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - uns.cellchat.netP.field.incoming
+  - uns.cellchat.netP.field.outgoing
+writes: []
+examples:
+  - 'scc.netVisual_CommunField(adata, signaling="PathA")'
+  - 'scc.netVisual_CommunField(adata, signaling="PathA", pattern="outgoing")'
+  - 'scc.netVisual_CommunField(adata, signaling="PathA", zoom_to=1, anchor_x=0.5, anchor_y=0.5)'
+failure_fixes:
+  - when: pattern is not "incoming" or "outgoing"
+    suggest:
+      - Pass pattern="incoming" or pattern="outgoing".
+    explanation: 'Raises ValueError("pattern must be ''incoming'' or ''outgoing''.").'
+  - when: zoom_to is negative
+    suggest:
+      - Pass zoom_to >= 0.
+    explanation: "Raises ValueError(\"Please check your `zoom.to`!\")."
+  - when: uns["cellchat"][slot_name] or its ["field"][pattern][signaling] entry is missing
+    suggest:
+      - Run computeCommunField(adata, slot_name=...) before plotting.
+    explanation: >-
+      The internal _resolve_field helper raises ValueError("Please check the
+      input 'signaling' and make sure it has been computed via
+      `computeCommunField`.") when slot_name, the field block, the pattern,
+      or the signaling key is absent.
+related:
+  - spatialcellchat.computeCommunField
+  - spatialcellchat.netVisual_CommunFieldGrid
+  - spatialcellchat.netVisual_CommunFieldZoomIn
+  - spatialcellchat.netVisual_CommunFlow

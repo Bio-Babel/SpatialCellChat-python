@@ -1,0 +1,215 @@
+id: spatialcellchat.netVisual_diffInteraction
+import_path: spatialcellchat.viz_network.netVisual_diffInteraction
+kind: function
+signature: >-
+  netVisual_diffInteraction(adata_list: Sequence[ad.AnnData], comparison:
+  Sequence[int] = (1, 2), measure: str = "count", color_use:
+  Optional[Sequence[str]] = None, color_edge: Sequence[str] = ("#b2182b",
+  "#2166ac"), title_name: Optional[str] = None, sources_use:
+  Optional[Sequence] = None, targets_use: Optional[Sequence] = None,
+  remove_isolate: bool = False, top: float = 1.0, weight_scale: bool = False,
+  vertex_weight: Union[float, Sequence[float]] = 20, vertex_weight_max:
+  Optional[float] = None, vertex_size_max: float = 15.0, vertex_label_cex:
+  float = 1.0, vertex_label_color: str = "black", edge_weight_max:
+  Optional[float] = None, edge_width_max: float = 8.0, alpha_edge: float =
+  0.6, label_edge: bool = False, edge_label_color: str = "black",
+  edge_label_cex: float = 0.8, edge_curved: float = 0.2, shape: str =
+  "circle", margin: float = 0.2, arrow_width: float = 1.0, arrow_size: float =
+  0.2, figsize: Tuple[float, float] = (6.0, 6.0)) -> Figure
+purpose: Circle-layout graph of the differential interaction count/strength between two datasets.
+description: >
+  Direct port of R's netVisual_diffInteraction (visualization.R:2387). This
+  is the two-dataset comparison entry point: it requires >= 2 AnnDatas
+  (mirroring R's `is.list(object@net[[1]])` merged-object discriminator)
+  and reads `adata_list[comparison[0]-1].uns['cellchat']['net'][measure]`
+  and `adata_list[comparison[1]-1].uns['cellchat']['net'][measure]` (both
+  must be present, with `measure` in {"count","weight","count.merged",
+  "weight.merged"}), reindexing onto the joint cell-group level set when
+  the two datasets' idents differ (missing cells filled with 0). Computes
+  `net_diff = obj2 - obj1`, applies sources_use/targets_use filtering and
+  optional remove_isolate, thresholds |net_diff| to its top `top`
+  quantile, then renders a circle layout (same vertex/edge geometry as
+  netVisual_circle) with edges coloured red (`color_edge[0]`) for positive
+  differences (interaction increased from dataset 1 to 2) and blue
+  (`color_edge[1]`) for negative differences. Pure reader over the input
+  AnnDatas; does not mutate either object.
+parameters:
+  - name: adata_list
+    type: Sequence[anndata.AnnData]
+    required: true
+    default: null
+    description: Per-dataset CellChat-state AnnDatas, len >= 2. R's mergeCellChat(list(c1, c2)) is a no-op here — pass [adata_ctrl, adata_treat] directly.
+  - name: comparison
+    type: Sequence[int]
+    required: false
+    default: (1, 2)
+    description: 1-based indices into adata_list selecting the two datasets to diff (net2 - net1).
+  - name: measure
+    type: str
+    required: false
+    default: "count"
+    description: '"count", "weight", "count.merged", or "weight.merged" — which uns["cellchat"]["net"][measure] matrix to diff. Raises ValueError for any other value.'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colours. Defaults to scPalette(n).
+  - name: color_edge
+    type: Sequence[str]
+    required: false
+    default: ("#b2182b", "#2166ac")
+    description: (positive-difference colour, negative-difference colour) for edges.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title. Defaults to "Differential number of interactions" (count[.merged]) or "Differential interaction strength" (weight[.merged]).
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these source cell groups (names or 1-based indices).
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these target cell groups (names or 1-based indices).
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop cell groups whose row-sum and column-sum of net_diff are both zero.
+  - name: top
+    type: float
+    required: false
+    default: 1.0
+    description: Keep only |net_diff| entries >= the (1-top) quantile of |net_diff|.
+  - name: weight_scale
+    type: bool
+    required: false
+    default: false
+    description: Scale edge width by |weight|/edge_weight_max instead of |weight| directly.
+  - name: vertex_weight
+    type: Union[float, Sequence[float]]
+    required: false
+    default: 20
+    description: Per-group vertex size driver (scalar or per-group sequence).
+  - name: vertex_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Normalisation max for vertex_weight. Defaults to max(vertex_weight).
+  - name: vertex_size_max
+    type: float
+    required: false
+    default: 15.0
+    description: Max vertex marker scale factor.
+  - name: vertex_label_cex
+    type: float
+    required: false
+    default: 1.0
+    description: Vertex label font-size scale; labels are hidden when <= 0.
+  - name: vertex_label_color
+    type: str
+    required: false
+    default: "black"
+    description: Vertex label text colour.
+  - name: edge_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Normalisation max for edge width when weight_scale=True. Defaults to the max |net_diff| entry.
+  - name: edge_width_max
+    type: float
+    required: false
+    default: 8.0
+    description: Maximum additional edge linewidth contribution.
+  - name: alpha_edge
+    type: float
+    required: false
+    default: 0.6
+    description: Edge colour alpha (opacity).
+  - name: label_edge
+    type: bool
+    required: false
+    default: false
+    description: Accepted for API parity; edge-weight text labels are not drawn by this implementation.
+  - name: edge_label_color
+    type: str
+    required: false
+    default: "black"
+    description: Accepted for API parity (unused; see label_edge).
+  - name: edge_label_cex
+    type: float
+    required: false
+    default: 0.8
+    description: Accepted for API parity (unused; see label_edge).
+  - name: edge_curved
+    type: float
+    required: false
+    default: 0.2
+    description: Bezier curvature factor for edges (0 = straight line).
+  - name: shape
+    type: str
+    required: false
+    default: "circle"
+    description: Accepted for R API parity; vertex marker shape is not varied by this implementation.
+  - name: margin
+    type: float
+    required: false
+    default: 0.2
+    description: Fractional axis-limit padding around the vertex layout.
+  - name: arrow_width
+    type: float
+    required: false
+    default: 1.0
+    description: Arrowhead line-width multiplier.
+  - name: arrow_size
+    type: float
+    required: false
+    default: 0.2
+    description: Arrowhead size multiplier.
+  - name: figsize
+    type: Tuple[float, float]
+    required: false
+    default: (6.0, 6.0)
+    description: Matplotlib figure size in inches.
+returns: >-
+  A new matplotlib.figure.Figure with a circular layout showing edges
+  colored by the sign of the count/weight difference between the two
+  datasets. Does not modify either input AnnData.
+mutates: >-
+  execution_class=pure_function; reads
+  adata_list[i].uns['cellchat']['net'][measure] for the two compared
+  datasets only, does not mutate any AnnData; returns_kind=new_object
+requires:
+  - uns.cellchat.net.count
+writes: []
+examples:
+  - "scc.netVisual_diffInteraction([adata_ctrl, adata_treat], comparison=(1, 2), measure='count')"
+  - "scc.netVisual_diffInteraction([adata_ctrl, adata_treat], measure='weight', weight_scale=True)"
+failure_fixes:
+  - when: "measure is not one of 'count', 'weight', 'count.merged', 'weight.merged'"
+    suggest:
+      - "Pass measure='count', 'weight', 'count.merged', or 'weight.merged'."
+    explanation: >-
+      netVisual_diffInteraction raises ValueError(f"Unknown measure:
+      {measure}") for any other value.
+  - when: "fewer than 2 AnnDatas are passed in adata_list"
+    suggest:
+      - "Pass a list/sequence of at least 2 AnnDatas, e.g. [adata_ctrl, adata_treat]."
+    explanation: >-
+      netVisual_diffInteraction raises ValueError("netVisual_diffInteraction
+      requires at least 2 AnnDatas ... single dataset!") when
+      len(adata_list) < 2.
+  - when: "uns['cellchat']['net'][measure] is missing on either compared dataset"
+    suggest:
+      - "Run aggregateNet(adata) on both datasets before calling netVisual_diffInteraction."
+    explanation: >-
+      netVisual_diffInteraction raises ValueError(f"adata_list[{i}].uns['cellchat']['net'][{measure!r}]
+      is missing — run aggregateNet first.") when either dataset's net dict
+      lacks the requested measure.
+related:
+  - spatialcellchat.netVisual_circle
+  - spatialcellchat.aggregateNet
+

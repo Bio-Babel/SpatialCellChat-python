@@ -1,0 +1,102 @@
+id: spatialcellchat.projectData
+import_path: spatialcellchat.preprocessing.projectData
+kind: function
+signature: >-
+  projectData(adata: ad.AnnData, adjMatrix: Union[np.ndarray,
+  sparse.spmatrix, pd.DataFrame], alpha: float = 0.5, normalizeAdjMatrix: str
+  = "rows", layer_in: str = "data_signaling", layer_out: str =
+  "data_project", adj_gene_names: Optional[Sequence[str]] = None) ->
+  ad.AnnData
+purpose: Smooth gene expression over a protein-protein-interaction (PPI) network via a random-walk-with-restart solve.
+description: >
+  Direct port of R's projectData (utilities.R:1603..1734, glueing the
+  private l1NormalizeRows/l1NormalizeColumns, projectOnNetwork,
+  randomWalkBySolve and projectFromNetworkRecombine helpers). Reads
+  adata.layers[layer_in] (cells x genes; default "data_signaling", the layer
+  written by preProcessing/subsetData), transposes to genes x cells,
+  projects it onto the adjacency matrix's gene index (missing genes filled
+  with 0), solves (I - alpha * A_norm) x = (1 - alpha) * E via
+  scipy.sparse.linalg.spsolve (or numpy.linalg.solve as a dense fallback),
+  recombines the solved rows back onto the original gene index, transposes
+  back to cells x genes, and writes the result to adata.layers[layer_out].
+  Per modeling.py's computeCommunProb docstring, this "data_project" layer
+  is what gets consumed when computeCommunProb is called with raw_use=False.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object, modified in place.
+  - name: adjMatrix
+    type: numpy.ndarray | scipy.sparse.spmatrix | pandas.DataFrame
+    required: true
+    default: null
+    description: >-
+      Square PPI adjacency matrix with non-zero row and column sums. If a
+      DataFrame, its index supplies the gene names (adj_gene_names is then
+      ignored).
+  - name: alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Restart-probability complement; must lie strictly in (0, 1).
+  - name: normalizeAdjMatrix
+    type: str
+    required: false
+    default: '"rows"'
+    description: '"rows" or "columns" — which axis of adjMatrix to L1-normalise before the solve.'
+  - name: layer_in
+    type: str
+    required: false
+    default: '"data_signaling"'
+    description: Layer holding the (cells x genes) expression to project.
+  - name: layer_out
+    type: str
+    required: false
+    default: '"data_project"'
+    description: >-
+      Layer name for the projected matrix (cells x genes). Canonical store
+      for R's chat@data.project slot (see
+      spatialcellchat._anndata.DATA_SLOT_TO_LAYER).
+  - name: adj_gene_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Required when adjMatrix is a plain ndarray/sparse matrix (ignored for DataFrame input).
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData).
+mutates: >-
+  execution_class=builder; mutates adata.layers[layer_out] in place;
+  returns_kind=same_object
+requires:
+  - "alpha must satisfy 0 < alpha < 1"
+  - "normalizeAdjMatrix must be 'rows' or 'columns'"
+  - "adjMatrix must be square"
+  - "adjMatrix must have non-zero row and column sums"
+  - "adj_gene_names must be supplied when adjMatrix is not a pandas.DataFrame"
+  - "adata.layers[layer_in] must already exist (e.g. written by subsetData/preProcessing)"
+writes:
+  - layers.data_project
+examples:
+  - pp.projectData(A, adj_df, alpha=0.5, normalizeAdjMatrix="rows")
+  - pp.projectData(A, ppi_ndarray, alpha=0.5, adj_gene_names=list(A.var_names))
+failure_fixes:
+  - when: ValueError "alpha must be a number in (0, 1)."
+    suggest:
+      - pass a numeric alpha strictly between 0 and 1.
+  - when: ValueError "normalizeAdjMatrix must be 'rows' or 'columns'."
+    suggest:
+      - pass one of these two literal strings.
+  - when: ValueError "adjMatrix must be square."
+    suggest:
+      - pass a square PPI adjacency matrix.
+  - when: ValueError "PPI cannot have zero rows/columns."
+    suggest:
+      - remove or fix genes/nodes with all-zero adjacency rows or columns.
+  - when: ValueError "adj_gene_names is required when adjMatrix is a plain ndarray."
+    suggest:
+      - either pass a pandas.DataFrame adjMatrix (index = gene names) or supply adj_gene_names explicitly.
+related:
+  - spatialcellchat.preProcessing
+  - spatialcellchat.subsetData
+  - spatialcellchat.computeCommunProb

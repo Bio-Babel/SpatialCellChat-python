@@ -1,0 +1,131 @@
+id: spatialcellchat.makeGridSpatialCellChat
+import_path: spatialcellchat.spatial.makeGridSpatialCellChat
+kind: function
+signature: >-
+  makeGridSpatialCellChat(adata: ad.AnnData, layer: Optional[str] = None,
+  cellsize: Union[float, Tuple[float, float]] = (5.0, 5.0), what:
+  Literal["polygons", "corners", "centers"] = "polygons", square: bool =
+  True, idents_ties_method: Literal["first", "last", "random"] = "first",
+  group_by: str = "active_ident", spatial_factors: Optional[Dict[str,
+  float]] = None) -> ad.AnnData
+purpose: Aggregate an AnnData's spots into a regular grid of square (or hex) super-spots.
+description: >
+  Direct port of R's makeGridSpatialCellChat (spatial.R:326). Builds a
+  cellsize-sized grid covering the bounding box of adata.obsm["spatial"]
+  (via the shared geopandas/shapely _make_grid_within helper, which
+  replaces R's sf::st_make_grid + sf::st_intersects), assigns each spot to
+  every grid cell it intersects, then for each non-empty grid cell computes
+  the per-grid mean of the expression matrix (adata.X, or adata.layers[layer]
+  when layer is given — R: data.slot) and the per-grid mean of the spatial
+  coordinates. The dominant ident per grid is chosen by majority vote over
+  the group_by obs column (ties broken per idents_ties_method: "first"
+  picks the first-occurring level via argmax, "last" the last-occurring,
+  "random" a uniform choice among tied levels using
+  numpy.random.default_rng(0)). Grids containing zero spots are dropped.
+  New spot names are "Grid<k>" (1-based grid id). spatial_factors (or, if
+  not given, adata.uns["cellchat"]["spatial.factors"]) supplies "ratio";
+  the new AnnData's spatial.factors["tol"] is recomputed as
+  (cellsize[0] * ratio) / 2. The returned AnnData is a brand-new object —
+  the input adata is read but never mutated in place.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Spatial AnnData to aggregate. Must have obsm["spatial"] and a
+      group_by column in obs. Raises ValueError if it is not an AnnData.
+  - name: layer
+    type: Optional[str]
+    required: false
+    default: null
+    description: "Layer name to aggregate from (R: data.slot). Defaults to adata.X when None."
+  - name: cellsize
+    type: Union[float, Tuple[float, float]]
+    required: false
+    default: (5.0, 5.0)
+    description: "Grid cell-size in coordinate units, either a scalar (square in both axes) or an (x, y) pair (R: cellsize)."
+  - name: what
+    type: 'Literal["polygons", "corners", "centers"]'
+    required: false
+    default: polygons
+    description: "Grid geometry kind passed to the grid-construction helper (R: what)."
+  - name: square
+    type: bool
+    required: false
+    default: true
+    description: "Whether the grid is square (True) or hexagonal (False) (R: square)."
+  - name: idents_ties_method
+    type: 'Literal["first", "last", "random"]'
+    required: false
+    default: first
+    description: >-
+      Tie-breaker used by the per-grid dominant-ident majority vote (R:
+      ties.method, passed to base::max.col). Raises ValueError if not one
+      of "first", "last", "random".
+  - name: group_by
+    type: str
+    required: false
+    default: active_ident
+    description: adata.obs column used as the per-cell ident labels for the majority vote. Raises ValueError if absent from adata.obs.
+  - name: spatial_factors
+    type: "Optional[Dict[str, float]]"
+    required: false
+    default: null
+    description: >-
+      Mapping with "ratio" (and optionally "tol", which is recomputed
+      regardless). Defaults to adata.uns["cellchat"]["spatial.factors"]
+      when None (ratio treated as 1.0 if that is also absent).
+returns: >-
+  A new anndata.AnnData of grid-aggregated super-spots: X holds the
+  per-grid mean expression (same var/gene set as the input), obs holds the
+  per-ident spot counts per grid plus "cell.type" (dominant ident,
+  categorical over the input's group_by levels), "spots.counts", and
+  "active_ident" (a copy of "cell.type"); obsm["spatial"] and
+  obsm["X_grid"] hold the per-grid mean coordinates; uns["cellchat"] holds
+  the recomputed "spatial.factors" (with the new "tol") and a "spatial"
+  sub-dict with "within_nGrid", "recommended.contact.range" (= cellsize[0] *
+  ratio) and a "makeGridSpatialCellChat" parameter/summary record. The
+  input adata is not modified.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm['spatial'],
+  adata.obs[group_by], adata.X/adata.layers[layer] and
+  adata.uns['cellchat']['spatial.factors'] but does not mutate adata in
+  place; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - obs.active_ident
+writes: []
+examples:
+  - "grid = makeGridSpatialCellChat(adata, cellsize=50.0)"
+  - "grid = makeGridSpatialCellChat(adata, cellsize=200.0)"
+  - "grid = makeGridSpatialCellChat(adata, layer='data_signaling', group_by='cellchat_idents', idents_ties_method='random')"
+failure_fixes:
+  - when: "adata is not an anndata.AnnData"
+    suggest:
+      - "Pass a genuine anndata.AnnData object as adata."
+    explanation: >-
+      makeGridSpatialCellChat raises ValueError("makeGridSpatialCellChat
+      expects an AnnData object") otherwise.
+  - when: "adata.obsm['spatial'] is missing"
+    suggest:
+      - "Set adata.obsm['spatial'] to the spot/cell spatial coordinates before calling makeGridSpatialCellChat."
+    explanation: >-
+      makeGridSpatialCellChat raises ValueError("makeGridSpatialCellChat
+      requires adata.obsm['spatial']") when that slot is absent.
+  - when: "group_by is not a column of adata.obs"
+    suggest:
+      - "Set group_by= to an existing adata.obs column, or add that column to adata.obs first."
+    explanation: >-
+      makeGridSpatialCellChat raises ValueError(f"group_by={group_by!r} not
+      found in adata.obs") when the column is missing.
+  - when: "idents_ties_method is not one of 'first', 'last', 'random'"
+    suggest:
+      - "Pass idents_ties_method as one of 'first', 'last', or 'random'."
+    explanation: >-
+      makeGridSpatialCellChat raises ValueError(f"idents_ties_method must be
+      one of 'first', 'last', 'random' (got {idents_ties_method!r})")
+      otherwise.
+related:
+  - spatialcellchat.computeGridSize
+  - spatialcellchat.computeCellDistance

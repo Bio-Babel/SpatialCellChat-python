@@ -1,0 +1,58 @@
+id: spatialcellchat.computeEigengap
+import_path: spatialcellchat.analysis_network.computeEigengap
+kind: function
+signature: >-
+  computeEigengap(CM: Union[np.ndarray, sparse.spmatrix], tau:
+  Optional[float] = None, tol: float = 0.01) -> Dict[str, Any]
+purpose: Estimate the number of signaling-network clusters via the Laplacian eigengap heuristic.
+description: >
+  Direct port of R's computeEigengap (analysis.R:1669). First runs
+  computeLaplacian(CM, tol=tol) to get K_init = the number of near-zero
+  eigenvalues (lower_bound). If tau is not given, it is chosen from K_init
+  (0.3 for K_init<=5, 0.4 for K_init<=10, 0.5 otherwise). CM is then
+  truncated at tau (values <= tau set to 0), symmetrised
+  ((CM + CM.T) / 2), and a second computeLaplacian call is run on the
+  truncated matrix. upper_bound is the first 1-based index where
+  diff(eigenvalues) attains its maximum (all tied maximal indices are also
+  returned as upper_bound_ties, mirroring R's which(gaps == max(gaps)) which
+  can return multiple indices). The R "gg.obj" plotting slot is dropped;
+  plotting is delegated to the visualisation layer. Used internally by
+  netClustering (methods="kmeans", k=None) to infer the cluster count from a
+  consensus matrix built over a kRange sweep.
+parameters:
+  - name: CM
+    type: "Union[numpy.ndarray, scipy.sparse.spmatrix]"
+    required: true
+    default: null
+    description: Consensus matrix (e.g. the kmeans co-clustering consensus matrix built by netClustering).
+  - name: tau
+    type: Optional[float]
+    required: false
+    default: null
+    description: >-
+      Truncation threshold. When omitted, estimated from K_init = the
+      lower_bound of computeLaplacian(CM, tol=tol): 0.3 (K_init<=5), 0.4
+      (K_init<=10), 0.5 otherwise.
+  - name: tol
+    type: float
+    required: false
+    default: 0.01
+    description: Tolerance for counting near-zero eigenvalues in both computeLaplacian calls.
+returns: >-
+  A new dict {"upper_bound": int, "lower_bound": int, "eigs": dict,
+  "upper_bound_ties": numpy.ndarray}. "eigs" is the dict returned by the
+  second (post-truncation) computeLaplacian call. "upper_bound" is the first
+  1-based index of the maximal Laplacian eigengap; "upper_bound_ties" lists
+  every 1-based index tying for that maximum.
+mutates: >-
+  execution_class=pure_function; makes a local copy of CM and does not mutate
+  the caller's array; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "computeEigengap(CM, tol=0.01)"
+  - "computeEigengap(CM, tau=0.4)"
+failure_fixes: []
+related:
+  - spatialcellchat.computeLaplacian
+  - spatialcellchat.netClustering

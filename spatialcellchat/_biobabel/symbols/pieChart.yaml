@@ -1,0 +1,59 @@
+id: spatialcellchat.pieChart
+import_path: spatialcellchat.viz_basic.pieChart
+kind: function
+signature: >-
+  pieChart(df: pd.DataFrame, label_size: float = 2.5, color_use:
+  Optional[Sequence[str]] = None, title: str = "", ax: Optional[Axes] = None)
+  -> Figure
+purpose: Plot a pie chart with percent labels for a (group, value) data frame.
+description: >
+  Direct port of R's pieChart (database.R:49). The R version uses ggplot2's
+  geom_bar(stat="identity") + coord_polar() with ggrepel percent labels; the
+  Python port renders an equivalent matplotlib.pyplot.pie. Sorts df by
+  value descending (mirrors R's arrange(desc(value))), computes each wedge's
+  percentage of the total (scales::percent, 0-decimal accuracy), draws the
+  pie via ax.pie(...), computes each wedge's mid-angle and a fixed
+  stack-vjust=0.5 radius (0.5) label position, then routes the percent
+  labels through spatialcellchat._text_repel.repel_text so labels avoid
+  overlapping (mirrors ggrepel::geom_text_repel). Draws the group legend
+  below the pie (loc="upper center", bbox_to_anchor=(0.5, -0.05)).
+parameters:
+  - name: df
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Must contain at least the columns "group" and "value"; wedge order follows descending "value" after internal sorting.
+  - name: label_size
+    type: float
+    required: false
+    default: 2.5
+    description: Base font-size multiplier for the percent labels (actual fontsize is label_size * 4).
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit wedge colours (truncated/matched to len(groups)); defaults to scPalette(len(groups)).
+  - name: title
+    type: str
+    required: false
+    default: ''
+    description: Legend title; omitted (None) when empty string.
+  - name: ax
+    type: Optional[matplotlib.axes.Axes]
+    required: false
+    default: null
+    description: Existing axes to draw onto; a new Figure/Axes (4x4 in) is created via plt.subplots() when None.
+returns: The matplotlib.figure.Figure containing the pie (ax.figure when ax was given, else the newly created figure).
+mutates: >-
+  execution_class=pure_function; takes no adata argument — operates purely
+  on the passed-in pandas.DataFrame and draws into the given (or a newly
+  created) matplotlib Axes; does not touch adata.uns/obs/var;
+  returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.pieChart(df, label_size=3.0, title="Category")'
+  - 'scc.pieChart(df, color_use=["#E41A1C", "#377EB8", "#4DAF4A"])'
+failure_fixes: []
+related:
+  - spatialcellchat.showDatabaseCategory

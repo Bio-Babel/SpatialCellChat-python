@@ -1,0 +1,52 @@
+id: spatialcellchat.createCellCellContactMatrixFrom_dspatial
+import_path: spatialcellchat.spatial.createCellCellContactMatrixFrom_dspatial
+kind: function
+signature: >-
+  createCellCellContactMatrixFrom_dspatial(d_spatial: sparse.spmatrix,
+  contact_threshold: float, tol: float) -> sparse.csc_matrix
+purpose: Build the binary cell-cell contact-adjacency matrix from a sparse distance matrix.
+description: >
+  Direct port of R's createCellCellContactMatrixFrom_dspatial (spatial.R:620).
+  Keeps only the entries of d_spatial with distance <= contact_threshold +
+  tol, sets them to 1, then sets the diagonal (positions (k, k) for
+  k = 0..min(n_rows, n_cols)-1) to 1 as well, collapsing any duplicate
+  coordinate to a single 1 (matching R's Matrix::diag<- overwrite
+  semantics). Takes a plain sparse matrix, never an AnnData; it is exercised
+  directly by computeCellDistance, which calls it on the "d.spatial" matrix
+  it just built to derive "adj.contact". Per the porting contract, callers
+  holding an AnnData should generally go through computeCellDistance (which
+  additionally writes obsp["spatial_connectivities"] via
+  squidpy.gr.spatial_neighbors) rather than calling this function directly,
+  though direct use is supported for ad-hoc parity with R.
+parameters:
+  - name: d_spatial
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: Sparse cell-cell distance matrix (R's d.spatial), e.g. the "d.spatial" output of computeCellDistance.
+  - name: contact_threshold
+    type: float
+    required: true
+    default: null
+    description: Contact-distance threshold in microns (R's contact.threshold).
+  - name: tol
+    type: float
+    required: true
+    default: null
+    description: Distance tolerance in microns (R's tol).
+returns: >-
+  A new scipy.sparse.csc_matrix of the same shape as d_spatial: the binary
+  contact adjacency matrix, with entries at 1 wherever the corresponding
+  d_spatial distance is <= contact_threshold + tol, plus a unit diagonal.
+  Does not mutate d_spatial.
+mutates: >-
+  execution_class=pure_function; does not mutate d_spatial or any AnnData;
+  returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "adj_contact = createCellCellContactMatrixFrom_dspatial(d_spatial, contact_threshold=10.0, tol=5.0)"
+  - "adj = createCellCellContactMatrixFrom_dspatial(d, contact_threshold=60, tol=5)"
+failure_fixes: []
+related:
+  - spatialcellchat.computeCellDistance

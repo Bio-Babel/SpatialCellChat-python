@@ -1,0 +1,150 @@
+id: spatialcellchat.StackedVlnPlot
+import_path: spatialcellchat.viz_delegated.StackedVlnPlot
+kind: function
+signature: >-
+  StackedVlnPlot(adata: ad.AnnData, features: Sequence[str], idents:
+  Optional[Sequence[str]] = None, split_by: Optional[str] = None, color_use:
+  Optional[Sequence[str]] = None, colors_ggplot: bool = False, angle_x: float
+  = 90.0, vjust_x: Optional[float] = None, hjust_x: Optional[float] = None,
+  show_text_y: bool = True, line_size: Optional[float] = None, pt_size: float
+  = 0.0, plot_margin: Any = None, show_median: bool = False, median_size:
+  float = 1.0, group_by: Optional[str] = None, swap_axes: bool = False,
+  slot_name: str = "data.signaling", **kwargs: Any) -> Figure
+purpose: Stacked violin plot of gene expression across cell groups, one panel per feature.
+description: >
+  Thin scanpy shim mirroring R's StackedVlnPlot (visualization.R:4010) on top
+  of scanpy.pl.stacked_violin. Resolves group_by via _resolve_group_by
+  (falls back to "cellchat_idents"/"active_ident"/"cell.type" in
+  adata.obs.columns when not given), optionally subsets cells to idents via
+  _subset_idents, translates slot_name to a scanpy layer= kwarg via
+  _slot_to_scanpy_layer (slot_name="data" reads adata.X; otherwise looks up
+  the canonical layer key in DATA_SLOT_TO_LAYER, falling back to adata.X if
+  that layer is absent), then calls sc.pl.stacked_violin(adata_use,
+  var_names=features, groupby=group_by, swap_axes=swap_axes, **kwargs).
+  Applies best-effort post-hoc visual tweaks: x-tick rotation/alignment from
+  angle_x/hjust_x, spine linewidth from line_size, a single per-panel y-tick
+  at the visible ymax when show_text_y=True (R parity:
+  scale_y_continuous(breaks=c(extract_max(p)))), and palette recoloring of
+  violin patches from color_use when provided (ignored when
+  colors_ggplot=True). split_by is accepted for R parity but is not
+  supported by the scanpy delegation — passing it emits a UserWarning and
+  the argument is otherwise ignored. show_median/median_size are reserved
+  (no scanpy equivalent) and have no effect.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData whose adata.X or adata.layers[<slot_name layer>] holds the expression matrix, and whose adata.obs holds the group_by column.
+  - name: features
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Gene names to plot as var_names, one violin panel per feature.
+  - name: idents
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict to cells whose group_by value is in this list (R parity subset on Idents).
+  - name: split_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: Reserved for merged-mode comparison; not supported by the scanpy delegation — if set, a UserWarning is emitted and it is ignored.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Palette applied to violin patches post-hoc (best effort); ignored when colors_ggplot=True.
+  - name: colors_ggplot
+    type: bool
+    required: false
+    default: false
+    description: When True, suppresses use of color_use so scanpy's default palette is kept.
+  - name: angle_x
+    type: float
+    required: false
+    default: 90.0
+    description: X tick-label rotation in degrees; also selects the default vjust_x/hjust_x pair (0/45/90 -> R's defaults table) when those are not given.
+  - name: vjust_x
+    type: Optional[float]
+    required: false
+    default: null
+    description: Vertical justification for x tick labels; defaulted from angle_x when None.
+  - name: hjust_x
+    type: Optional[float]
+    required: false
+    default: null
+    description: Horizontal justification for x tick labels (>=1.0 -> right, <=0.0 -> left, else center); defaulted from angle_x when None.
+  - name: show_text_y
+    type: bool
+    required: false
+    default: true
+    description: When True, set a single y-tick at each panel's visible ymax; when False, clear y-ticks on every axes.
+  - name: line_size
+    type: Optional[float]
+    required: false
+    default: null
+    description: When set, applied as the linewidth of each axes' spines (best-effort visual tweak).
+  - name: pt_size
+    type: float
+    required: false
+    default: 0.0
+    description: Carried for R parity (jitter point size); not directly forwarded to scanpy in this implementation.
+  - name: plot_margin
+    type: Any
+    required: false
+    default: null
+    description: Reserved for R parity (ggplot plot.margin); no effect in the scanpy delegation.
+  - name: show_median
+    type: bool
+    required: false
+    default: false
+    description: Reserved; no scanpy equivalent, has no effect.
+  - name: median_size
+    type: float
+    required: false
+    default: 1.0
+    description: Reserved; no scanpy equivalent, has no effect.
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: obs column defining cell groups; auto-resolved via _resolve_group_by when None.
+  - name: swap_axes
+    type: bool
+    required: false
+    default: false
+    description: Forwarded to scanpy.pl.stacked_violin swap_axes.
+  - name: slot_name
+    type: str
+    required: false
+    default: data.signaling
+    description: Chat data slot to read expression from; translated to a scanpy layer= kwarg via _slot_to_scanpy_layer ("data" means adata.X). Raises ValueError if not "data" and not a recognised key in DATA_SLOT_TO_LAYER.
+  - name: kwargs
+    type: Any
+    required: false
+    default: null
+    description: Forwarded to sc.pl.stacked_violin (show and return_fig default to False/True respectively unless overridden).
+returns: >-
+  A matplotlib.figure.Figure containing one stacked-violin panel per
+  feature (scanpy's StackedViolin wrapper's underlying figure, with
+  post-hoc tick/label/palette adjustments applied).
+mutates: >-
+  execution_class=pure_function; reads adata.X/adata.layers and adata.obs
+  only, does not mutate adata; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.StackedVlnPlot(adata, features=['Tgfb1', 'Tgfbr1'])"
+  - "scc.StackedVlnPlot(adata, features=genes, group_by='cellchat_idents', color_use=['#FF0000', '#0000FF'])"
+failure_fixes:
+  - when: "slot_name is not \"data\" and not a recognised key in DATA_SLOT_TO_LAYER"
+    suggest:
+      - "Pass slot_name=\"data\" for the raw matrix, or one of the canonical DATA_SLOT_TO_LAYER keys (e.g. \"data.signaling\")."
+    explanation: >-
+      _slot_to_scanpy_layer raises ValueError("Unknown slot_name ...; expected
+      one of ...") for any slot_name outside {"data"} | DATA_SLOT_TO_LAYER.keys().
+related:
+  - spatialcellchat.dotPlot
+  - spatialcellchat.plotGeneExpression

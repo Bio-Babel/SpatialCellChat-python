@@ -1,0 +1,93 @@
+id: spatialcellchat.subsetData
+import_path: spatialcellchat.preprocessing.subsetData
+kind: function
+signature: >-
+  subsetData(adata: ad.AnnData, features: Optional[Sequence[str]] = None,
+  db: Optional[dict] = None, layer_out: str = "data_signaling") -> ad.AnnData
+purpose: Subset the expression matrix to signaling-relevant (or user-supplied) genes and return a fresh AnnData.
+description: >
+  Direct port of R's subsetData (utilities.R:1035). When features is None,
+  the gene set is extractGene(db) (union of all CellChatDB genes)
+  intersected with adata.var_names; when features is given, it is used
+  directly (intersected with adata.var_names). Before subsetting, if db is
+  given and contains "interaction", the annotation column of
+  db["interaction"] is normalised in place (utilities.R:1037-1050 parity):
+  for non-RNA datatype (read from
+  adata.uns["cellchat"]["options"]["datatype"], default "RNA") missing an
+  "annotation" column, one is added with all rows set to "Secreted
+  Signaling" and a UserWarning is emitted; if "annotation" already has more
+  than one distinct value, rows are reordered by the canonical factor level
+  order ["Secreted Signaling", "ECM-Receptor", "Non-protein Signaling",
+  "Cell-Cell Contact"]. Either way db["interaction"] is reassigned in place
+  on the caller's db dict — this is a real side effect on the db argument,
+  independent of the returned AnnData. The gene subset itself is materialised
+  as sub = adata[:, gene_use].copy(); sub.layers[layer_out] = sub.X.copy().
+
+  uns['cellchat'] handling (verified): this function contains no explicit
+  `sub.uns[...]` assignment anywhere in its body. The tutorial
+  (SpatialCellChat_analysis_of_spatial_transcriptomics_data.ipynb, cell 20)
+  calls `sub = scc.subsetData(adata, db=db_use)` and then explicitly runs
+  `sub.uns["cellchat"] = adata.uns["cellchat"]` with the comment "Carry the
+  cellchat container forward (subset returns a fresh AnnData)" — i.e. the
+  documented calling convention treats propagating uns['cellchat'] onto the
+  returned sub as the caller's responsibility, not something subsetData
+  itself writes. (Whether AnnData's own slice+.copy() machinery would have
+  copied adata.uns wholesale onto sub regardless was not exercised here —
+  imports/execution were out of scope for this audit — so this contract
+  follows the verified source + the tutorial's explicit, documented pattern
+  rather than assuming an implicit carry-over.)
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: The input expression object; not mutated (a fresh subset is returned).
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: User-supplied gene set; bypasses the database when given.
+  - name: db
+    type: Optional[dict]
+    required: false
+    default: null
+    description: >-
+      CellChat database (e.g. from load_db). Must be supplied when
+      features is None. Its "interaction" table may be mutated in place
+      (annotation column added/reordered) as a side effect.
+  - name: layer_out
+    type: str
+    required: false
+    default: '"data_signaling"'
+    description: Name of the layer in the returned sub-AnnData that holds a copy of the same sub-matrix (mirrors R's object@data.signaling slot).
+returns: >-
+  A NEW AnnData object (sub = adata[:, gene_use].copy()) restricted to the
+  resolved gene set, with sub.layers[layer_out] holding a copy of sub.X. The
+  input adata is not mutated. sub.uns is not explicitly (re)populated by
+  this function; per the tutorial's documented pattern, callers should
+  manually carry forward sub.uns["cellchat"] = adata.uns["cellchat"] if
+  downstream CellChat state needs to be visible on the returned object.
+mutates: >-
+  execution_class=builder; does not mutate adata; returns a new/fresh
+  AnnData subset; also mutates the caller-supplied db["interaction"]
+  DataFrame in place (annotation column normalisation) as a documented side
+  effect; returns_kind=new_object
+requires:
+  - "either features or db must be provided (db required when features is None)"
+writes:
+  - layers.data_signaling
+examples:
+  - sub = scc.subsetData(adata, db=db_use)
+  - 'sub.uns["cellchat"] = adata.uns["cellchat"]  # tutorial pattern: carry the cellchat container forward (subsetData returns a fresh AnnData)'
+  - sub = pp.subsetData(adata, features=["g1", "g2", "g3"])
+failure_fixes:
+  - when: ValueError "Either `features` or `db` must be provided to subsetData."
+    suggest:
+      - pass one of features or db.
+  - when: UserWarning "A column named `annotation` is required in `object@DB$interaction`..." emitted when datatype != "RNA" and db["interaction"] lacks an annotation column
+    suggest:
+      - expected, not an error; the column is auto-filled with "Secreted Signaling".
+related:
+  - spatialcellchat.extractGene
+  - spatialcellchat.preProcessing
+  - spatialcellchat.normalizeData

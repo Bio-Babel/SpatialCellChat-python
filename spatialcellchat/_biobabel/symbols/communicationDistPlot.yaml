@@ -1,0 +1,89 @@
+id: spatialcellchat.communicationDistPlot
+import_path: spatialcellchat.viz_basic.communicationDistPlot
+kind: function
+signature: >-
+  communicationDistPlot(adata: ad.AnnData, enriched_only: bool = True,
+  density_alpha: float = 0.5) -> Figure
+purpose: Plot the density of cell-cell distances for diffusible vs. contact-dependent communication (Diffusible/Contact split).
+description: >
+  Direct port of R's communicationDistPlot (spatial.R:95). Reads
+  uns["cellchat"]["images"]["result.computeCellDistance"] (set by
+  computeCommunProb; raises ValueError if absent) for "d.spatial" and
+  "adj.contact"; interaction_range comes from
+  uns["cellchat"]["options"]["parameter"]["interaction.range"] (default
+  250.0). When enriched_only=True (default), reads
+  uns["cellchat"]["net"]["prob.cell"] (raises ValueError if missing) as a
+  3-D (cell, cell, LR-pair) sparse array of enriched interactions; if
+  options["parameter"]["all.diffusible"] is True, all enriched distances go
+  to the diffusible panel; if options["parameter"]["all.contact.dependent"]
+  is True, they all go to the contact panel; otherwise the LR-pair index
+  (3rd coordinate) is split by counting how many rows of
+  uns["cellchat"]["LR"]["LRsig"]["annotation"] are in {"Secreted Signaling",
+  "ECM-Receptor", "Non-protein Signaling"} (nLR1), with pairs before nLR1
+  treated as diffusible and the rest as contact-dependent (raises ValueError
+  if LR.LRsig/annotation is missing, or if no diffusible-annotated rows
+  exist). When enriched_only=False, uses every non-zero entry of d.spatial
+  (diffusible panel) and of d.spatial*adj.contact (contact panel) directly.
+  Renders one stacked density panel per non-None side via the internal
+  _density_panel helper (a single "Diffusible signaling" panel is drawn as a
+  fallback if somehow neither side yields data).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      AnnData with uns["cellchat"]["images"]["result.computeCellDistance"]
+      populated by computeCommunProb, and (when enriched_only=True)
+      uns["cellchat"]["net"]["prob.cell"] plus, unless an
+      all.diffusible/all.contact.dependent flag is set,
+      uns["cellchat"]["LR"]["LRsig"]["annotation"].
+  - name: enriched_only
+    type: bool
+    required: false
+    default: true
+    description: When True, restrict distances to interactions in net["prob.cell"], split into diffusible/contact-dependent panels; when False, use all non-zero distance/contact entries.
+  - name: density_alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Fill alpha for the kernel-density panels.
+returns: >-
+  A new matplotlib.figure.Figure with one stacked axes per non-empty
+  side (diffusible and/or contact-dependent), laid out via plt.subplots()
+  and fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; reads
+  uns["cellchat"]["images"]["result.computeCellDistance"],
+  uns["cellchat"]["options"]["parameter"], uns["cellchat"]["net"]["prob.cell"]
+  (when enriched_only=True), and uns["cellchat"]["LR"]["LRsig"]["annotation"]
+  (when enriched_only=True and neither all.diffusible nor
+  all.contact.dependent is set) via spatialcellchat._anndata.cellchat_dict;
+  does not write back into adata.uns/obs/var; returns_kind=new_object
+requires:
+  - uns.cellchat.images.result.computeCellDistance
+  - uns.cellchat.net.prob.cell
+examples:
+  - 'scc.communicationDistPlot(adata, enriched_only=True)'
+  - 'scc.communicationDistPlot(adata, enriched_only=False)'
+  - 'scc.communicationDistPlot(adata, enriched_only=True, density_alpha=0.3)'
+failure_fixes:
+  - when: "uns['cellchat']['images']['result.computeCellDistance'] is missing"
+    suggest:
+      - "Run computeCommunProb before calling communicationDistPlot."
+    explanation: "communicationDistPlot raises ValueError(\"communicationDistPlot requires uns['cellchat']['images']['result.computeCellDistance'] (set by computeCommunProb)\")."
+  - when: "enriched_only=True but uns['cellchat']['net']['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb (which populates net['prob.cell']) before calling with enriched_only=True, or pass enriched_only=False."
+    explanation: "communicationDistPlot raises ValueError(\"enriched_only=True requires net['prob.cell']\")."
+  - when: "enriched_only=True, neither all.diffusible nor all.contact.dependent is set, and uns['cellchat']['LR']['LRsig']['annotation'] is missing"
+    suggest:
+      - "Ensure uns['cellchat']['LR']['LRsig'] (with an 'annotation' column) is populated, e.g. via identifyOverExpressedInteractions, before calling communicationDistPlot."
+    explanation: "communicationDistPlot raises ValueError(\"communicationDistPlot: cannot split diffusible vs contact-dependent rows because uns['cellchat']['LR']['LRsig'] or its 'annotation' column is missing.\")."
+  - when: "the LRsig annotation column has no diffusible-signaling rows"
+    suggest:
+      - "Verify uns['cellchat']['LR']['LRsig']['annotation'] contains at least one of 'Secreted Signaling', 'ECM-Receptor', or 'Non-protein Signaling', or set options['parameter']['all.contact.dependent']=True if the dataset is purely contact-dependent."
+    explanation: "communicationDistPlot raises ValueError(\"communicationDistPlot: no diffusible-signaling annotation found in uns['cellchat']['LR']['LRsig']['annotation'] ...\")."
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.communicationDistPlot2

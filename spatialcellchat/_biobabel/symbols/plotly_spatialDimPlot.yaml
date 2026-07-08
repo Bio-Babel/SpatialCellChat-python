@@ -1,0 +1,141 @@
+id: spatialcellchat.plotly_spatialDimPlot
+import_path: spatialcellchat.viz_plotly.plotly_spatialDimPlot
+kind: function
+signature: >-
+  plotly_spatialDimPlot(adata: ad.AnnData, group_by: Optional[str] = None,
+  group_highlight: Optional[Sequence[str]] = None, cells_highlight:
+  Optional[Sequence] = None, sources_use: Optional[Sequence] = None,
+  targets_use: Optional[Sequence] = None, idents_use: Optional[Sequence] =
+  None, method: str = "2d", color_use: Optional[Sequence[str]] = None,
+  nohighlight_alpha: float = 0.65, title_name: Optional[str] = None,
+  scene_name: str = "scene", point_size: float = 2.0, show_legend: bool =
+  True, legend_group_title: str = "labels", three_dim_z: float = 0.0) ->
+  go.Figure
+purpose: Interactive Plotly 2D/3D spatial scatter of spots colored by cell group, with optional group/cell highlighting and source/target/ident recoloring.
+description: >
+  Direct port of R's plotly_spatialDimPlot (visualization.R:7787). Reads spot
+  coordinates from adata.obsm["spatial"] via the internal
+  _get_coords_swapped helper (a labeled pass-through — no axis swap is
+  applied in the Python port, unlike R's Seurat-derived (imagerow, imagecol)
+  convention; see _get_coords_swapped docstring, audit M-VIZ-6). Group
+  labels come from group_by (an adata.obs column, coerced to categorical) or,
+  when group_by is None, from spatialcellchat.modeling._get_idents. Supports
+  highlighting a subset of groups (group_highlight) or specific cells
+  (cells_highlight, by cell ID or 1-based integer index) — mutually
+  exclusive — and recoloring by sources_use/targets_use or idents_use (Others
+  bucketed in grey), mirroring spatialDimPlot's semantics. Builds one
+  plotly.graph_objects.Scatter (2D) or Scatter3d (3D) trace per category,
+  splitting each into a full-opacity "main" set and a
+  nohighlight_alpha-opacity dimmed set when highlighting is active.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] populated as a 2-column (x, y) matrix.
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: Column in adata.obs to color points by; falls back to the resolved ident factor when None.
+  - name: group_highlight
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Cell-group categories to highlight; non-highlighted spots are drawn at nohighlight_alpha opacity. Mutually exclusive with cells_highlight.
+  - name: cells_highlight
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Cell IDs (strings) or 1-based integer indices to highlight. Mutually exclusive with group_highlight.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Group labels or 1-based indices recolored as "sources"; combined with targets_use into an Others-bucketed category.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Group labels or 1-based indices recolored as "targets".
+  - name: idents_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict/relabel the color categories to this subset (everything else becomes "Others").
+  - name: method
+    type: str
+    required: false
+    default: "2d"
+    description: Plot mode, "2d" (Scatter) or "3d" (Scatter3d); any other value raises ValueError.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit per-category hex colors; falls back to scPalette(n_categories).
+  - name: nohighlight_alpha
+    type: float
+    required: false
+    default: 0.65
+    description: Opacity of non-highlighted spots.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Figure title.
+  - name: scene_name
+    type: str
+    required: false
+    default: scene
+    description: Plotly 3D scene reference name used only when method="3d".
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Marker size (2D traces render at point_size + 4).
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Whether to show the trace legend.
+  - name: legend_group_title
+    type: str
+    required: false
+    default: labels
+    description: Plotly legendgroup applied to every trace.
+  - name: three_dim_z
+    type: float
+    required: false
+    default: 0.0
+    description: Constant z-coordinate assigned to every point when method="3d".
+returns: >-
+  A new plotly.graph_objects.Figure with one trace per color category (2D
+  Scatter or 3D Scatter3d), y-axis reversed in 2D mode to match image-pixel
+  convention.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"], adata.obs, and
+  adata.obs_names only; does not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+writes: []
+examples:
+  - 'scc.plotly_spatialDimPlot(adata, method="2d")'
+  - 'scc.plotly_spatialDimPlot(adata, group_by="celltype2")'
+  - 'scc.plotly_spatialDimPlot(adata, sources_use=["A"], targets_use=["B"])'
+  - 'scc.plotly_spatialDimPlot(adata, cells_highlight=["cell0", "cell1"])'
+failure_fixes:
+  - when: 'method is not "2d" or "3d"'
+    suggest:
+      - 'Pass method="2d" or method="3d".'
+    explanation: 'Raises ValueError(''The parameter "method" in this function only supports for "2d","3d"!'').'
+  - when: both group_highlight and cells_highlight are passed
+    suggest:
+      - Supply only one of group_highlight or cells_highlight per call.
+    explanation: "Raises ValueError(\"Please don't input `group.highlight` or `cells.highlight` simultaneously.\")."
+  - when: adata.obsm["spatial"] is not a 2-column matrix
+    suggest:
+      - Ensure adata.obsm["spatial"] has exactly 2 columns (x, y).
+    explanation: "_get_coords_swapped raises ValueError(\"Please check the input 'coordinates' and make sure it is a two column matrix.\")."
+related:
+  - spatialcellchat.spatialDimPlot
+  - spatialcellchat.plotly_spatialLRpairPlot

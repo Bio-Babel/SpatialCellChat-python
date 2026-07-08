@@ -1,0 +1,100 @@
+id: spatialcellchat.compareInteractions
+import_path: spatialcellchat.analysis_ranking.compareInteractions
+kind: function
+signature: >-
+  compareInteractions(adata_list: Sequence[ad.AnnData], measure: str = "count",
+  group: Optional[Sequence] = None, group_levels: Optional[Sequence] = None,
+  digits: int = 3, dataset_names: Optional[Sequence[str]] = None) ->
+  pd.DataFrame
+purpose: Build the total-count/weight comparison data frame across multiple datasets.
+description: >
+  Direct port of the data-construction part of R's compareInteractions
+  (analysis.R:1846); the plot-only arguments (color.use, width, title.name,
+  etc.) are omitted and the function returns the underlying ggplot$data data
+  frame instead of a ggplot object. For each AnnData in adata_list it reads
+  uns["cellchat"]["net"]["count"] (measure="count") or ["weight"]
+  (measure="weight") and sums the whole matrix; when measure="weight" the
+  per-dataset totals are additionally rounded to `digits` decimals. Dataset
+  labels default to "d1", "d2", ... (or dataset_names when given). The
+  per-dataset group label defaults to 1 for every dataset unless `group` is
+  supplied; `group_levels` optionally fixes the categorical ordering of the
+  group column.
+parameters:
+  - name: adata_list
+    type: Sequence[anndata.AnnData]
+    required: true
+    default: null
+    description: >-
+      Each AnnData must have uns["cellchat"]["net"]["count"] (measure="count")
+      or uns["cellchat"]["net"]["weight"] (measure="weight"), i.e. aggregateNet
+      must already have been run on each.
+  - name: measure
+    type: str
+    required: false
+    default: count
+    description: '"count" or "weight" — which aggregated quantity to compare.'
+  - name: group
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Per-dataset group label, one entry per element of adata_list. Defaults to 1 for every dataset.
+  - name: group_levels
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Optional ordering of the categorical "group" column.
+  - name: digits
+    type: int
+    required: false
+    default: 3
+    description: Rounding precision applied to the per-dataset totals when measure="weight".
+  - name: dataset_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Override labels used for the "dataset" column; must match len(adata_list) when given.
+returns: >-
+  A tidy pandas.DataFrame with one row per dataset and columns "count"
+  (always named "count", holding the weight total when measure="weight"),
+  "dataset" (categorical, ordered as adata_list), and "group" (categorical,
+  default "1"). No AnnData is mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.net
+writes: []
+examples:
+  - "scc.compareInteractions([adata1, adata2], measure='count')"
+  - "scc.compareInteractions([adata1, adata2], measure='weight', dataset_names=['ctrl', 'treated'])"
+  - "scc.compareInteractions([adata1, adata2, adata3], group=['A', 'A', 'B'], group_levels=['A', 'B'])"
+failure_fixes:
+  - when: "measure is not 'count' or 'weight'"
+    suggest:
+      - "Pass measure='count' or measure='weight'."
+    explanation: >-
+      compareInteractions raises ValueError("measure must be 'count' or
+      'weight', got ...") for any other value.
+  - when: "uns['cellchat']['net']['count'] or ['weight'] is missing on one of the AnnData objects"
+    suggest:
+      - "Run aggregateNet() on every AnnData in adata_list first."
+    explanation: >-
+      compareInteractions raises ValueError("net['<measure>'] missing; run
+      aggregateNet first") when the requested measure is absent from an
+      AnnData's net slot.
+  - when: "group length does not match adata_list length"
+    suggest:
+      - "Pass one group label per element of adata_list."
+    explanation: >-
+      compareInteractions raises ValueError("group length ... != adata_list
+      length ...") on a length mismatch.
+  - when: "dataset_names length does not match adata_list length"
+    suggest:
+      - "Pass one name per element of adata_list, or omit dataset_names to use the d1, d2, ... default."
+    explanation: >-
+      compareInteractions raises ValueError("dataset_names length ... !=
+      adata_list length ...") on a length mismatch.
+related:
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.rankNet
+  - spatialcellchat.getMaxWeight
+  - spatialcellchat.mergeInteractions

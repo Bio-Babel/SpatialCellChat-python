@@ -1,0 +1,106 @@
+id: spatialcellchat.computeNetSimilarityPairwise
+import_path: spatialcellchat.analysis_network.computeNetSimilarityPairwise
+kind: function
+signature: >-
+  computeNetSimilarityPairwise(adata_list: Sequence[ad.AnnData], slot_name:
+  str = "netP", type_: str = "functional", comparison: Optional[Sequence[int]]
+  = None, k: Optional[int] = None, thresh: Optional[float] = None,
+  dataset_names: Optional[Sequence[str]] = None) -> Dict[str, Any]
+purpose: Compute the joint signaling-network similarity matrix across multiple datasets.
+description: >
+  Direct port of R's computeNetSimilarityPairwise (analysis.R:1391). Because
+  the Python port has no merged AnnData object, this takes a list of AnnData
+  objects (adata_list) instead of a single merged object; comparison is a
+  1-based subset of adata_list indices (defaults to all datasets), and
+  dataset_names labels each dataset (defaults to "dataset1", "dataset2", ...).
+  For each selected dataset it reads uns["cellchat"][slot_name]["prob"]
+  (K, K, N_i) and concatenates all pathways/LR-pairs across datasets into one
+  pool of size n_total = sum(N_i), labelling each with
+  "<pathway>--<dataset_name>". Optionally trims weak interactions per-dataset
+  via a thresh quantile. Builds the n_total x n_total similarity matrix the
+  same way as computeNetSimilarity (Jaccard-overlap for type_="functional",
+  1 - computeNetD_structure for type_="structural"), smooths it via buildSNN
+  (k neighbours, defaults to ceil(sqrt(n_total)), +1 if >25), and writes the
+  resulting DataFrame ONLY into the first dataset's slot
+  (adata_list[0]), keyed by comparison_name = "-".join(str(c) for c in
+  comparison) (e.g. "1-2").
+parameters:
+  - name: adata_list
+    type: Sequence[anndata.AnnData]
+    required: true
+    default: null
+    description: One AnnData per dataset to compare.
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: Slot in uns["cellchat"] to read prob from ("netP" or "net").
+  - name: type_
+    type: str
+    required: false
+    default: "functional"
+    description: "'functional' or 'structural'; selects the similarity kernel."
+  - name: comparison
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 1-based dataset indices into adata_list (mirrors R semantics). Defaults to all datasets, i.e. range(1, len(adata_list)+1).
+  - name: k
+    type: Optional[int]
+    required: false
+    default: null
+    description: Number of nearest neighbours for SNN smoothing over the pooled n_total pathways/pairs.
+  - name: thresh
+    type: Optional[float]
+    required: false
+    default: null
+    description: Trim quantile threshold in [0, 0.25], applied per-dataset before pooling.
+  - name: dataset_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: >-
+      Labels used to build pooled names "<pathway>--<dataset_name>". Must
+      match len(comparison) when given; defaults to ["dataset1",
+      "dataset2", ...].
+returns: >-
+  A new dict {"matrix": pandas.DataFrame, "comparison_name": str} — the pooled
+  n_total x n_total similarity matrix and its comparison-name key.
+mutates: >-
+  execution_class=builder; as a side effect, mutates
+  adata_list[0].uns['cellchat'][slot_name]['similarity'][type_]['matrix'][comparison_name]
+  in place (only the FIRST dataset in adata_list is written); returns_kind=new_object
+  (returns a new {matrix, comparison_name} dict, not the mutated adata)
+requires:
+  - uns.cellchat.netP.prob
+  - uns.cellchat.net.prob
+writes:
+  - uns.cellchat.netP.similarity.functional.matrix
+  - uns.cellchat.netP.similarity.structural.matrix
+  - uns.cellchat.net.similarity.functional.matrix
+  - uns.cellchat.net.similarity.structural.matrix
+examples:
+  - "scc.computeNetSimilarityPairwise([adata1, adata2], slot_name='netP', type_='functional', comparison=[1, 2], dataset_names=['A', 'B'])"
+  - "scc.computeNetSimilarityPairwise([adata1, adata2], type_='structural', thresh=0.1)"
+failure_fixes:
+  - when: "uns['cellchat'][slot_name]['prob'] is missing for one of the selected datasets"
+    suggest:
+      - "Run computeCommunProb / computeAvgCommunProb (for slot_name='net') or computeCommunProbPathway (for slot_name='netP') on every dataset in adata_list first."
+    explanation: >-
+      computeNetSimilarityPairwise raises ValueError(f"adata_list[{ds_idx -
+      1}].uns['cellchat']['{slot_name}']['prob'] is required.") for the
+      offending dataset index.
+  - when: "len(dataset_names) does not match len(comparison)"
+    suggest:
+      - "Pass dataset_names with exactly one label per entry in comparison."
+    explanation: >-
+      computeNetSimilarityPairwise raises ValueError("len(dataset_names) must
+      match len(comparison).") otherwise.
+  - when: "prob is not a 3-D array for one of the datasets"
+    suggest:
+      - "Ensure every dataset's prob array has shape (K, K, N)."
+    explanation: computeNetSimilarityPairwise raises ValueError("`prob` must be 3-D.") otherwise.
+related:
+  - spatialcellchat.computeNetSimilarity
+  - spatialcellchat.computeNetD_structure
+  - spatialcellchat.netEmbedding

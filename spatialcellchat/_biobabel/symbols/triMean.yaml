@@ -1,0 +1,32 @@
+id: spatialcellchat.triMean
+import_path: spatialcellchat.triMean
+kind: function
+signature: 'triMean(x: ''ArrayLike'', na_rm: ''bool'' = True) -> ''float'''
+purpose: Compute Tukey's trimean.
+description: >
+  Direct port of R's triMean (modeling.R:2580): the mean of the quantiles
+  at probabilities (0.25, 0.50, 0.50, 0.75), i.e. (Q1 + 2*Q2 + Q3) / 4.
+  Quantiles use R's default type-7 interpolation, which matches numpy's
+  default quantile method. When na_rm=True (the default), NaNs are
+  dropped before computing quantiles (np.nanquantile); otherwise any NaN
+  propagates through np.quantile.
+parameters:
+- name: x
+  type: ArrayLike
+  required: true
+  default: null
+- name: na_rm
+  type: bool
+  required: false
+  default: true
+mutates: "execution_class=pure_function; no in-place mutation of `x`; returns_kind=new_object"
+returns: float
+requires: []
+writes: []
+examples:
+  - "triMean(np.arange(1, 11, dtype=float))"
+  - "triMean(np.array([-1.0, -0.5, 0.0, 0.5, 1.0]))"
+  - "triMean(np.concatenate([[np.nan], np.arange(1, 11, dtype=float)]))"
+failure_fixes: []
+related:
+  - spatialcellchat.computeAveExpr

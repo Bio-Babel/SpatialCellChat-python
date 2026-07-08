@@ -1,0 +1,37 @@
+id: spatialcellchat.cell_group_identity_resolution
+name: How cell-group identity (the grouping for communication) is resolved
+description: >-
+  Every group-level computation (communication probability, aggregation,
+  averaging, ranking, centrality) is defined over a set of cell groups. Those
+  groups come from spatialcellchat._anndata.get_idents_levels, which resolves
+  the grouping in a fixed priority: (1) when a result slot snapshot is passed
+  (e.g. cc['net'] or cc['netP']), its stored dimnames['source'] or
+  meta['groups'] — the factor levels captured at compute time, so results are
+  not corrupted if the user later renames categories; then falling back to the
+  current AnnData factor via (2) adata.obs[<column>].cat.categories, trying the
+  columns 'cellchat_idents', then 'active_ident', then 'cell.type' in that
+  order. If none is present it raises ValueError telling you to set
+  adata.obs['cellchat_idents'] as a categorical. This chain is the Python port
+  of R's cellchat@idents. Because grouping is a categorical, unused/stale
+  levels are a common failure: several averaging/aggregation functions
+  (modeling.computeCommunProb path, modeling_avg) raise
+  "...ensure that the factor levels are correct! You may need to drop unused
+  levels." when the column carries categories not actually present in the data.
+category: state-management
+invariants:
+  - Cell-group identity is taken from adata.obs by trying 'cellchat_idents', then 'active_ident', then 'cell.type' — set 'cellchat_idents' (as a pandas categorical) to control grouping explicitly and unambiguously.
+  - When a result slot already exists, its captured levels (dimnames['source'] / meta['groups']) take precedence over the live obs column, so renaming obs categories after computing net/netP does not silently change existing results.
+  - Unused categorical levels in the identity column cause a "factor levels are correct / drop unused levels" ValueError; fix with adata.obs[col] = adata.obs[col].cat.remove_unused_categories() before the group-level call.
+mental_model: >-
+  For R users: this is cellchat@idents / the group.by identity — set it once
+  and every group-level function uses it. The obs-column priority chain plays
+  the role of the object's active identity slot.
+  For Python users: the "cell groups" are the categories of one obs column,
+  picked by the cellchat_idents > active_ident > cell.type priority. Make that
+  column an explicit pandas.Categorical containing only the levels present in
+  the current (possibly subset) data.
+  General: if group-level output has an unexpected number of groups, or you
+  hit a "factor levels" error, check which identity column is being resolved
+  and drop unused categories.
+related_concepts:
+  - spatialcellchat.cellchat_object_state

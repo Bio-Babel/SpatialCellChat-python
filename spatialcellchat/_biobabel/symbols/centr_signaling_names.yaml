@@ -1,0 +1,43 @@
+id: spatialcellchat.centr_signaling_names
+import_path: spatialcellchat._centrality.centr_signaling_names
+kind: function
+signature: "centr_signaling_names(centr_dict: dict) -> list"
+purpose: Return the signaling / LR-pair names recorded in a centrality dict.
+description: >
+  Mirrors R's dimnames(obj@netP$centr)[[3]] on the flat centrality schema
+  written by netAnalysis_computeCentrality: {"values": ndarray(n_measure,
+  n_nodes, n_signal), "centr_names": [...], "node_names": [...],
+  "signaling_names": [...]}. Simply returns a copy of
+  centr_dict["signaling_names"].
+parameters:
+  - name: centr_dict
+    type: dict
+    required: true
+    default: null
+    description: >-
+      The flat schema dict produced by netAnalysis_computeCentrality
+      (either slot["centr"] for do_group=True or slot["centr.cell"] for
+      do_group=False).
+returns: A new list of signaling / LR-pair names, i.e. list(centr_dict["signaling_names"]).
+mutates: >-
+  execution_class=pure_function; read-only lookup over centr_dict, no
+  mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'centr_cell = sub.uns["cellchat"]["net"]["centr.cell"]; scc.centr_signaling_names(centr_cell)'
+failure_fixes:
+  - when: "centr_dict is not a dict"
+    suggest:
+      - "Pass the flat schema dict written by netAnalysis_computeCentrality (e.g. adata.uns['cellchat']['net']['centr.cell'])."
+    explanation: centr_signaling_names raises TypeError("centr_dict must be a dict") otherwise.
+  - when: "centr_dict is a dict but lacks a 'signaling_names' key"
+    suggest:
+      - "Ensure centr_dict was produced by netAnalysis_computeCentrality (flat {values, centr_names, node_names, signaling_names} schema), not a legacy nested {signaling: {measure: array}} layout."
+    explanation: >-
+      centr_signaling_names raises KeyError("centr_dict missing
+      'signaling_names' key — expected flat schema {values, centr_names,
+      node_names, signaling_names}") otherwise.
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.centr_value

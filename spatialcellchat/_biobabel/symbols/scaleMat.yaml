@@ -1,0 +1,43 @@
+id: spatialcellchat.scaleMat
+import_path: spatialcellchat.scaleMat
+kind: function
+signature: 'scaleMat(x: ''ArrayLike'', scale: ''str'', na_rm: ''bool'' = True) ->
+  ''np.ndarray'''
+purpose: Scale a data matrix.
+description: >
+  Direct port of R's scaleMat (utilities.R:821). `scale` is resolved via
+  R-style pmatch against {"none", "row", "column", "r1", "c1"}: an exact
+  match wins, otherwise a unique prefix match is used; no match or an
+  ambiguous prefix (e.g. "c", which matches both "column" and "c1") raises
+  ValueError. "row"/"column" z-score along the chosen axis (subtract the
+  mean, divide by the sample standard deviation with ddof=1); "r1"/"c1"
+  divide by the row/column sum instead; "none" returns x unchanged. When
+  na_rm=True (the default), NaNs are ignored via nanmean/nanstd/nansum
+  along the relevant axis.
+parameters:
+- name: x
+  type: ArrayLike
+  required: true
+  default: null
+- name: scale
+  type: str
+  required: true
+  default: null
+- name: na_rm
+  type: bool
+  required: false
+  default: true
+mutates: "execution_class=pure_function; no in-place mutation of `x`; returns_kind=new_object"
+returns: np.ndarray
+requires: []
+writes: []
+examples:
+  - "scaleMat(x, 'row')"
+  - "scaleMat(x, 'column')"
+  - "scaleMat(x, 'c1')"
+failure_fixes:
+  - when: 'ValueError: "scale argument shoud take values: ''none'', ''row'' or ''column''"'
+    suggest:
+      - pass an unambiguous value/prefix of 'none', 'row', 'column', 'r1', or 'c1' (e.g. 'c' alone is ambiguous between 'column' and 'c1' and raises).
+related:
+  - spatialcellchat.computeCommunProb

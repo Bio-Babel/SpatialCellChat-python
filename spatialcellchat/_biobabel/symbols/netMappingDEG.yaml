@@ -1,0 +1,82 @@
+id: spatialcellchat.netMappingDEG
+import_path: spatialcellchat.analysis_network.netMappingDEG
+kind: function
+signature: >-
+  netMappingDEG(adata: ad.AnnData, features_name: str, thresh: float = 0.05)
+  -> pd.DataFrame
+purpose: Map differentially-expressed-gene statistics onto the inferred ligand-receptor communications.
+description: >
+  Direct port of R's netMappingDEG (analysis.R:3222). Looks up
+  uns["cellchat"]["var.features"][f"{features_name}.info"] (a DEG stats
+  table with columns clusters, features, pvalues, logFC, pct.1, pct.2 —
+  written by identifyOverExpressedGenes under that features_name), and
+  uns["cellchat"]["DB"]["geneInfo"] / ["complex"]. Calls
+  subsetCommunication(adata, thresh=thresh) to get the long-table
+  communication data frame (net); if that returns a dict (merged-mode, one
+  DataFrame per dataset) the pieces are concatenated with a "datasets"
+  column added. Builds "source.ligand" / "target.receptor" join keys on net
+  and a matching "clusters.features" join key on the DEG table, then for
+  each row: if the ligand/receptor gene is a plain (non-complex) gene
+  symbol present in geneInfo, its DEG stats are joined directly by exact
+  key match; otherwise (the ligand/receptor name is a complex from
+  DB["complex"]) its subunit genes are looked up, their per-subunit DEG rows
+  averaged (skipping missing subunits), and that average is assigned. Eight
+  new columns are added: ligand.pvalues, ligand.logFC, ligand.pct.1,
+  ligand.pct.2, receptor.pvalues, receptor.logFC, receptor.pct.1,
+  receptor.pct.2 (NaN where no match is found). This function only reads
+  adata.uns["cellchat"]; it does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Must contain uns["cellchat"]["var.features"][f"{features_name}.info"]
+      (written by identifyOverExpressedGenes) and uns["cellchat"]["DB"]
+      (geneInfo + complex) plus whatever subsetCommunication needs (net/netP,
+      uns["cellchat"]["LR"]["LRsig"]).
+  - name: features_name
+    type: str
+    required: true
+    default: null
+    description: Used to look up var.features[features_name + ".info"].
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold passed through to subsetCommunication.
+returns: >-
+  A new pandas.DataFrame — the inferred-communication data frame (from
+  subsetCommunication) augmented with eight DEG columns: ligand.pvalues,
+  ligand.logFC, ligand.pct.1, ligand.pct.2, receptor.pvalues,
+  receptor.logFC, receptor.pct.1, receptor.pct.2.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'] only (via
+  var.features / DB / subsetCommunication), does not mutate adata;
+  returns_kind=new_object
+requires:
+  - uns.cellchat.var.features
+  - uns.cellchat.DB.geneInfo
+  - uns.cellchat.DB.complex
+writes: []
+examples:
+  - "scc.netMappingDEG(adata, features_name='features')"
+  - "scc.netMappingDEG(adata, features_name='features', thresh=0.05)"
+failure_fixes:
+  - when: "var.features[f'{features_name}.info'] does not exist"
+    suggest:
+      - "Run identifyOverExpressedGenes(adata, features_name=...) first, using the same features_name."
+    explanation: >-
+      netMappingDEG raises ValueError("The input features.name does not
+      exist in `names(var.features)`. Please first run
+      `identifyOverExpressedGenes`!") when the entry is missing.
+  - when: "uns['cellchat']['DB']['geneInfo'] or ['complex'] is missing"
+    suggest:
+      - "Populate uns['cellchat']['DB'] with the ligand-receptor database (geneInfo + complex tables) before calling netMappingDEG."
+    explanation: >-
+      netMappingDEG raises ValueError("adata.uns['cellchat']['DB']['geneInfo']
+      and adata.uns['cellchat']['DB']['complex'] are required.") when either
+      is None.
+related:
+  - spatialcellchat.identifyOverExpressedGenes
+  - spatialcellchat.subsetCommunication

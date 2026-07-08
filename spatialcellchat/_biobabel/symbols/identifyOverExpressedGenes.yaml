@@ -1,0 +1,191 @@
+id: spatialcellchat.identifyOverExpressedGenes
+import_path: spatialcellchat.de.identifyOverExpressedGenes
+kind: function
+signature: >-
+  identifyOverExpressedGenes(adata: ad.AnnData, *, do_grid: bool = False,
+  cellsize: Sequence[float] = (5.0, 5.0), what: str = "polygons", square: bool
+  = True, data_use: Optional[pd.DataFrame] = None, selection_method:
+  Literal["wilcox", "moransi", "meringue"] = "wilcox", features_name: str =
+  "features", group_by: Optional[str] = None, idents_use: Optional[Sequence] =
+  None, invert: bool = False, group_dataset: Optional[str] = None,
+  pos_dataset: Optional[str] = None, only_pos: bool = True, features:
+  Optional[Sequence[str]] = None, thresh_pc: float = 0.0, thresh_fc: float =
+  0.0, thresh_p: float = 0.05) -> pd.DataFrame
+purpose: >-
+  Identify over-expressed genes (wilcox) or spatially-variable genes
+  (moransi/meringue) for downstream ligand-receptor inference.
+description: >
+  Direct port of R's identifyOverExpressedGenes (utilities.R:1095). Reads the
+  genes x cells expression matrix via resolve_data_matrix(adata,
+  "data.signaling") (adata.layers["data_signaling"] preferred, falling back to
+  adata.X) unless data_use is given. Branches on selection_method: "wilcox"
+  runs a Seurat::FindAllMarkers-style per-cluster Wilcoxon rank-sum test
+  (ident labels from adata.obs[group_by] or adata.obs["active_ident"] when
+  group_by is None) with pct/logFC/p-value thresholds (thresh_pc, thresh_fc,
+  thresh_p) and Bonferroni correction over the full gene universe; "moransi"
+  computes a per-gene Moran's I (ape::Moran.I port) using inverse-square
+  distance weights from adata.obsm["spatial"], keeping genes with p.value <
+  thresh_p; "meringue" builds a Delaunay-based binary spatial neighbor graph
+  from adata.obsm["spatial"] and keeps genes with BH-adjusted p.adj <
+  thresh_p. When do_grid=True, the function instead recurses: it builds a
+  coarse grid AnnData via makeGridSpatialCellChat, runs subsetData on it with
+  the parent's uns["cellchat"]["DB"], recomputes DE on the grid with
+  do_grid=False, propagates the grid's resulting DE.<features_name> /
+  DE.<features_name>.info back onto the parent adata, and stashes the grid
+  AnnData under uns["cellchat"]["misc"]["grid.object"]. In all non-grid
+  branches the final significant-feature list and its per-gene stats table are
+  written into uns["cellchat"]["DE"], and adata.var["highly_variable_signaling"]
+  is set to a boolean mask over adata.var_names.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Cells x genes AnnData, already log-normalised. Data matrix is read via
+      resolve_data_matrix(adata, "data.signaling") unless data_use is given.
+      For moransi/meringue, adata.obsm["spatial"] must hold 2-D coordinates.
+      For wilcox, ident labels default to adata.obs["active_ident"].
+  - name: do_grid
+    type: bool
+    required: false
+    default: false
+    description: >-
+      When True, recurse through a grid-coarsened copy of adata
+      (makeGridSpatialCellChat + subsetData) before computing DE, then
+      propagate results back to the parent adata.
+  - name: cellsize
+    type: Sequence[float]
+    required: false
+    default: (5.0, 5.0)
+    description: Grid cell size used by the do_grid branch.
+  - name: what
+    type: str
+    required: false
+    default: polygons
+    description: Geometry kind passed to makeGridSpatialCellChat in the do_grid branch.
+  - name: square
+    type: bool
+    required: false
+    default: true
+    description: Whether to use square grid cells in the do_grid branch.
+  - name: data_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Pre-prepared genes x cells expression matrix overriding the resolved adata matrix.
+  - name: selection_method
+    type: '"wilcox" | "moransi" | "meringue"'
+    required: false
+    default: wilcox
+    description: >-
+      Selection algorithm. Invalid values raise ValueError. moransi/meringue
+      require adata.obsm["spatial"].
+  - name: features_name
+    type: str
+    required: false
+    default: features
+    description: Key under uns["cellchat"]["DE"] (and prefix for "<features_name>.info") that results are stored at.
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: adata.obs column used as ident labels for the wilcox branch; defaults to "active_ident" when None.
+  - name: idents_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict wilcox comparisons to these idents.
+  - name: invert
+    type: bool
+    required: false
+    default: false
+    description: When True and idents_use is set, exclude those idents instead of restricting to them.
+  - name: group_dataset
+    type: Optional[str]
+    required: false
+    default: null
+    description: adata.obs column identifying dataset/condition for two-condition wilcox DE.
+  - name: pos_dataset
+    type: Optional[str]
+    required: false
+    default: null
+    description: Positive-condition level of group_dataset; required (and validated) when group_dataset is set.
+  - name: only_pos
+    type: bool
+    required: false
+    default: true
+    description: Keep only positive log-fold-change genes after ranking (wilcox branch).
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict to these genes (intersected with the resolved data matrix's index).
+  - name: thresh_pc
+    type: float
+    required: false
+    default: 0.0
+    description: Minimum-percent-expressing threshold (wilcox branch).
+  - name: thresh_fc
+    type: float
+    required: false
+    default: 0.0
+    description: Minimum log-fold-change threshold (wilcox branch).
+  - name: thresh_p
+    type: float
+    required: false
+    default: 0.05
+    description: P-value (wilcox/moransi) or BH-adjusted p-value (meringue) significance threshold.
+returns: >-
+  A pandas.DataFrame: the markers.all table (clusters, features, pvalues,
+  logFC, pct.1, pct.2, pvalues.adj[, datasets]) for selection_method="wilcox";
+  or the per-gene Moran's-I result (observed, p.value for moransi;
+  observed, expected, sd, p.value, p.adj for meringue) indexed by gene, for
+  moransi/meringue. The same table (or, for do_grid=True, the grid's
+  markers.all) is also written into uns["cellchat"]["DE"], and
+  adata.var["highly_variable_signaling"] is updated in place.
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['DE']['<features_name>']
+  (list of over-expressed/significant gene names) and
+  adata.uns['cellchat']['DE']['<features_name>.info'] (full per-gene stats
+  table) in place, and sets adata.var['highly_variable_signaling'] (bool per
+  gene); when do_grid=True also writes
+  adata.uns['cellchat']['misc']['grid.object'] (the grid AnnData); returns_kind=new_object
+  (returns the markers/stats DataFrame, not adata itself)
+requires: []
+writes:
+  - uns.cellchat.DE.features
+  - uns.cellchat.DE.features.info
+  - uns.cellchat.misc.grid.object
+examples:
+  - 'scc.identifyOverExpressedGenes(sub, selection_method="meringue")'
+  - 'de.identifyOverExpressedGenes(adata, selection_method="wilcox")'
+  - 'de.identifyOverExpressedGenes(adata, selection_method="moransi", thresh_p=0.05)'
+failure_fixes:
+  - when: "selection_method is not one of 'wilcox', 'moransi', 'meringue'"
+    suggest:
+      - "Pass selection_method='wilcox', 'moransi', or 'meringue'."
+    explanation: >-
+      Raises ValueError("selection_method must be one of 'wilcox', 'moransi',
+      'meringue'") for any other value.
+  - when: "selection_method='wilcox', group_by is None, and adata.obs has no 'active_ident' column"
+    suggest:
+      - "Set adata.obs['active_ident'] to your cluster/group labels, or pass group_by='<column>'."
+    explanation: >-
+      Raises ValueError("group_by is None and adata.obs has no 'active_ident'
+      column").
+  - when: "selection_method is 'moransi' or 'meringue' and adata.obsm has no 'spatial' key"
+    suggest:
+      - "Populate adata.obsm['spatial'] with 2-D spot coordinates before calling."
+    explanation: >-
+      The internal _get_coords helper raises ValueError("selection_method
+      requires spatial coordinates in adata.obsm['spatial']").
+  - when: "group_dataset is set but pos_dataset is None or not a value present in adata.obs[group_dataset]"
+    suggest:
+      - "Pass pos_dataset as one of the exact values found in adata.obs[group_dataset]."
+    explanation: >-
+      Raises ValueError("pos_dataset must be one of: " + comma-joined sorted
+      unique values of adata.obs[group_dataset]).
+related:
+  - spatialcellchat.identifyOverExpressedLigandReceptor
+  - spatialcellchat.identifyOverExpressedInteractions

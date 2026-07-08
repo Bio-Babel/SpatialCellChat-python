@@ -1,0 +1,36 @@
+id: spatialcellchat.load_ppi
+import_path: spatialcellchat.database.load_ppi
+kind: function
+signature: 'def load_ppi(species: Literal["human", "mouse"]) -> tuple[sp.csr_matrix, list[str]]:'
+purpose: Load the bundled protein-protein interaction (PPI) adjacency matrix for one species.
+description: >
+  Loads the PPI network bundled with the package for the requested species.
+  Validates ``species`` against ``PPI_SPECIES`` (``"human"``, ``"mouse"``),
+  then reads a sparse ``PPI.npz`` matrix and the accompanying
+  ``PPI.rows.txt`` gene-symbol label file from ``resources/db/<species>/``.
+  Raises ``RuntimeError`` if the matrix row count does not match the number
+  of labels (bundled-resource consistency check).
+parameters:
+  - name: species
+    type: 'Literal["human", "mouse"]'
+    required: true
+    default: null
+    description: Species code selecting which bundled PPI network to load.
+returns: >
+  A tuple ``(mat, rows)``: ``mat`` is the square, symmetric PPI adjacency
+  matrix as a ``scipy.sparse.csr_matrix``; ``rows`` is the list of gene
+  symbols labelling both the rows and columns of ``mat``, in matrix order.
+mutates: 'execution_class=pure_function; no in-place mutation (reads static bundled npz/txt resources into fresh objects); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.load_ppi("human")'
+  - 'scc.load_ppi("mouse")'
+failure_fixes:
+  - when: ValueError "species must be one of (...)"
+    suggest:
+      - pass "human" or "mouse".
+  - when: RuntimeError "PPI shape mismatch"
+    suggest:
+      - indicates a corrupted/mismatched bundled resource; reinstall or rebuild the package data rather than passing different arguments.
+related: []

@@ -1,0 +1,44 @@
+id: spatialcellchat.computeLaplacian
+import_path: spatialcellchat.analysis_network.computeLaplacian
+kind: function
+signature: >-
+  computeLaplacian(CM: Union[np.ndarray, sparse.spmatrix], tol: float = 0.01)
+  -> Dict[str, Any]
+purpose: Eigenvalues of the normalised graph Laplacian of a consensus/similarity matrix.
+description: >
+  Direct port of R's computeLaplacian (analysis.R:1720). Builds the
+  normalised Laplacian L = 1 - (CM / sqrt(colsum)).T / sqrt(colsum) (R does
+  not symmetrise here) and computes its eigenvalues: when
+  min(100, n) == n it uses a dense eigen-decomposition
+  (numpy.linalg.eigvalsh); otherwise it uses scipy.sparse.linalg.eigsh with
+  which="SM" (mirrors R's RSpectra::eigs_sym) to get the 100 smallest-magnitude
+  eigenvalues. Returns the sorted vector of absolute eigenvalues plus a count
+  of how many are <= tol. Used internally by computeEigengap to estimate the
+  cluster-count bounds for netClustering.
+parameters:
+  - name: CM
+    type: "Union[numpy.ndarray, scipy.sparse.spmatrix]"
+    required: true
+    default: null
+    description: Square consensus / similarity matrix.
+  - name: tol
+    type: float
+    required: false
+    default: 0.01
+    description: >-
+      Tolerance below which an eigenvalue is considered zero; used to compute
+      the returned n_zeros count.
+returns: >-
+  A new dict {"val": numpy.ndarray, "n_zeros": int} where "val" is the sorted
+  vector of eigen-magnitudes and "n_zeros" is the number of values <= tol.
+mutates: >-
+  execution_class=pure_function; operates only on the input CM array; no
+  in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "computeLaplacian(CM)"
+  - "computeLaplacian(CM, tol=0.05)"
+failure_fixes: []
+related:
+  - spatialcellchat.computeEigengap

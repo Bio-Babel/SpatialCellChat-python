@@ -1,0 +1,60 @@
+id: spatialcellchat.computeAveExpr
+import_path: spatialcellchat._expr.computeAveExpr
+kind: function
+signature: "computeAveExpr(data_use: ArrayLike, group: Union[Sequence, pd.Categorical], features: Optional[Sequence[str]] = None, type: Literal[\"triMean\", \"truncatedMean\", \"median\"] = \"triMean\", trim: Optional[float] = None) -> pd.DataFrame"
+purpose: "Compute average expression per cell group; a port of computeAveExpr (modeling.R:2170), one of the per-LR-pair expression aggregators used by computeCommunProb."
+description: >
+  Accepts a ready-made genes-by-cells data_use matrix (DataFrame or
+  ndarray) plus a per-cell `group` factor, in place of the R reference's
+  CellChat-object indirection. Optionally restricts rows to `features`
+  (in data_use's original row order), coerces `group` to pandas.Categorical
+  if needed, builds a per-group reduction function via the internal
+  `_make_FunMean(type, trim)` switch (triMean / truncatedMean / median),
+  and aggregates each gene's expression within each present group level.
+  Absent factor levels are silently dropped, matching R's `aggregate`.
+parameters:
+  - name: data_use
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Genes-by-cells expression matrix. If a DataFrame, its index supplies gene names; otherwise a generic integer index is used.
+  - name: group
+    type: Union[Sequence, pandas.Categorical]
+    required: true
+    default: null
+    description: Per-cell group labels (R's object@idents); coerced to pandas.Categorical if not already one.
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict the output to these features, in the order of rownames(data_use).
+  - name: type
+    type: "Literal[\"triMean\", \"truncatedMean\", \"median\"]"
+    required: false
+    default: "triMean"
+    description: Per-group reduction method.
+  - name: trim
+    type: Optional[float]
+    required: false
+    default: null
+    description: Truncation fraction for the truncated mean; required (non-null) when type="truncatedMean".
+returns: >
+  A pandas.DataFrame of genes-by-groups average expression, indexed by the
+  chosen features and columned by the present group levels in factor order.
+mutates: "execution_class=pure_function; no in-place mutation of `data_use` or `group`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeAveExpr(data_use, group, type='triMean')"
+  - "computeAveExpr(data_use, group, features=['G1', 'G3', 'G5'], type='median')"
+  - "computeAveExpr(data_use, group, type='truncatedMean', trim=0.1)"
+failure_fixes:
+  - when: 'ValueError: invalid ''trim'' argument'
+    suggest:
+      - pass a non-null `trim` when type='truncatedMean'.
+  - when: 'ValueError: "''arg'' should be one of ''triMean'', ''truncatedMean'', ''median''"'
+    suggest:
+      - pass one of the three supported `type` values.
+related:
+  - spatialcellchat.triMean
+  - spatialcellchat.computeCommunProb

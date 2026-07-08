@@ -1,0 +1,51 @@
+id: spatialcellchat.buildSNN
+import_path: spatialcellchat._snn.buildSNN
+kind: function
+signature: "buildSNN(data_use: Union[np.ndarray, pd.DataFrame, sparse.spmatrix], k: int = 10, k_scale: int = 10, prune_SNN: float = 1.0 / 15.0) -> sparse.csr_matrix"
+purpose: "Build a symmetric Shared-Nearest-Neighbour (SNN) graph over samples, a port of SpatialCellChat::buildSNN."
+description: >
+  Materialises data_use as a dense (features x samples) array (densifying
+  sparse input, and reading a DataFrame's .values), fits a
+  sklearn.neighbors.NearestNeighbors kd-tree on the transposed
+  (samples x features) matrix, and queries min(k_scale*k, n_samples-1)
+  neighbours per sample. The first k-1 neighbours (plus self) form a
+  one-hot co-membership matrix S; SNN = S @ S.T gives raw co-membership
+  counts, which are Jaccard-normalised as e_ij / (k + (k - e_ij)),
+  thresholded to zero below prune_SNN, and the diagonal is forced to 1.
+  Raises ValueError if k exceeds the number of samples.
+parameters:
+  - name: data_use
+    type: Union[numpy.ndarray, pandas.DataFrame, scipy.sparse.spmatrix]
+    required: true
+    default: null
+    description: Features-by-samples matrix; the columns are the samples whose SNN graph is built. Sparse input is densified internally.
+  - name: k
+    type: int
+    required: false
+    default: 10
+    description: Number of nearest neighbours used to build the SNN graph.
+  - name: k_scale
+    type: int
+    required: false
+    default: 10
+    description: Granularity multiplier; the kd-tree is queried for min(k_scale * k, n_samples - 1) candidate neighbours before truncating to k - 1.
+  - name: prune_SNN
+    type: float
+    required: false
+    default: 0.06666666666666667
+    description: Cut-off applied to the Jaccard-style similarities; entries below this threshold are zeroed out.
+returns: >
+  A scipy.sparse.csr_matrix of shape (n_samples, n_samples): the symmetric
+  SNN adjacency matrix with 1 on the diagonal.
+mutates: "execution_class=pure_function; no in-place mutation of `data_use` (densified via .toarray()/.values/np.asarray into a local copy, never mutated); each call builds and returns a brand-new scipy.sparse.csr_matrix; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "buildSNN(data_use, k=10, k_scale=10, prune_SNN=1.0 / 15.0)"
+  - "buildSNN(df, k=5)"
+  - "buildSNN(data_use, k=5, prune_SNN=0.5)"
+failure_fixes:
+  - when: 'ValueError: k cannot be greater than the number of samples'
+    suggest:
+      - reduce k, or pass a data_use with more sample columns.
+related: []

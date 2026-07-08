@@ -1,0 +1,53 @@
+id: spatialcellchat.signaling_pathway_ranking
+title: Rank signaling pathways by information flow and inspect a pathway's L-R contribution
+description: >
+  Given an already-inferred communication network, rank signaling pathways
+  (or L-R pairs) by total information flow / interaction count, optionally
+  split by interaction category, then drill into one pathway's individual
+  L-R-pair contributions. Mirrors the "Identify the enriched signaling —
+  rankNet" and "netAnalysis_contribution" sections of the package tutorial.
+task_tags:
+  - rank-signaling-pathways
+when_to_use:
+  - >-
+    A spatial_ccc_inference_lowres / _highres run has already produced
+    uns['cellchat']['netP']['prob'], and the goal is to identify which
+    pathways (or L-R pairs) dominate communication, or to see which
+    specific L-R pairs drive one pathway's signal.
+when_not_to_use:
+  - >-
+    Communication probability has not yet been computed for this AnnData —
+    run spatial_ccc_inference_lowres or spatial_ccc_inference_highres first.
+inputs:
+  - name: adata
+    kind: anndata.AnnData
+    description: AnnData with a completed CellChat inference (uns['cellchat']['netP']['prob'] and uns['cellchat']['LR']['LRsig'] populated).
+    requirements:
+      - >-
+        Must already have uns.cellchat.netP.prob and uns.cellchat.LR.LRsig
+        populated by spatial_ccc_inference_lowres / _highres; this
+        workflow only reads existing state, it computes no new
+        communication probabilities.
+steps:
+  - symbol: spatialcellchat.rankNet
+    purpose: Rank pathways by information flow (or interaction count), optionally restricted to one interaction category.
+    args:
+      adata: $inputs.adata
+      mode: single
+      slot_name: netP
+      measure: weight
+      signaling_type: '["Secreted Signaling"]'
+    notes:
+      - Pure function; returns a ranking DataFrame, does not mutate adata.
+      - Call once per interaction category (e.g. "Secreted Signaling", "ECM-Receptor", "Cell-Cell Contact") to reproduce the tutorial's split ranking.
+  - symbol: spatialcellchat.netAnalysis_contribution
+    purpose: Rank the individual L-R pairs within one signaling pathway by their contribution to total communication probability.
+    args:
+      adata: $inputs.adata
+      signaling: pathway_show
+    notes:
+      - Pick `signaling` from the pathway names surfaced by the rankNet step (e.g. the top row of its output DataFrame).
+templates: []
+outputs:
+  - "A long-form pathway (or L-R-pair) ranking DataFrame, from rankNet."
+  - "A bar-chart Figure of one pathway's per-L-R-pair contribution, from netAnalysis_contribution."

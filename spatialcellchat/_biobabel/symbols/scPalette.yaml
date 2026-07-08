@@ -1,0 +1,29 @@
+id: spatialcellchat.scPalette
+import_path: spatialcellchat._palette.scPalette
+kind: function
+signature: "scPalette(n: int) -> np.ndarray"
+purpose: "Single-cell visualization palette; the literal 26-colour palette from visualization.R, stretched for n > 26."
+description: >
+  For n <= 26 returns the first n entries of a fixed 26-colour hex palette
+  baked into visualization.R. For n > 26 the 26-colour palette is treated
+  as anchors and stretched to n colours using R's
+  grDevices::colorRampPalette algorithm (linear interpolation of sRGB
+  channels across the anchors, with R's approxfun operator ordering and
+  rgb(..., maxColorValue=255) truncation-toward-zero on the output).
+parameters:
+  - name: n
+    type: int
+    required: true
+    default: null
+    description: Number of colours to generate.
+returns: >
+  A numpy.ndarray of length n containing uppercase "#RRGGBB" hex strings.
+mutates: "execution_class=pure_function; no in-place mutation of the module-level palette constant; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "scPalette(5)"
+  - "scPalette(26)"
+  - "scPalette(50)"
+failure_fixes: []
+related: []

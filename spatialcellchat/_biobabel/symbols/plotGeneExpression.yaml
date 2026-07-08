@@ -1,0 +1,114 @@
+id: spatialcellchat.plotGeneExpression
+import_path: spatialcellchat.viz_delegated.plotGeneExpression
+kind: function
+signature: >-
+  plotGeneExpression(adata: ad.AnnData, features: Optional[Sequence[str]] =
+  None, signaling: Optional[Sequence[str]] = None, enriched_only: bool =
+  True, type: Literal["violin", "dot", "bar"] = "violin", group_by:
+  Optional[str] = None, color_use: Optional[Sequence[str]] = None,
+  slot_name: str = "data.signaling", **kwargs: Any) -> Figure
+purpose: Show ligand/receptor gene expression for one or more signaling pathways, dispatching to a violin, dot, or bar renderer.
+description: >
+  Mirrors R's plotGeneExpression (visualization.R:6280). Exactly one of
+  features/signaling must ultimately be used to build the gene list: if
+  features is given it takes precedence (a UserWarning is emitted if
+  signaling is also given); if only signaling is given, the L-R gene set
+  is resolved via extractEnrichedLR(adata, signaling=list(signaling),
+  geneLR_return=True, enriched_only=enriched_only) and its "geneLR" key is
+  used as the feature list; if neither is given, raises ValueError. The
+  resolved feature list is then intersected with adata.var_names — if the
+  intersection is empty, raises ValueError. group_by is resolved via
+  _resolve_group_by. Dispatches by type: "violin" -> StackedVlnPlot(adata,
+  features=genes_present, group_by=group_by, color_use=color_use,
+  slot_name=slot_name, **kwargs); "dot" -> dotPlot(adata,
+  features=genes_present, group_by=group_by, color_use=color_use or
+  ("#F8766D", "#00BFC4"), slot_name=slot_name, **kwargs); "bar" -> the
+  internal _barPlot helper (R: barPlot), which reads the expression matrix
+  via resolve_data_matrix(adata, slot_name), computes a per-cell-group
+  aggregate (truncatedMean/triMean/median, forwarded via **kwargs) for
+  each feature, and renders one bar-chart panel per feature. Any type
+  outside {"violin","dot","bar"} raises ValueError immediately.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData whose adata.X/adata.layers hold expression and whose adata.obs holds the group_by column; when signaling is used, must also carry the cellchat DB/LR state required by extractEnrichedLR.
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit gene list to plot; takes precedence over signaling (with a UserWarning if both are given).
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Signaling pathway name(s) whose ligand/receptor genes are resolved via extractEnrichedLR when features is not given.
+  - name: enriched_only
+    type: bool
+    required: false
+    default: true
+    description: Forwarded to extractEnrichedLR's enriched_only when resolving genes from signaling.
+  - name: type
+    type: Literal["violin", "dot", "bar"]
+    required: false
+    default: violin
+    description: Renderer to dispatch to; "violin" -> StackedVlnPlot, "dot" -> dotPlot, "bar" -> internal _barPlot. Any other value raises ValueError.
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: obs column defining cell groups; auto-resolved via _resolve_group_by when None before dispatch.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Forwarded to the chosen renderer as its palette (dotPlot falls back to ("#F8766D", "#00BFC4") when None).
+  - name: slot_name
+    type: str
+    required: false
+    default: data.signaling
+    description: Chat data slot to read expression from; forwarded to StackedVlnPlot/dotPlot/_barPlot so post-preProcessing (ALRA) values are used when present.
+  - name: kwargs
+    type: Any
+    required: false
+    default: null
+    description: Forwarded to the dispatched renderer (StackedVlnPlot, dotPlot, or the internal _barPlot, which additionally accepts method/trim/x_lab_rot/ncol).
+returns: >-
+  A matplotlib.figure.Figure produced by the dispatched renderer
+  (StackedVlnPlot, dotPlot, or the internal bar-plot helper).
+mutates: >-
+  execution_class=pure_function; reads adata.X/adata.layers, adata.obs,
+  adata.var_names, and (via extractEnrichedLR when signaling is used)
+  adata.uns['cellchat'] DB/LR state only, does not mutate adata;
+  returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.plotGeneExpression(adata, signaling=['TGFb'], type='violin')"
+  - "scc.plotGeneExpression(adata, signaling=['TGFb', 'WNT'], type='dot', enriched_only=False)"
+  - "scc.plotGeneExpression(adata, features=['Tgfb1', 'Tgfbr1'], type='bar')"
+failure_fixes:
+  - when: "neither features nor signaling is provided"
+    suggest:
+      - "Pass either features=[...] or signaling=[...]."
+    explanation: >-
+      Raises ValueError("Either `features` or `signaling` must be provided.")
+      when both are None.
+  - when: "type is not one of \"violin\", \"dot\", \"bar\""
+    suggest:
+      - "Use type='violin', type='dot', or type='bar'."
+    explanation: >-
+      Raises ValueError("`type` must be 'violin', 'dot', or 'bar'") for any
+      other value (checked in test_plotGeneExpression_invalid_type_raises).
+  - when: "none of the resolved ligand/receptor genes are present in adata.var_names"
+    suggest:
+      - "Verify the signaling pathway name(s) match adata.uns['cellchat']['DB']['interaction']['pathway_name'], or that adata.var_names uses the same gene symbols as the CellChatDB."
+    explanation: >-
+      Raises ValueError("None of the inferred ligand/receptor genes are in
+      adata.var_names") when the intersection with adata.var_names is empty
+      (checked in test_plotGeneExpression_no_overlap_raises).
+related:
+  - spatialcellchat.StackedVlnPlot
+  - spatialcellchat.dotPlot
+  - spatialcellchat.extractEnrichedLR

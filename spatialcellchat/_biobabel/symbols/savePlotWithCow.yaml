@@ -1,0 +1,79 @@
+id: spatialcellchat.savePlotWithCow
+import_path: spatialcellchat.viz_basic.savePlotWithCow
+kind: function
+signature: >-
+  savePlotWithCow(filename: str, plot: Optional[Figure] = None, ncol: int =
+  1, nrow: int = 1, base_height: float = 3.71, base_asp: float = 1.618,
+  base_width: Optional[float] = None, **kwargs: Any) -> None
+purpose: Save a matplotlib Figure to disk with cowplot::save_plot-style width/height derivation.
+description: >
+  Direct port of R's savePlotWithCow (utilities.R:10), mirroring
+  cowplot::save_plot: given a width-aspect-height triple, derives the
+  missing dimension and forwards to Figure.savefig. When plot is None, uses
+  the current active figure (plt.gcf()), mirroring R's
+  grDevices::recordPlot(). R-only aliases in kwargs ("width", "height",
+  "base_aspect_ratio", "cols", "rows") are popped and translated/dropped
+  before the remaining kwargs are forwarded to savefig: width defaults to
+  (base_width or base_height*base_asp) * ncol; height defaults to
+  base_height * nrow; base_aspect_ratio (if given) overrides base_asp. The
+  target figure's size is set via set_size_inches(width, height) before
+  saving.
+parameters:
+  - name: filename
+    type: str
+    required: true
+    default: null
+    description: Output file path passed to Figure.savefig.
+  - name: plot
+    type: Optional[matplotlib.figure.Figure]
+    required: false
+    default: null
+    description: Figure to save; uses plt.gcf() (the current active figure) when None.
+  - name: ncol
+    type: int
+    required: false
+    default: 1
+    description: Multiplies the per-panel base width to get the final figure width.
+  - name: nrow
+    type: int
+    required: false
+    default: 1
+    description: Multiplies base_height to get the final figure height.
+  - name: base_height
+    type: float
+    required: false
+    default: 3.71
+    description: Per-panel height in inches, used unless height/kwargs["height"] is given.
+  - name: base_asp
+    type: float
+    required: false
+    default: 1.618
+    description: Aspect ratio used to derive base_width when base_width is None; overridden by kwargs["base_aspect_ratio"] when given.
+  - name: base_width
+    type: Optional[float]
+    required: false
+    default: null
+    description: Per-panel width in inches; derived as base_height * base_asp when None.
+  - name: kwargs
+    type: Any
+    required: false
+    default: null
+    description: >-
+      Forwarded to Figure.savefig after popping the R-only aliases "width"
+      (overrides the derived width), "height" (overrides the derived
+      height), "base_aspect_ratio" (overrides base_asp), and "cols"/"rows"
+      (dropped, R-only synonyms for ncol/nrow).
+returns: None. Writes the figure image to filename as a side effect.
+mutates: >-
+  execution_class=pure_function; takes no adata argument — mutates only the
+  size of the passed-in (or current) matplotlib Figure via
+  set_size_inches, and performs a filesystem side effect (writes an image
+  file to filename via Figure.savefig); returns_kind=none (returns None)
+requires: []
+writes: []
+examples:
+  - 'scc.savePlotWithCow("out.png", plot=fig, ncol=2, nrow=1, base_height=2.0)'
+  - 'scc.savePlotWithCow("out.png")'
+  - 'scc.savePlotWithCow("out.png", plot=fig, width=4.0, height=3.0, base_aspect_ratio=2.0)'
+failure_fixes: []
+related: []

@@ -1,0 +1,122 @@
+id: spatialcellchat.netVisual_barplot
+import_path: spatialcellchat.viz_basic.netVisual_barplot
+kind: function
+signature: >-
+  netVisual_barplot(adata: ad.AnnData, comparison: Sequence[int] = (1, 2),
+  measure: Literal["count", "weight"] = "count", sources_use:
+  Optional[Union[Sequence[str], Sequence[int]]] = None, targets_use:
+  Optional[Union[Sequence[str], Sequence[int]]] = None, invert_source: bool =
+  False, invert_target: bool = False, signaling: Optional[str] = None,
+  slot_name: Literal["netP", "net"] = "netP", color_use:
+  Optional[Sequence[str]] = None, title_name: Optional[str] = None,
+  x_lab_rot: Union[bool, float] = False, **kwargs: Any) -> Figure
+purpose: Bar plot of the inferred number/strength of cell-cell interactions per target group (or their differential for a merged comparison).
+description: >
+  Direct port of R's netVisual_barplot (visualization.R:2746). Reads
+  uns["cellchat"]["net"] (required — raises ValueError if absent). Detects a
+  "merged" object by checking whether every value of net is itself a dict
+  keyed by comparison index (mirrors R's is.list(object@net[[1]])); for a
+  merged object, subtracts net[comparison[0]][measure] from
+  net[comparison[1]][measure] and titles the plot "Differential number/
+  strength of interactions". For a single object: if signaling is given,
+  reads uns["cellchat"][slot_name]["prob"] and selects the slice matching
+  signaling in its dimnames (raises ValueError if signaling is not found);
+  otherwise reads net[measure] directly (net["count"] or net["weight"]).
+  Melts the resulting cell x cell matrix into long form (source, target,
+  value), optionally subsets sources_use/targets_use (1-based positional
+  ints are resolved against the cell-group level order, invert_source /
+  invert_target take the complement), colours target levels via
+  scPalette when color_use is None, and delegates the bar drawing to
+  barplot_internal(x="target", y="value", fill="target").
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with uns["cellchat"]["net"] (and, for signaling=, uns["cellchat"][slot_name]) populated.
+  - name: comparison
+    type: Sequence[int]
+    required: false
+    default: (1, 2)
+    description: For merged objects, the two comparison indices (keys of net) to subtract (net[comparison[1]] - net[comparison[0]]).
+  - name: measure
+    type: 'Literal["count", "weight"]'
+    required: false
+    default: count
+    description: Which net matrix to plot ("count" or "weight").
+  - name: sources_use
+    type: Optional[Union[Sequence[str], Sequence[int]]]
+    required: false
+    default: null
+    description: Subset of source cell groups (names, or 1-based positional indices into the cell-group level order).
+  - name: targets_use
+    type: Optional[Union[Sequence[str], Sequence[int]]]
+    required: false
+    default: null
+    description: Subset of target cell groups (names, or 1-based positional indices).
+  - name: invert_source
+    type: bool
+    required: false
+    default: false
+    description: When True, keep the complement of sources_use instead.
+  - name: invert_target
+    type: bool
+    required: false
+    default: false
+    description: When True, keep the complement of targets_use instead.
+  - name: signaling
+    type: Optional[str]
+    required: false
+    default: null
+    description: For single (non-merged) objects, plot the per-signaling-pathway slice of slot_name["prob"] instead of the aggregate net[measure].
+  - name: slot_name
+    type: 'Literal["netP", "net"]'
+    required: false
+    default: netP
+    description: Which uns["cellchat"] sub-slot to read "prob"/dimnames from when signaling is given.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-target-level colours; defaults to scPalette(n_groups) restricted to the target levels present after subsetting.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; auto-derived from measure/signaling/merged status when None.
+  - name: x_lab_rot
+    type: Union[bool, float]
+    required: false
+    default: false
+    description: Forwarded to barplot_internal for x tick-label rotation.
+  - name: kwargs
+    type: Any
+    required: false
+    default: null
+    description: Forwarded to barplot_internal.
+returns: A new matplotlib.figure.Figure containing the bar plot, laid out via plt.subplots() and fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; reads uns["cellchat"]["net"] (and
+  uns["cellchat"][slot_name] when signaling is given) via
+  spatialcellchat._anndata.cellchat_dict; does not write back into
+  adata.uns/obs/var; returns_kind=new_object
+requires:
+  - uns.cellchat.net
+examples:
+  - 'scc.netVisual_barplot(adata, measure="count")'
+  - >-
+    scc.netVisual_barplot(adata, measure="weight", sources_use=["G0"],
+    targets_use=[1, 2], color_use=["#FF0000", "#00FF00", "#0000FF"])
+  - 'scc.netVisual_barplot(adata, signaling="pair0", title_name="custom", x_lab_rot=True)'
+failure_fixes:
+  - when: "uns['cellchat']['net'] is missing"
+    suggest:
+      - "Run computeCommunProb (and aggregateNet) before calling netVisual_barplot."
+    explanation: "netVisual_barplot raises ValueError(\"netVisual_barplot requires uns['cellchat']['net']\") when the net slot is absent."
+  - when: "signaling is given but not found in the slot_name dimnames"
+    suggest:
+      - "Pass a signaling pathway name present in uns['cellchat'][slot_name]'s dimnames, or check spelling/case."
+    explanation: 'netVisual_barplot raises ValueError(f"signaling {signaling!r} not in slot {slot_name!r} dimnames").'
+related:
+  - spatialcellchat.barplot_internal
+  - spatialcellchat.computeCommunProb

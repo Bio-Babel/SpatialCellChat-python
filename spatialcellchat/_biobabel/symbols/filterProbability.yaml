@@ -1,0 +1,90 @@
+id: spatialcellchat.filterProbability
+import_path: spatialcellchat.modeling.filterProbability
+kind: function
+signature: >-
+  filterProbability(adata: ad.AnnData, nboot: int = 100, seed_use: int = 666,
+  thresh: float = 0.05) -> ad.AnnData
+purpose: Filter individual cell-cell communications via a per-LR null quantile.
+description: >
+  Direct port of R's filterProbability (modeling.R:1976-2054). For every
+  L-R pair: draw nboot cells without replacement (via
+  spatialcellchat._bootstrap.make_cell_permutation), gather the per-cell
+
+  Prob.cell.i row values at columns where d.spatial[cell, ] > 0 (or, for
+  contact-dependent pairs / when all pairs are contact-dependent, using
+  adj.contact instead of d.spatial), take the (1 - thresh) quantile of the
+  pooled values, then truncate Prob.cell.i via scMatrixTruncation so only
+  entries >= that quantile survive (unless the quantile is exactly 0, in
+  which case the pair's matrix is left unchanged). If thresh=1.0
+  (quantile_prob == 0), the function returns immediately without mutating
+  adata. Reads net["tmp"]["prob.cell"] (per-pair CSC dict, set by
+  computeCommunProb), uns["cellchat"]["images"]["result.computeCellDistance"]
+  (d.spatial / adj.contact, also set by computeCommunProb), and
+  uns["cellchat"]["options"]["parameter"] (nLR, nLR1,
+  all.contact.dependent, also set by computeCommunProb) to decide which
+  distance-derived mask each LR pair uses.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object whose uns["cellchat"]["net"]["tmp"]["prob.cell"] list was
+      written by computeCommunProb.
+  - name: nboot
+    type: int
+    required: false
+    default: 100
+    description: Number of cells sampled without replacement per LR pair for the null quantile estimate.
+  - name: seed_use
+    type: int
+    required: false
+    default: 666
+    description: Random seed used to build the cell permutation.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: >-
+      Significance threshold; quantile_prob = 1 - thresh is the quantile of
+      pooled null values used as the truncation cutoff. thresh=1.0 is a
+      no-op early return.
+returns: >-
+  The mutated adata (same object). Rewrites
+  adata.uns["cellchat"]["net"]["tmp"]["prob.cell"] (per-pair CSC dict, each
+  matrix truncated in place via scMatrixTruncation) and rebuilds
+  adata.uns["cellchat"]["net"]["prob.cell"] (the stacked 3-D sparse array)
+  from the truncated per-pair matrices.
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['net']['tmp']['prob.cell']
+  and adata.uns['cellchat']['net']['prob.cell'] in place; returns_kind=same_object
+requires:
+  - uns.cellchat.net.tmp.prob.cell
+  - uns.cellchat.images.result.computeCellDistance
+writes:
+  - uns.cellchat.net.tmp.prob.cell
+  - uns.cellchat.net.prob.cell
+examples:
+  - "scc.filterProbability(sub)"
+  - "modeling.filterProbability(adata, nboot=20, seed_use=42, thresh=0.5)"
+  - "modeling.filterProbability(adata, nboot=10, thresh=1.0)"
+failure_fixes:
+  - when: "uns['cellchat']['net'] is missing, or net['tmp']['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb() first to compute the cell-level communication probability."
+    explanation: >-
+      filterProbability raises ValueError("filterProbability: please run
+      computeCommunProb to compute the communication probability/strength
+      between any interacting individual cells") when net is None or
+      net['tmp']['prob.cell'] is absent.
+  - when: "uns['cellchat']['images']['result.computeCellDistance'] is missing"
+    suggest:
+      - "Run computeCommunProb() first — it writes the required d.spatial/adj.contact result."
+    explanation: >-
+      filterProbability raises ValueError("filterProbability requires
+      uns['cellchat']['images']['result.computeCellDistance'] (set by
+      computeCommunProb)") when that slot is absent.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.scMatrixTruncation
+  - spatialcellchat.filterCommunication

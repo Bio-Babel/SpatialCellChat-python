@@ -1,0 +1,140 @@
+id: spatialcellchat.netEmbedding
+import_path: spatialcellchat.analysis_network.netEmbedding
+kind: function
+signature: >-
+  netEmbedding(adata: ad.AnnData, slot_name: str = "netP", type_: str =
+  "functional", comparison: Optional[Sequence[int]] = None, pathway_remove:
+  Optional[Sequence[str]] = None, n_neighbors: Optional[int] = None,
+  min_dist: float = 0.3, n_components: int = 2, seed_use: int = 42,
+  umap_method: str = "umap-learn", mode: Optional[str] = None,
+  **umap_kwargs: Any) -> ad.AnnData
+purpose: Manifold-learn (UMAP) a 2-D embedding of the signaling-network similarity matrix.
+description: >
+  Direct port of R's netEmbedding (analysis.R:1503). Resolves
+  comparison_name via the shared _resolve_comparison_name helper: an
+  explicit `comparison` list is joined with "-"; otherwise mode='single'
+  forces "single", mode='merged' auto-detects from the number of keys in
+  slot["similarity"][type_]["matrix"], and no mode auto-detects the same way
+  (merged-style "-"-containing keys vs. a "single" key). Reads the similarity
+  matrix at slot["similarity"][type_]["matrix"][comparison_name] (a
+  pandas.DataFrame or ndarray). Drops pathway_remove columns/rows — by
+  default, pathways whose column sum equals 1 (i.e. only the diagonal entry
+  is nonzero, meaning no similarity link to anything else). Runs
+  umap.UMAP(metric="correlation" for umap_method="umap-learn", or
+  "euclidean" for "uwot", to mirror R's runUMAP vs. uwot::umap defaults) on
+  the similarity matrix directly as features (rows = pathways; no
+  precomputed distance), with n_neighbors defaulting to
+  ceil(sqrt(N))+1 (clamped to [2, N-1]). The resulting (N, n_components)
+  embedding is written as a pandas.DataFrame (columns "UMAP1", "UMAP2", ...)
+  into slot["similarity"][type_]["dr"][comparison_name].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object whose
+      uns["cellchat"][slot_name]["similarity"][type_]["matrix"][comparison_name]
+      is consumed (written by computeNetSimilarity / computeNetSimilarityPairwise).
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: Slot to read from ("netP" or "net").
+  - name: type_
+    type: str
+    required: false
+    default: "functional"
+    description: "'functional' or 'structural'; must match the type_ used to build the similarity matrix."
+  - name: comparison
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: >-
+      1-based dataset indices. Defaults to "single" for single-dataset mode or
+      range(1, n_datasets+1) for merged mode.
+  - name: pathway_remove
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathway names to drop from the embedding. Defaults to those with column-sum == 1 in the similarity matrix.
+  - name: n_neighbors
+    type: Optional[int]
+    required: false
+    default: null
+    description: UMAP n_neighbors. Defaults to ceil(sqrt(N))+1, then clamped to [2, N-1].
+  - name: min_dist
+    type: float
+    required: false
+    default: 0.3
+    description: UMAP min_dist.
+  - name: n_components
+    type: int
+    required: false
+    default: 2
+    description: UMAP output dimensionality.
+  - name: seed_use
+    type: int
+    required: false
+    default: 42
+    description: UMAP random_state (also seeds numpy.random before fitting).
+  - name: umap_method
+    type: str
+    required: false
+    default: "umap-learn"
+    description: >-
+      'umap-learn' (metric='correlation', mirrors R's runUMAP default) or
+      'uwot' (metric='euclidean', mirrors R's uwot::umap default).
+  - name: mode
+    type: Optional[str]
+    required: false
+    default: null
+    description: "'single' or 'merged'; overrides comparison-name auto-detection (mirrors R's object@options$mode)."
+  - name: umap_kwargs
+    type: Any
+    required: false
+    default: null
+    description: Additional keyword arguments forwarded to umap.UMAP.
+returns: >-
+  The mutated adata (same object). Writes a pandas.DataFrame embedding into
+  uns["cellchat"][slot_name]["similarity"][type_]["dr"][comparison_name].
+mutates: >-
+  execution_class=builder; mutates
+  adata.uns['cellchat'][slot_name]['similarity'][type_]['dr'][comparison_name]
+  in place; returns_kind=same_object
+requires:
+  - uns.cellchat.netP.similarity.functional.matrix
+  - uns.cellchat.netP.similarity.structural.matrix
+  - uns.cellchat.net.similarity.functional.matrix
+  - uns.cellchat.net.similarity.structural.matrix
+writes:
+  - uns.cellchat.netP.similarity.functional.dr
+  - uns.cellchat.netP.similarity.structural.dr
+  - uns.cellchat.net.similarity.functional.dr
+  - uns.cellchat.net.similarity.structural.dr
+examples:
+  - "scc.netEmbedding(adata, slot_name='netP', type_='functional')"
+  - "scc.netEmbedding(adata, slot_name='netP', type_='functional', n_neighbors=5, umap_method='uwot')"
+  - "scc.netEmbedding(adata, slot_name='netP', type_='functional', mode='merged')"
+failure_fixes:
+  - when: "umap_method is neither 'umap-learn' nor 'uwot'"
+    suggest:
+      - "Pass umap_method='umap-learn' or umap_method='uwot'."
+    explanation: netEmbedding raises ValueError(f"umap_method must be 'umap-learn' or 'uwot'; got {umap_method!r}") otherwise.
+  - when: "similarity[type_] (or the whole 'similarity' key) is missing"
+    suggest:
+      - "Run computeNetSimilarity (or computeNetSimilarityPairwise for merged mode) first, with the same slot_name/type_."
+    explanation: >-
+      netEmbedding raises ValueError(f"adata.uns['cellchat']['{slot_name}']['similarity']['{type_}']
+      missing; run computeNetSimilarity first.") when the similarity[type_]
+      entry is absent.
+  - when: "similarity[type_]['matrix'][comparison_name] is missing"
+    suggest:
+      - "Verify the comparison / mode argument matches the comparison_name under which computeNetSimilarity(Pairwise) actually stored the matrix."
+    explanation: >-
+      netEmbedding raises ValueError(f"similarity['{type_}']['matrix']['{comparison_name}']
+      not found.") when the resolved comparison_name key is absent.
+related:
+  - spatialcellchat.computeNetSimilarity
+  - spatialcellchat.computeNetSimilarityPairwise
+  - spatialcellchat.netClustering

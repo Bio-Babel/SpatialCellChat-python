@@ -1,0 +1,187 @@
+id: spatialcellchat.dotPlot
+import_path: spatialcellchat.viz_delegated.dotPlot
+kind: function
+signature: >-
+  dotPlot(adata: ad.AnnData, features: Sequence[str], rotation: bool = True,
+  colormap: str = "OrRd", color_direction: int = 1, color_use: Sequence[str]
+  = ("#F8766D", "#00BFC4"), scale: bool = True, col_min: float = -2.5,
+  col_max: float = 2.5, dot_scale: float = 6.0, assay: str = "RNA", idents:
+  Optional[Sequence[str]] = None, group_by: Optional[str] = None, split_by:
+  Optional[str] = None, legend_width: float = 0.5, angle_x: float = 45.0,
+  hjust_x: float = 1.0, angle_y: float = 0.0, hjust_y: float = 0.5,
+  show_legend: bool = True, color_heatmap: Optional[str] = None,
+  standard_scale: Optional[Literal["var", "group"]] = None, swap_axes:
+  Optional[bool] = None, slot_name: str = "data.signaling", **kwargs: Any)
+  -> Figure
+purpose: Dot plot of gene expression (dot size = percent expressed, color = scaled mean) by cell group.
+description: >
+  Thin scanpy shim mirroring R's dotPlot (visualization.R:3954) on top of
+  scanpy.pl.dotplot. Resolves group_by via _resolve_group_by, subsets cells
+  to idents via _subset_idents, resolves the colormap (color_heatmap
+  overrides colormap when set; color_direction=-1 reverses the colormap),
+  derives standard_scale from scale ("var" when scale=True, unless
+  standard_scale is explicitly given, which always takes precedence), and
+  derives swap_axes from rotation unless swap_axes is explicitly given.
+  Translates slot_name to a scanpy layer= kwarg via _slot_to_scanpy_layer
+  (same semantics as StackedVlnPlot: "data" -> adata.X; otherwise the
+  DATA_SLOT_TO_LAYER-mapped layer, falling back to adata.X if absent), then
+  calls sc.pl.dotplot(adata_use, var_names=features, groupby=group_by,
+  cmap=..., standard_scale=..., swap_axes=..., vmin=col_min, vmax=col_max,
+  dot_max=1.0, ...). Because scanpy's return_fig=True path returns the
+  DotPlot wrapper before make_figure() is called, the shim invokes
+  fig_or_obj.style(dot_max=1.0, dot_min=0.0,
+  size_exponent=dot_scale/6.0) and fig_or_obj.make_figure() itself so
+  .fig is populated. Finally applies best-effort tick rotation
+  (angle_x/hjust_x, angle_y) to every axes and removes the legend from all
+  axes when show_legend=False. assay, color_use, legend_width, hjust_y are
+  carried for R parity but are not meaningfully forwarded to scanpy
+  (scanpy plots from adata.X/layers and manages its own legend/cmap).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData whose adata.X or adata.layers[<slot_name layer>] holds the expression matrix, and whose adata.obs holds the group_by column.
+  - name: features
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Gene names plotted as var_names.
+  - name: rotation
+    type: bool
+    required: false
+    default: true
+    description: coord_flip-equivalent; forwarded as scanpy swap_axes when swap_axes is not explicitly given.
+  - name: colormap
+    type: str
+    required: false
+    default: OrRd
+    description: Matplotlib colormap name; overridden by color_heatmap when set.
+  - name: color_direction
+    type: int
+    required: false
+    default: 1
+    description: "-1 reverses the resolved colormap; 1 leaves it as-is."
+  - name: color_use
+    type: Sequence[str]
+    required: false
+    default: ["#F8766D", "#00BFC4"]
+    description: Carried for R parity; scanpy uses its own legend/cmap so this has no direct visual effect.
+  - name: scale
+    type: bool
+    required: false
+    default: true
+    description: When True (and standard_scale is None), dispatched to scanpy standard_scale="var" (matches Seurat's row-scale).
+  - name: col_min
+    type: float
+    required: false
+    default: -2.5
+    description: Dispatched to scanpy vmin after standardisation.
+  - name: col_max
+    type: float
+    required: false
+    default: 2.5
+    description: Dispatched to scanpy vmax after standardisation.
+  - name: dot_scale
+    type: float
+    required: false
+    default: 6.0
+    description: Dispatched to the DotPlot wrapper's style(size_exponent=dot_scale/6.0) call.
+  - name: assay
+    type: str
+    required: false
+    default: RNA
+    description: Reserved for R parity; scanpy always plots from adata.X/layers regardless of this value.
+  - name: idents
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict to cells whose group_by value is in this list (R parity Idents %in% idents).
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: obs column defining cell groups; auto-resolved via _resolve_group_by when None.
+  - name: split_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: Forwarded through kwargs handling to scanpy as split_by.
+  - name: legend_width
+    type: float
+    required: false
+    default: 0.5
+    description: Reserved for R parity; no direct scanpy equivalent.
+  - name: angle_x
+    type: float
+    required: false
+    default: 45.0
+    description: Best-effort x tick-label rotation applied post-hoc to every axes.
+  - name: hjust_x
+    type: float
+    required: false
+    default: 1.0
+    description: Horizontal alignment for x tick labels (>=1.0 -> right, <=0.0 -> left, else center).
+  - name: angle_y
+    type: float
+    required: false
+    default: 0.0
+    description: Best-effort y tick-label rotation applied post-hoc.
+  - name: hjust_y
+    type: float
+    required: false
+    default: 0.5
+    description: Reserved for R parity; not applied to y tick labels in this implementation.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: When False, removes the legend from every axes after plotting.
+  - name: color_heatmap
+    type: Optional[str]
+    required: false
+    default: null
+    description: Backwards-compatible alias for colormap; overrides colormap when set.
+  - name: standard_scale
+    type: Optional[Literal["var", "group"]]
+    required: false
+    default: null
+    description: Explicit override for the scale-derived standard_scale; takes precedence over scale when set.
+  - name: swap_axes
+    type: Optional[bool]
+    required: false
+    default: null
+    description: Explicit override for the rotation-derived swap_axes; takes precedence over rotation when set.
+  - name: slot_name
+    type: str
+    required: false
+    default: data.signaling
+    description: Chat data slot to read expression from; translated to a scanpy layer= kwarg via _slot_to_scanpy_layer. Raises ValueError if not "data" and not a recognised DATA_SLOT_TO_LAYER key.
+  - name: kwargs
+    type: Any
+    required: false
+    default: null
+    description: Forwarded to sc.pl.dotplot (show and return_fig default to False/True respectively unless overridden).
+returns: >-
+  A matplotlib.figure.Figure for the dot plot (scanpy's DotPlot wrapper's
+  underlying figure after make_figure(), with post-hoc tick rotation and
+  optional legend removal applied).
+mutates: >-
+  execution_class=pure_function; reads adata.X/adata.layers and adata.obs
+  only, does not mutate adata; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.dotPlot(adata, features=['Tgfb1', 'Tgfbr1'])"
+  - "scc.dotPlot(adata, features=genes, group_by='active_ident', color_heatmap='Blues', swap_axes=True)"
+  - "scc.dotPlot(adata, features=genes, standard_scale='var')"
+failure_fixes:
+  - when: "slot_name is not \"data\" and not a recognised key in DATA_SLOT_TO_LAYER"
+    suggest:
+      - "Pass slot_name=\"data\" for the raw matrix, or one of the canonical DATA_SLOT_TO_LAYER keys (e.g. \"data.signaling\")."
+    explanation: >-
+      _slot_to_scanpy_layer raises ValueError("Unknown slot_name ...; expected
+      one of ...") for any slot_name outside {"data"} | DATA_SLOT_TO_LAYER.keys().
+related:
+  - spatialcellchat.StackedVlnPlot
+  - spatialcellchat.plotGeneExpression

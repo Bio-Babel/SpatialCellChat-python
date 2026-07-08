@@ -1,0 +1,45 @@
+id: spatialcellchat.extractGeneSubset
+import_path: spatialcellchat.database.extractGeneSubset
+kind: function
+signature: >-
+  def extractGeneSubset(geneSet: Sequence[str], complex_input: pd.DataFrame, geneInfo:
+  pd.DataFrame) -> list[str]:
+purpose: Expand a gene/complex-name set into official gene symbols by replacing complex names with their subunits.
+description: >
+  Splits `geneSet` into names already present in `geneInfo["Symbol"]`
+  (official symbols, kept as-is) and the remainder (treated as candidate
+  complex names). Candidate names found in `complex_input`'s index are
+  expanded to their non-empty `subunit_*` column values, traversed
+  column-major (mirrors R's `unlist` on a data frame) and deduplicated via
+  `_flatten_unique_nonempty`. Returns the unique union of official symbols
+  followed by expanded subunits, order preserved.
+parameters:
+  - name: geneSet
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Gene or complex names to expand.
+  - name: complex_input
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB complex table, indexed by complex name, with `subunit_*` columns.
+  - name: geneInfo
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB gene-info table; must have a `Symbol` column.
+returns: >
+  A new list of unique gene symbols: official symbols from `geneSet` plus
+  the subunits of any complex names found in `geneSet`, deduplicated,
+  order preserved.
+mutates: 'execution_class=pure_function; no in-place mutation of `geneSet`, `complex_input`, or `geneInfo`; returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.extractGeneSubset(["TGFB1", "TGFbR1_R2", "TGFB2"], db["complex"], db["geneInfo"])'
+  - 'scc.extractGeneSubset(["TGFbR1_R2"], db["complex"], db["geneInfo"])'
+failure_fixes: []
+related:
+  - spatialcellchat.extractGene
+  - spatialcellchat.extractGeneSubsetFromPair

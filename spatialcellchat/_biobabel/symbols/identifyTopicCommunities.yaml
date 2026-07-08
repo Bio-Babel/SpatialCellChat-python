@@ -1,0 +1,235 @@
+id: spatialcellchat.identifyTopicCommunities
+import_path: spatialcellchat.analysis_topics.identifyTopicCommunities
+kind: function
+signature: >-
+  identifyTopicCommunities(adata: ad.AnnData, slot_name: str = "net",
+  pattern: Literal["incoming", "outgoing"] = "incoming", resolution:
+  Optional[float] = None, clustering_method: Literal["seurat",
+  "autoStardust", "weightStardust", "fusion"] = "seurat", nPrograms:
+  Optional[int] = None, k_signaling: int = 20, k_spatial: int = 20, method:
+  str = "matrix", algorithm: int = 1, prune_SNN: float = 1.0 / 15.0,
+  spatialWeight: float = 0.5, k_fusion: int = 20, t_fusion: int = 20,
+  truncated: bool = False, resRange: Optional[Sequence[float]] = None,
+  eigengap: bool = True, tol: float = 0.01, min_pct: float = 0.1,
+  logfc_threshold: float = 0.25, do_plot: bool = False, filename: str = "",
+  seed_use: int = 666, return_seurat: bool = True) -> ad.AnnData
+purpose: Cluster cells into topic communities from a fitted NMF topic embedding, optionally fusing spatial coordinates.
+description: >
+  Direct port of R's identifyTopicCommunities (analysis.R:3521). Requires
+  slot["centr.cell"] (raises the same message as identifyCellTopics when
+  absent/empty) and slot["topic"][pattern] (raises if missing — must have
+  been written by a prior identifyCellTopics call with a single topic_k).
+  Builds a shared-nearest-neighbour (SNN) graph over the topic embedding
+  (clustering_method="seurat"), or fuses it with spatial distance
+  (adata.obsm["spatial"] or ["X_spatial"]) for "autoStardust"/"weightStardust"
+  (raises ValueError if spatial coordinates are absent), or runs SNF fusion
+  of the topic-SNN and a spatial-SNN for "fusion" (raises NotImplementedError
+  if spatialcellchat._snf is not importable, and ValueError if spatial
+  coordinates are absent). Community detection runs Leiden
+  (algorithm=4, via leidenalg) or Louvain (algorithm in {1,2,3}, via
+  python-igraph) at a fixed `resolution`, or sweeps `resRange` (auto-derived
+  from `n` when None) to build a consensus matrix and pick the resolution
+  whose cluster count best matches an eigengap- or SVD-derived target K,
+  backing off to lower resolutions until the smallest cluster has >= 10
+  cells. Cluster labels are written to adata.obs[f"label.{prefix}"] as
+  f"{prefix}{cluster_id}" strings (prefix "OCR" for pattern="outgoing", "ICR"
+  for "incoming"). When more than one cluster results, a per-cluster
+  Wilcoxon rank-sum marker table (over the centrality matrix, Seurat
+  FindAllMarkers-style schema) is computed and stored under
+  slot["topic"][pattern]["markers"]. Cluster assignments, resolution, and
+  label_col are always stored under slot["topic"][pattern]; the full
+  embedding + labels are additionally stored under
+  slot["topic"][pattern]["seurat_obj"] when return_seurat=True.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"][slot_name]["centr.cell"] and ["topic"][pattern] populated.
+  - name: slot_name
+    type: str
+    required: false
+    default: net
+    description: Which uns["cellchat"] slot holds centr.cell / topic / receives cluster results.
+  - name: pattern
+    type: 'Literal["incoming", "outgoing"]'
+    required: false
+    default: incoming
+    description: Which topic embedding (written by identifyCellTopics) to cluster; also selects the "OCR"/"ICR" label prefix.
+  - name: resolution
+    type: Optional[float]
+    required: false
+    default: null
+    description: Fixed clustering resolution; if None, sweeps resRange and auto-selects.
+  - name: clustering_method
+    type: 'Literal["seurat", "autoStardust", "weightStardust", "fusion"]'
+    required: false
+    default: seurat
+    description: '"seurat": SNN on topic embedding only. "autoStardust"/"weightStardust": fuse with spatial distance. "fusion": SNF fusion of topic-SNN and spatial-SNN.'
+  - name: nPrograms
+    type: Optional[int]
+    required: false
+    default: null
+    description: Number of topic dimensions to use for the SNN; defaults to the signaling loading matrix's column count, capped at k_topics.
+  - name: k_signaling
+    type: int
+    required: false
+    default: 20
+    description: k-nearest-neighbours for the topic-embedding SNN.
+  - name: k_spatial
+    type: int
+    required: false
+    default: 20
+    description: k-nearest-neighbours for the spatial-distance SNN (autoStardust/weightStardust/fusion).
+  - name: method
+    type: str
+    required: false
+    default: matrix
+    description: Reserved (R's igraph/matrix selector); ignored — Leiden/Louvain always run over an igraph.
+  - name: algorithm
+    type: int
+    required: false
+    default: 1
+    description: '1/2/3 dispatch to Louvain (python-igraph community_multilevel); 4 dispatches to Leiden (leidenalg). Only != 4 triggers 1..K label renumbering.'
+  - name: prune_SNN
+    type: float
+    required: false
+    default: 1.0 / 15.0
+    description: SNN edge-weight pruning threshold.
+  - name: spatialWeight
+    type: float
+    required: false
+    default: 0.5
+    description: Relative weight of the spatial-distance term for clustering_method="weightStardust".
+  - name: k_fusion
+    type: int
+    required: false
+    default: 20
+    description: k parameter for the SNF fusion step (clustering_method="fusion").
+  - name: t_fusion
+    type: int
+    required: false
+    default: 20
+    description: Number of SNF iterations (clustering_method="fusion").
+  - name: truncated
+    type: bool
+    required: false
+    default: false
+    description: If True (fusion only), keep only the top-k_fusion neighbours per spot in the fused matrix instead of rebuilding an SNN from 1 - fused distance.
+  - name: resRange
+    type: Optional[Sequence[float]]
+    required: false
+    default: null
+    description: Candidate resolutions to sweep when `resolution` is None; auto-derived from n (< 50 or not) if not supplied.
+  - name: eigengap
+    type: bool
+    required: false
+    default: true
+    description: If True, infer target cluster count K via computeEigengap on the consensus matrix; if False, via a truncated-SVD rule.
+  - name: tol
+    type: float
+    required: false
+    default: 0.01
+    description: Tolerance used by both the eigengap and SVD-based K-selection rules.
+  - name: min_pct
+    type: float
+    required: false
+    default: 0.1
+    description: Minimum detection-fraction filter for the per-cluster marker (Wilcoxon) test.
+  - name: logfc_threshold
+    type: float
+    required: false
+    default: 0.25
+    description: Minimum log2 fold-change filter for the per-cluster marker test.
+  - name: do_plot
+    type: bool
+    required: false
+    default: false
+    description: Reserved for API parity; plotting is not implemented in this port.
+  - name: filename
+    type: str
+    required: false
+    default: ''
+    description: Reserved for API parity; unused.
+  - name: seed_use
+    type: int
+    required: false
+    default: 666
+    description: RNG seed for Leiden clustering.
+  - name: return_seurat
+    type: bool
+    required: false
+    default: true
+    description: If True, store the full embedding + labels under slot["topic"][pattern]["seurat_obj"].
+returns: >-
+  The mutated adata (same object). adata.obs[f"label.{prefix}"] holds the
+  per-cell cluster label (categorical string, prefix "OCR"/"ICR"). uns["cellchat"][slot_name]["topic"][pattern]
+  gains "clusters", "resolution", "label_col", optionally "markers" (a
+  per-cluster Wilcoxon marker DataFrame) and, if return_seurat=True,
+  "seurat_obj" (cell_embeddings, loadings, labels, label_col).
+mutates: >-
+  execution_class=builder; mutates adata.obs (adds a label.<prefix> column)
+  and adata.uns['cellchat'][slot_name]['topic'][pattern] in place;
+  returns_kind=same_object
+requires:
+  - uns.cellchat.net.centr.cell
+  - uns.cellchat.net.topic.incoming
+  - uns.cellchat.net.topic.outgoing
+writes:
+  - obs.label.OCR
+  - obs.label.ICR
+  - uns.cellchat.net.topic.incoming.clusters
+  - uns.cellchat.net.topic.incoming.resolution
+  - uns.cellchat.net.topic.incoming.label_col
+  - uns.cellchat.net.topic.incoming.markers
+  - uns.cellchat.net.topic.incoming.seurat_obj
+examples:
+  - "scc.identifyTopicCommunities(sub, slot_name='net', pattern='incoming', clustering_method='seurat')"
+  - "scc.identifyTopicCommunities(sub, slot_name='net', pattern='outgoing', clustering_method='weightStardust', spatialWeight=0.5)"
+  - "scc.identifyTopicCommunities(sub, slot_name='net', pattern='incoming', resolution=0.3, algorithm=4)"
+failure_fixes:
+  - when: "slot['centr.cell'] is missing or empty"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata, do_group=False) first."
+    explanation: >-
+      identifyTopicCommunities raises ValueError("Please run
+      `netAnalysis_computeCentrality` with `do.group=F` to compute the
+      network centrality scores!").
+  - when: "slot['topic'][pattern] is missing"
+    suggest:
+      - "Run identifyCellTopics(adata, slot_name=slot_name, pattern=pattern, topic_k=(k,)) with a single k first."
+    explanation: >-
+      identifyTopicCommunities raises ValueError("adata.uns['cellchat']['<slot_name>']['topic']['<pattern>']
+      is missing; run `identifyCellTopics` with a single `topic_k` first.").
+  - when: "clustering_method is 'autoStardust'/'weightStardust'/'fusion' but adata.obsm has no 'spatial' or 'X_spatial' coordinates"
+    suggest:
+      - "Populate adata.obsm['spatial'], or use clustering_method='seurat' if spatial fusion is not needed."
+    explanation: >-
+      identifyTopicCommunities raises ValueError("autoStardust requires
+      spatial coordinates in adata.obsm['spatial']."),
+      ValueError("weightStardust requires spatial coordinates in
+      adata.obsm['spatial']."), or ValueError("fusion requires spatial
+      coordinates in adata.obsm['spatial'].") depending on clustering_method.
+  - when: "clustering_method='fusion' but spatialcellchat._snf is not implemented"
+    suggest:
+      - "Use a different clustering_method until spatialcellchat._snf is available."
+    explanation: >-
+      identifyTopicCommunities raises NotImplementedError("clustering_method='fusion'
+      requires spatialcellchat._snf (sub-agent A's territory in slice 5).").
+  - when: "clustering_method is not one of the four supported values"
+    suggest:
+      - "Pass one of 'seurat', 'autoStardust', 'weightStardust', 'fusion'."
+    explanation: >-
+      identifyTopicCommunities raises ValueError("Unknown clustering_method:
+      ...").
+  - when: "algorithm is not in {1, 2, 3, 4}"
+    suggest:
+      - "Pass algorithm in {1, 2, 3, 4}."
+    explanation: >-
+      identifyTopicCommunities raises ValueError("algorithm must be in
+      {1, 2, 3, 4}; got ...").
+related:
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.extractTopicSignaling
+  - spatialcellchat.buildSNN
+  - spatialcellchat.computeEigengap

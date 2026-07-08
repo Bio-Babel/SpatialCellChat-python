@@ -1,0 +1,102 @@
+id: spatialcellchat.computeCellDistance
+import_path: spatialcellchat.spatial.computeCellDistance
+kind: function
+signature: >-
+  computeCellDistance(coordinates: Union[np.ndarray, pd.DataFrame,
+  ad.AnnData], interaction_range: float = 250.0, contact_range: float = 10.0,
+  ratio: Optional[float] = None, tol: float = 5.0) -> Dict[str,
+  sparse.csc_matrix]
+purpose: Compute pairwise cell-cell spatial distance and the binary contact-adjacency matrix.
+description: >
+  Direct port of R's computeCellDistance (spatial.R:541). Builds the dense
+  Euclidean distance matrix over the input coordinates (Rfast::Dist
+  equivalent), then keeps the strictly-positive entries at most
+  (interaction_range + tol) / ratio to form the sparse "d.spatial" matrix
+  (rescaled back to microns by ratio when ratio is given). When ratio is
+  None the threshold is undefined and d.spatial is empty, matching R's
+  ``x / NULL`` behaviour. The binary contact adjacency ("adj.contact") is
+  then derived by calling createCellCellContactMatrixFrom_dspatial on
+  d.spatial with contact_threshold=contact_range. When coordinates is an
+  AnnData, its obsm["spatial"] supplies the coordinates; the function then
+  additionally writes obsp["spatial_distances"] = d.spatial,
+  obsp["spatial_connectivities"] via squidpy.gr.spatial_neighbors (radius =
+  contact_range + tol, with a unit diagonal added to match R), and stashes
+  the call parameters under uns["cellchat"]["spatial"]["computeCellDistance"].
+  Internally called by computeCommunProb (modeling.py) with plain coordinate
+  arrays (adata.obsm["spatial"]) to derive the spatial weighting used in
+  communication-probability inference.
+parameters:
+  - name: coordinates
+    type: Union[numpy.ndarray, pandas.DataFrame, anndata.AnnData]
+    required: true
+    default: null
+    description: >-
+      Either a (n, 2) matrix of cell coordinates (rows are cells) or an
+      AnnData whose obsm["spatial"] holds those coordinates. Raises
+      ValueError if coercion does not yield a two-column matrix, or if an
+      AnnData is passed without obsm["spatial"].
+  - name: interaction_range
+    type: float
+    required: false
+    default: 250.0
+    description: "Maximum interaction range, in microns (R: interaction.range)."
+  - name: contact_range
+    type: float
+    required: false
+    default: 10.0
+    description: "Cell-cell contact threshold, in microns (R: contact.range)."
+  - name: ratio
+    type: Optional[float]
+    required: false
+    default: null
+    description: >-
+      Pixel-to-micron conversion factor (R: ratio). When None (matching R's
+      default) the threshold (interaction_range + tol) / ratio is
+      undefined and the resulting d.spatial matrix is empty.
+  - name: tol
+    type: float
+    required: false
+    default: 5.0
+    description: "Distance tolerance, in microns (R: tol; R default is contact.range/2 = 5)."
+returns: >-
+  A new two-key dict {"d.spatial": scipy.sparse.csc_matrix, "adj.contact":
+  scipy.sparse.csc_matrix} of shape (n, n), matching R's return value. When
+  coordinates is an AnnData, the same matrices are additionally written into
+  that AnnData's obsp and uns slots (see mutates), but the dict is still the
+  primary return value.
+mutates: >-
+  execution_class=builder (only when coordinates is an anndata.AnnData);
+  mutates adata.obsp['spatial_distances'], adata.obsp['spatial_connectivities']
+  and adata.uns['cellchat']['spatial']['computeCellDistance'] in place;
+  returns_kind=new_object (the returned dict is a new object regardless of
+  input type; when coordinates is a plain ndarray/DataFrame there is no
+  mutation at all — execution_class=pure_function in that case)
+requires:
+  - obsm.spatial
+writes:
+  - obsp.spatial_distances
+  - obsp.spatial_connectivities
+  - uns.cellchat.spatial.computeCellDistance
+examples:
+  - "res = computeCellDistance(coords, interaction_range=250, contact_range=10, ratio=1.0, tol=5)"
+  - "res = computeCellDistance(adata, interaction_range=300, contact_range=50, ratio=1.0, tol=10)"
+  - "d_spatial, adj_contact = res['d.spatial'], res['adj.contact']"
+failure_fixes:
+  - when: "coordinates does not coerce to a two-column (n, 2) matrix"
+    suggest:
+      - "Pass an (n, 2) array/DataFrame of x/y coordinates, or an AnnData with a two-column obsm['spatial']."
+    explanation: >-
+      computeCellDistance (via the shared _coords_to_array helper) raises
+      ValueError("Please check the input 'coordinates' and make sure it is
+      a two column matrix.") when the coerced array is not 2-D with exactly
+      2 columns.
+  - when: "coordinates is an AnnData without obsm['spatial']"
+    suggest:
+      - "Set adata.obsm['spatial'] to the spot/cell coordinates before calling computeCellDistance."
+    explanation: >-
+      computeCellDistance raises ValueError("computeCellDistance requires
+      spatial coordinates in adata.obsm['spatial']") when coordinates is an
+      AnnData lacking that slot.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.createCellCellContactMatrixFrom_dspatial

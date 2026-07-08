@@ -1,0 +1,77 @@
+id: spatialcellchat.subsetDB
+import_path: spatialcellchat.database.subsetDB
+kind: function
+signature: >-
+  def subsetDB(CellChatDB: Mapping[str, pd.DataFrame], search: str | Sequence[str] |
+  Sequence[Sequence[str]] | None = None, key: str | Sequence[str] = "annotation",
+  non_protein: bool = False) -> dict[str, pd.DataFrame]:
+purpose: Subset a CellChatDB's interaction table by matching values in one or more columns.
+description: >
+  Filters ``CellChatDB["interaction"]`` down to rows whose ``key`` column(s)
+  match ``search``. When ``search`` is ``None`` and ``"annotation"`` is among
+  ``key``, defaults to the standard protein-signaling annotations
+  (``"Secreted Signaling"``, ``"ECM-Receptor"``, ``"Cell-Cell Contact"``), or
+  all four (including ``"Non-protein Signaling"``) when ``non_protein=True``.
+  Unless ``non_protein`` is (or becomes) ``True``, rows annotated
+  ``"Non-protein Signaling"`` are dropped first. If the flattened ``search``
+  values include ``"Non-protein Signaling"``, ``non_protein`` is forced
+  ``True`` and a ``UserWarning`` is emitted. ``key`` dispatches on
+  ``len(key) == 1`` (R parity): a scalar-like key filters via
+  ``column.isin(search)``; a multi-column key requires ``search`` to be a
+  list of per-column target lists of the same length, combined with logical
+  AND. Only the ``"interaction"`` table is filtered; ``"complex"``,
+  ``"cofactor"``, ``"geneInfo"`` pass through unchanged.
+parameters:
+  - name: CellChatDB
+    type: Mapping[str, pandas.DataFrame]
+    required: true
+    default: null
+    description: A CellChatDB dict, as returned by load_db (or updateCellChatDB).
+  - name: search
+    type: str | Sequence[str] | Sequence[Sequence[str]] | None
+    required: false
+    default: null
+    description: >-
+      Value(s) to match against `key`. A string/sequence of strings when
+      `key` is scalar; a sequence of sequences (one per key column) when
+      `key` is a vector. `None` selects the default protein-signaling
+      annotations.
+  - name: key
+    type: str | Sequence[str]
+    required: false
+    default: '"annotation"'
+    description: Column name(s) of CellChatDB["interaction"] to filter on.
+  - name: non_protein
+    type: bool
+    required: false
+    default: 'False'
+    description: If False, rows annotated "Non-protein Signaling" are dropped before filtering.
+returns: >
+  A new dict with the same keys as `CellChatDB`; `"interaction"` is replaced
+  with the filtered subset, the other three tables are the same objects as
+  in the input.
+mutates: 'execution_class=pure_function; no in-place mutation (builds `out = dict(CellChatDB)`, a new shallow dict, and reassigns its "interaction" entry to a filtered DataFrame slice; the input mapping and its DataFrames are left untouched); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.subsetDB(db, search=["Secreted Signaling", "ECM-Receptor", "Cell-Cell Contact"], non_protein=False)'
+  - 'scc.subsetDB(db_human, search=["Secreted Signaling"], key="annotation")'
+  - 'scc.subsetDB(db_human, search=[["Secreted Signaling"], ["TGFb"]], key=["annotation", "pathway_name"])'
+failure_fixes:
+  - when: ValueError "Each element of the `key` should be one of the column names of the interaction_input from CellChatDB"
+    suggest:
+      - pass a key that exists in CellChatDB["interaction"].columns.
+  - when: TypeError "When `key` is a vector, the `search` should be a list."
+    suggest:
+      - when `key` has length > 1, pass `search` as a list of per-key sequences, not a flat string list.
+  - when: ValueError "When `key` is a vector, the `search` should be a list with the size being `length(key)`."
+    suggest:
+      - make len(search) == len(key).
+  - when: UserWarning "non-protein signaling is now included..." emitted when "Non-protein Signaling" appears in `search`
+    suggest:
+      - expected, not an error; `non_protein` is auto-set True.
+related:
+  - spatialcellchat.load_db
+  - spatialcellchat.updateCellChatDB
+  - spatialcellchat.subsetData
+  - spatialcellchat.identifyOverExpressedInteractions

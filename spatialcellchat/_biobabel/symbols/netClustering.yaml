@@ -1,0 +1,122 @@
+id: spatialcellchat.netClustering
+import_path: spatialcellchat.analysis_network.netClustering
+kind: function
+signature: >-
+  netClustering(adata: ad.AnnData, slot_name: str = "netP", type_: str =
+  "functional", comparison: Optional[Sequence[int]] = None, k:
+  Optional[int] = None, methods: str = "kmeans", k_eigen: Optional[int] =
+  None, n_init: int = 10, seed_use: int = 42, mode: Optional[str] = None) ->
+  ad.AnnData
+purpose: Cluster signaling networks based on their UMAP embedding (from netEmbedding).
+description: >
+  Direct port of R's netClustering (analysis.R:1564). Resolves
+  comparison_name the same way as netEmbedding (via the shared
+  _resolve_comparison_name helper: "single" for single-dataset mode, or the
+  merged-mode key inferred from
+  slot["similarity"][type_]["matrix"]), then reads the embedding
+  slot["similarity"][type_]["dr"][comparison_name] written by netEmbedding.
+  For methods="kmeans" with k=None, the cluster count is inferred: for each
+  candidate k in range(2, min(N-1, 10)+1) it runs sklearn KMeans(n_init=
+  n_init, random_state=seed_use) on the embedding, accumulates a co-clustering
+  consensus matrix CM, and calls computeEigengap(CM, tol=0.01) to get
+  num_cluster = max(upper_bound, 1); a final KMeans with that num_cluster is
+  then fit. For methods="kmeans" with k given, KMeans(n_clusters=k) is fit
+  directly. For methods="spectral", both k and k_eigen must be given: it
+  builds a normalised graph Laplacian from the embedding, keeps the k_eigen
+  eigenvectors with the largest eigenvalues, and runs KMeans(n_clusters=k) on
+  those eigenvectors. Cluster labels are written as a 1-based
+  pandas.Series (R parity) into slot["similarity"][type_]["group"][comparison_name].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object containing the embedding written by netEmbedding.
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: Slot to read/write ("netP" or "net").
+  - name: type_
+    type: str
+    required: false
+    default: "functional"
+    description: "'functional' or 'structural'; must match the type_ used when netEmbedding was run."
+  - name: comparison
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: >-
+      1-based dataset indices; defaults to "single" for single-dataset mode
+      or the auto-detected merged-mode comparison key (see netEmbedding).
+  - name: k
+    type: Optional[int]
+    required: false
+    default: null
+    description: Number of clusters. When omitted (methods="kmeans" only), inferred via computeEigengap over a kRange sweep of 2..min(N-1, 10).
+  - name: methods
+    type: str
+    required: false
+    default: "kmeans"
+    description: "'kmeans' or 'spectral'."
+  - name: k_eigen
+    type: Optional[int]
+    required: false
+    default: null
+    description: Number of top eigenvectors used by methods="spectral". Required together with k when methods="spectral".
+  - name: n_init
+    type: int
+    required: false
+    default: 10
+    description: KMeans n_init (R uses nstart=10).
+  - name: seed_use
+    type: int
+    required: false
+    default: 42
+    description: KMeans random_state.
+  - name: mode
+    type: Optional[str]
+    required: false
+    default: null
+    description: "'single' or 'merged'; overrides comparison-name auto-detection (mirrors R's object@options$mode). See netEmbedding for details."
+returns: >-
+  The mutated adata (same object). Writes a 1-based
+  pandas.Series of cluster labels into
+  uns["cellchat"][slot_name]["similarity"][type_]["group"][comparison_name].
+mutates: >-
+  execution_class=builder; mutates
+  adata.uns['cellchat'][slot_name]['similarity'][type_]['group'][comparison_name]
+  in place; returns_kind=same_object
+requires:
+  - uns.cellchat.netP.similarity.functional.dr
+  - uns.cellchat.netP.similarity.structural.dr
+  - uns.cellchat.net.similarity.functional.dr
+  - uns.cellchat.net.similarity.structural.dr
+writes:
+  - uns.cellchat.netP.similarity.functional.group
+  - uns.cellchat.netP.similarity.structural.group
+  - uns.cellchat.net.similarity.functional.group
+  - uns.cellchat.net.similarity.structural.group
+examples:
+  - "scc.netClustering(adata, slot_name='netP', type_='functional', k=3)"
+  - "scc.netClustering(adata, slot_name='netP', type_='functional')"
+  - "scc.netClustering(adata, methods='spectral', k=3, k_eigen=4)"
+failure_fixes:
+  - when: "similarity[type_]['dr'][comparison_name] is missing"
+    suggest:
+      - "Run netEmbedding(adata, slot_name=..., type_=...) first, using the same comparison / mode."
+    explanation: >-
+      netClustering raises ValueError(f"similarity['{type_}']['dr']['{comparison_name}']
+      not found; run netEmbedding first.") when the dr slot is absent.
+  - when: "methods='spectral' but k or k_eigen is missing"
+    suggest:
+      - "Pass both k and k_eigen when methods='spectral'."
+    explanation: netClustering raises ValueError("methods='spectral' requires both `k` and `k_eigen`.") otherwise.
+  - when: "methods is neither 'kmeans' nor 'spectral'"
+    suggest:
+      - "Pass methods='kmeans' or methods='spectral'."
+    explanation: netClustering raises ValueError(f"Unknown clustering method {methods!r}.") for any other value.
+related:
+  - spatialcellchat.netEmbedding
+  - spatialcellchat.computeEigengap
+  - spatialcellchat.computeNetSimilarity

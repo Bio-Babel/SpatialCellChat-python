@@ -1,0 +1,228 @@
+id: spatialcellchat.netVisual_bubble
+import_path: spatialcellchat.viz_heatmap.netVisual_bubble
+kind: function
+signature: >-
+  netVisual_bubble(adata: ad.AnnData, sources_use: Optional[Sequence] = None,
+  targets_use: Optional[Sequence] = None, signaling: Optional[Sequence[str]] =
+  None, pairLR_use: Optional[pd.DataFrame] = None, sort_by_source: bool =
+  False, sort_by_target: bool = False, sort_by_source_priority: bool = True,
+  color_heatmap: str = "Spectral", n_colors: int = 10, direction: int = -1,
+  thresh: float = 0.05, comparison: Optional[Sequence[int]] = None, group:
+  Optional[Sequence[int]] = None, remove_isolate: bool = False, max_dataset:
+  Optional[int] = None, min_dataset: Optional[int] = None, min_quantile: float
+  = 0.0, max_quantile: float = 1.0, line_on: bool = True, line_size: float =
+  0.2, color_text_use: bool = True, color_text: Optional[Sequence[str]] =
+  None, title_name: Optional[str] = None, font_size: float = 10.0,
+  font_size_title: float = 10.0, show_legend: bool = True, grid_on: bool =
+  True, color_grid: str = "grey90", angle_x: float = 90.0, return_data: bool =
+  False) -> Figure
+purpose: Bubble plot of significant L-R interactions across source->target cell-group pairs.
+description: >
+  Direct port of R's netVisual_bubble (visualization.R:2894). Calls
+  subsetCommunication(adata, slot_name="net", sources_use, targets_use,
+  signaling, pairLR_use, thresh) to get the significant L-R x cell-pair long
+  table, then bins pval into 3 significance tiers (>0.05, 0.01-0.05, <0.01)
+  and transforms prob via -1/log(prob) (non-finite/negative results are
+  replaced by an evenly spaced series above the finite max, ordered by the
+  original prob). Missing source->target combinations (when both
+  sources_use and targets_use are given) are padded with pval=1/prob=NaN
+  rows so every combination has a column. Rows are ordered by
+  interaction_name_2, then x-axis columns are ordered by
+  sort_by_source/sort_by_target/sort_by_source_priority. min_quantile/
+  max_quantile clip the colour-mapped prob values. remove_isolate drops
+  rows with NaN prob. Renders one dot per (source.target, LR-pair) cell,
+  sized by the pval tier and coloured by a brewer/viridis colour ramp
+  (reversed when direction=-1) over the (possibly quantile-clipped) prob
+  range, with a Commun.-Prob. colorbar and a pval-tier size legend. When
+  `comparison` is given together with >=2 per-dataset children under
+  uns['cellchat']['net'] carrying "prob"/"pval" (merged mode), the function
+  instead iterates per dataset, suffixes each source.target with
+  "(dataset)", applies max_dataset/min_dataset masking, and draws vertical
+  dashed separators between dataset groups when line_on=True. Pure reader;
+  does not mutate adata. When return_data=True the long DataFrame used for
+  plotting is attached to the returned Figure as
+  `fig._netVisual_bubble_df`.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"]["net"]["prob"]/["pval"] populated (single-dataset mode), or a merged per-dataset net dict (comparison-driven mode).
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to these source cell groups (names or 1-based indices); forwarded to subsetCommunication.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to these target cell groups (names or 1-based indices); forwarded to subsetCommunication.
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathway names to filter on; forwarded to subsetCommunication.
+  - name: pairLR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Direct LR-pair restriction DataFrame; forwarded to subsetCommunication.
+  - name: sort_by_source
+    type: bool
+    required: false
+    default: false
+    description: Order x-axis columns by source first (when targets_use given, combined with sort_by_target).
+  - name: sort_by_target
+    type: bool
+    required: false
+    default: false
+    description: Order x-axis columns by target first (when sources_use given, combined with sort_by_source).
+  - name: sort_by_source_priority
+    type: bool
+    required: false
+    default: true
+    description: When both sort_by_source and sort_by_target are True, sort by (source, target) instead of (target, source).
+  - name: color_heatmap
+    type: str
+    required: false
+    default: "Spectral"
+    description: RColorBrewer palette name driving the dot colour ramp.
+  - name: n_colors
+    type: int
+    required: false
+    default: 10
+    description: Brewer palette anchor count before expansion to a 99-step ramp.
+  - name: direction
+    type: int
+    required: false
+    default: -1
+    description: Reverse the colour ramp when -1.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: Significance threshold forwarded to subsetCommunication (pval >= thresh rows are zeroed/dropped upstream).
+  - name: comparison
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 1-based dataset indices selecting the merged-mode branch; requires >=2 per-dataset children under uns['cellchat']['net'] carrying 'prob'/'pval'.
+  - name: group
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: Merged-mode only; integer group id per dataset in `comparison`, used to colour x-tick labels by dataset group.
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop rows whose (possibly padded) prob is NaN; also disables line_on in merged mode.
+  - name: max_dataset
+    type: Optional[int]
+    required: false
+    default: null
+    description: Merged-mode only; 1-based dataset index/indices — keep an LR-pair/cell-group cell only if its maximum prob occurs in one of these datasets.
+  - name: min_dataset
+    type: Optional[int]
+    required: false
+    default: null
+    description: Merged-mode only; 1-based dataset index/indices — additionally require the minimum prob to occur in one of these datasets (only checked when max/min indices differ).
+  - name: min_quantile
+    type: float
+    required: false
+    default: 0.0
+    description: Lower quantile clip applied to the transformed prob values driving the colour scale.
+  - name: max_quantile
+    type: float
+    required: false
+    default: 1.0
+    description: Upper quantile clip applied to the transformed prob values driving the colour scale.
+  - name: line_on
+    type: bool
+    required: false
+    default: true
+    description: Merged-mode only; draw dashed vertical separators between dataset groups (forced False when remove_isolate=True).
+  - name: line_size
+    type: float
+    required: false
+    default: 0.2
+    description: Line width of the merged-mode dataset separators.
+  - name: color_text_use
+    type: bool
+    required: false
+    default: true
+    description: Merged-mode only; colour x-tick labels by their dataset group.
+  - name: color_text
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Merged-mode only; explicit per-group colours for x-tick labels. Defaults to ggPalette.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title.
+  - name: font_size
+    type: float
+    required: false
+    default: 10.0
+    description: Tick-label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Title font size.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Draw the Commun.-Prob. colorbar and pval-tier size legend.
+  - name: grid_on
+    type: bool
+    required: false
+    default: true
+    description: Draw light gridlines between rows/columns.
+  - name: color_grid
+    type: str
+    required: false
+    default: "grey90"
+    description: Gridline colour (R-style grey name translated via the internal grey map).
+  - name: angle_x
+    type: float
+    required: false
+    default: 90.0
+    description: x-axis tick-label rotation in degrees.
+  - name: return_data
+    type: bool
+    required: false
+    default: false
+    description: When True, attach the long-table DataFrame used for plotting as fig._netVisual_bubble_df.
+returns: >-
+  A new matplotlib.figure.Figure with one dot per (source.target, LR-pair)
+  cell, a Commun.-Prob. colorbar, and a p-value-tier size legend. Does not
+  modify adata. When return_data=True, the plotting DataFrame is also
+  attached as fig._netVisual_bubble_df.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net'] (via
+  subsetCommunication) only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.net.pval
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "scc.netVisual_bubble(sub, sources_use=['Epithelial'], targets_use=['Fibroblast'])"
+  - "scc.netVisual_bubble(sub, signaling=['TGFb'], sort_by_target=True, remove_isolate=True)"
+  - "scc.netVisual_bubble(sub, return_data=True, color_heatmap='Reds')"
+failure_fixes:
+  - when: "no significant interactions are found after subsetCommunication + padding/quantile filtering"
+    suggest:
+      - "Lower thresh, widen sources_use/targets_use, or verify computeCommunProb/aggregateNet produced significant communication for the requested signaling."
+    explanation: >-
+      netVisual_bubble raises ValueError("No interactions are detected.
+      Please consider changing the cell groups for analysis.") when the
+      resulting long table (single- or merged-mode) has zero rows.
+related:
+  - spatialcellchat.subsetCommunication
+

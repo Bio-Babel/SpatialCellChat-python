@@ -1,0 +1,189 @@
+id: spatialcellchat.netVisual_heatmap
+import_path: spatialcellchat.viz_heatmap.netVisual_heatmap
+kind: function
+signature: >-
+  netVisual_heatmap(adata: ad.AnnData, comparison: Sequence[int] = (1, 2),
+  measure: Optional[str] = "count", signaling: Optional[str] = None, slot_name:
+  str = "netP", thresh: float = 0.05, color_use: Optional[Sequence[str]] =
+  None, color_heatmap: Sequence[str] = ("#2166ac", "#b2182b"), title_name:
+  Optional[str] = None, width: Optional[float] = None, height: Optional[float]
+  = None, font_size: float = 8.0, font_size_title: float = 10.0, x_lab_rot:
+  float = 90.0, cluster_rows: bool = False, cluster_cols: bool = False,
+  sources_use: Optional[Sequence] = None, targets_use: Optional[Sequence] =
+  None, remove_isolate: bool = False, remove_diagonal: bool = False, row_show:
+  Optional[Sequence] = None, col_show: Optional[Sequence] = None) -> Figure
+purpose: Communication-network heatmap with top/right per-cell-group bar plots.
+description: >
+  Direct port of R's netVisual_heatmap (visualization.R:2549). When
+  `signaling` is None and `measure` is set (default "count"), plots
+  `uns['cellchat']['net'][measure]` (or, when a merged net dict-of-dicts is
+  detected via a "comparison" key or >=2 per-dataset children carrying
+  "count"/"weight", plots the difference `net[comparison[1]] -
+  net[comparison[0]]`). When `signaling` is given, reads
+  `uns['cellchat'][slot_name]['prob']`, zeroing entries with pval > thresh
+  when slot_name="net", slices the pathway/interaction named by `signaling`
+  out of the third axis (netP: "pathways"; net:
+  "dimnames"["interaction_name"]), and plots that 2-D slice. Row/column
+  names come from the cell-group idents on `uns['cellchat']['net']`.
+  sources_use/targets_use zero out non-matching rows/cols before
+  remove_isolate (drops all-zero row+col pairs) and remove_diagonal are
+  applied. Builds an asymmetric colorRamp3-style diverging or sequential
+  colormap from `color_heatmap` depending on the sign of the matrix, then
+  renders a gridspec layout: main heatmap body, top/right |value|-sum bar
+  plots colored by color_use, bottom/left cell-group color strips, and a
+  rotated colorbar title. Pure reader; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"] populated by upstream calls (computeCommunProb / aggregateNet / computeCommunProbPathway).
+  - name: comparison
+    type: Sequence[int]
+    required: false
+    default: (1, 2)
+    description: 1-based indices into the merged per-dataset net dict; only used in the merged-mode branch.
+  - name: measure
+    type: Optional[str]
+    required: false
+    default: "count"
+    description: '"count" or "weight"; quantity plotted from uns["cellchat"]["net"] when signaling is None. Raises ValueError if not one of these.'
+  - name: signaling
+    type: Optional[str]
+    required: false
+    default: null
+    description: Pathway (slot_name="netP") or interaction (slot_name="net") name; when set, plots the pathway/LR-pair slice of slot_name["prob"] instead of measure.
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: '"netP" or "net"; source slot for signaling-driven plotting. Raises ValueError if neither.'
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value cutoff applied when slot_name == "net" (entries with pval > thresh are zeroed).
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colour for the bar plots and annotation strips. Defaults to scPalette(n_groups).
+  - name: color_heatmap
+    type: Sequence[str]
+    required: false
+    default: ("#2166ac", "#b2182b")
+    description: Bottom/top (or 1- or 3-anchor) colours driving the heatmap colormap.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Figure suptitle; auto-derived from measure/signaling when omitted.
+  - name: width
+    type: Optional[float]
+    required: false
+    default: null
+    description: Figure width in inches.
+  - name: height
+    type: Optional[float]
+    required: false
+    default: null
+    description: Figure height in inches.
+  - name: font_size
+    type: float
+    required: false
+    default: 8.0
+    description: Axis-label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Title / axis-title font size.
+  - name: x_lab_rot
+    type: float
+    required: false
+    default: 90.0
+    description: x-axis tick-label rotation in degrees.
+  - name: cluster_rows
+    type: bool
+    required: false
+    default: false
+    description: Reserved for clustered row ordering (kept for API parity; not applied in this implementation).
+  - name: cluster_cols
+    type: bool
+    required: false
+    default: false
+    description: Reserved for clustered column ordering (kept for API parity; not applied in this implementation).
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Zero out rows not in this source subset (names or 1-based indices).
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Zero out columns not in this target subset (names or 1-based indices).
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop rows+columns whose row-sum and column-sum are both zero.
+  - name: remove_diagonal
+    type: bool
+    required: false
+    default: false
+    description: Zero the diagonal before plotting.
+  - name: row_show
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Explicit row subsetting (names or 1-based indices) applied after remove_isolate.
+  - name: col_show
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Explicit column subsetting (names or 1-based indices) applied after remove_isolate.
+returns: >-
+  A new matplotlib.figure.Figure containing the heatmap body, top/right
+  strength bar plots, cell-group colour strips, and a colorbar. Does not
+  modify adata.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'] only, does not
+  mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.count
+  - uns.cellchat.netP.prob
+  - uns.cellchat.netP.pathways
+writes: []
+examples:
+  - 'scc.netVisual_heatmap(sub, slot_name="netP", signaling=pathway_show, color_heatmap=("Reds",))'
+  - 'scc.netVisual_heatmap(sub, measure="count")'
+  - 'scc.netVisual_heatmap(sub, measure="weight", remove_isolate=True, sources_use=["Epithelial"])'
+failure_fixes:
+  - when: "measure is not 'count' or 'weight'"
+    suggest:
+      - "Pass measure='count' or measure='weight' (or leave signaling set instead)."
+    explanation: >-
+      netVisual_heatmap raises ValueError("measure must be 'count' or
+      'weight'.") for any other value.
+  - when: "slot_name is not 'netP' or 'net'"
+    suggest:
+      - "Pass slot_name='netP' or slot_name='net'."
+    explanation: >-
+      netVisual_heatmap raises ValueError("slot_name must be 'netP' or
+      'net'.") for any other value.
+  - when: "signaling name not found in the resolved pathway/interaction axis"
+    suggest:
+      - "Check the spelling of signaling against uns['cellchat']['netP']['pathways'] (or the interaction_name axis for slot_name='net')."
+    explanation: >-
+      netVisual_heatmap raises ValueError(f"signaling {signaling!r} not in
+      {slot_name}.") when the name is absent from the resolved axis.
+  - when: "the resulting matrix is all-zero or empty after subsetting/thresholding"
+    suggest:
+      - "Lower thresh, widen sources_use/targets_use, or verify computeCommunProb/aggregateNet actually produced nonzero communication."
+    explanation: >-
+      netVisual_heatmap raises ValueError("No significant cell-cell
+      communication is inferred!") when the plotted matrix sums to zero.
+related:
+  - spatialcellchat.netVisual
+  - spatialcellchat.netAnalysis_signalingRole_heatmap

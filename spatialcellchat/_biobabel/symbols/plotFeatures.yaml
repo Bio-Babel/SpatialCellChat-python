@@ -1,0 +1,176 @@
+id: spatialcellchat.plotFeatures
+import_path: spatialcellchat.viz_basic.plotFeatures
+kind: function
+signature: >-
+  plotFeatures(df_score: pd.DataFrame, group_by: Optional[Sequence] = None,
+  group_highlight: Optional[Any] = None, show_group: bool = False,
+  cells_highlight: Optional[Union[Sequence[str], Sequence[int]]] = None,
+  method: Literal["normal", "3d", "2d"] = "normal", plot_title: Optional[str]
+  = None, plot_ncol: int = 2, point_size: float = 3.0, highlight_alpha: float
+  = 1.0, nohighlight_alpha: float = 0.65, show_colorscale: bool = True,
+  color_heatmap: Union[str, Sequence[str]] = "Blues", color_0: Optional[str]
+  = None, color_NA: str = "#E5E5E5", n_colors: int = 8, direction: int = 1,
+  color_use: Optional[Union[Sequence[str], Dict[str, str]]] = None,
+  legend_group: str = "score", legend_group_title: str = "score's value",
+  scene_name: str = "scene1", colorbar_y: float = 0.5, three_dim_z: float =
+  0.0) -> Figure
+purpose: Spot/cell-level scatter plot coloured by a continuous score, with optional highlighting and an optional side-by-side cell-group panel.
+description: >
+  Direct port of R's plotFeatures (visualization.R:7105). The R reference
+  dispatches on method to either ggplot2 (default "normal") or plotly ("2d"
+  / "3d"); the Python port renders all three with matplotlib (the "3d"
+  branch is a flat-Z 2-D projection). Takes df_score as a 3-column
+  (x, y, score) frame (columns are renamed positionally). cells_highlight
+  (by index label when strings, else by 0-based position) or
+  group_highlight (matched against group_by) sets per-point alpha
+  (highlight_alpha vs nohighlight_alpha) for method="normal", or a boolean
+  mask otherwise. Builds a colormap from color_heatmap: the literal
+  "RedsBlues" routes through
+  spatialcellchat._themes.generate_RedsBlues_colormap (direction=-1 flips
+  it); any other named brewer palette is resolved via _resolve_brewer +
+  _color_ramp_palette; an explicit sequence of colours is used directly
+  (reversed when direction=-1). NaN/non-finite scores are drawn separately
+  in color_NA. When show_group=False, draws a single scatter panel
+  (optionally with a colorbar). When show_group=True (requires group_by),
+  draws two panels side by side: a categorical "Cell annotation" dim-plot
+  (coloured via color_use / scPalette) and the continuous score panel.
+parameters:
+  - name: df_score
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Three-column data frame (x, y, score); the index (if string) is used to match cells_highlight by name.
+  - name: group_by
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Per-row cell-group labels; required when show_group=True (raises ValueError otherwise), also used with group_highlight for alpha masking.
+  - name: group_highlight
+    type: Optional[Any]
+    required: false
+    default: null
+    description: A single group_by level to highlight (mask = group_by == group_highlight); only applied when group_by is also given.
+  - name: show_group
+    type: bool
+    required: false
+    default: false
+    description: When True, returns a two-panel Figure (dim-plot + score-plot); requires group_by.
+  - name: cells_highlight
+    type: Optional[Union[Sequence[str], Sequence[int]]]
+    required: false
+    default: null
+    description: Cell ids (matched against df_score.index) or 0-based positions to highlight at full alpha (or full mask for 2d/3d methods).
+  - name: method
+    type: 'Literal["normal", "3d", "2d"]'
+    required: false
+    default: normal
+    description: Rendering mode; raises ValueError for any other value. All three render via matplotlib in this port.
+  - name: plot_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Panel title (bold, fontsize 10) when given.
+  - name: plot_ncol
+    type: int
+    required: false
+    default: 2
+    description: Minimum number of columns for the show_group=True two-panel layout (max(plot_ncol, 2)).
+  - name: point_size
+    type: float
+    required: false
+    default: 3.0
+    description: Base marker size (actual scatter size is point_size * 10).
+  - name: highlight_alpha
+    type: float
+    required: false
+    default: 1.0
+    description: Alpha for highlighted points (method="normal").
+  - name: nohighlight_alpha
+    type: float
+    required: false
+    default: 0.65
+    description: Alpha for non-highlighted points (method="normal").
+  - name: show_colorscale
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw a colourbar for the score panel(s).
+  - name: color_heatmap
+    type: Union[str, Sequence[str]]
+    required: false
+    default: Blues
+    description: Named palette ("RedsBlues" or a brewer-style name) or an explicit list of colours defining the continuous colormap.
+  - name: color_0
+    type: Optional[str]
+    required: false
+    default: null
+    description: Override colour for the lowest colormap anchor (or the RedsBlues midpoint); "default" maps to "#E5E5E5".
+  - name: color_NA
+    type: str
+    required: false
+    default: '#E5E5E5'
+    description: Colour used for NaN/non-finite score points.
+  - name: n_colors
+    type: int
+    required: false
+    default: 8
+    description: Number of anchor colours sampled from a named brewer palette before interpolation.
+  - name: direction
+    type: int
+    required: false
+    default: 1
+    description: 1 for the palette's natural order, -1 to reverse it (and to switch the RedsBlues sign convention).
+  - name: color_use
+    type: Optional[Union[Sequence[str], Dict[str, str]]]
+    required: false
+    default: null
+    description: Colour(s) for the group_by dim-plot panel (show_group=True); defaults to scPalette(n_groups).
+  - name: legend_group
+    type: str
+    required: false
+    default: score
+    description: Carried for parity with the R signature (plotly legend group name); not used by the matplotlib rendering.
+  - name: legend_group_title
+    type: str
+    required: false
+    default: score's value
+    description: Carried for parity with the R signature; not used by the matplotlib rendering.
+  - name: scene_name
+    type: str
+    required: false
+    default: scene1
+    description: Carried for parity with the R signature (plotly 3d scene name); not used by the matplotlib rendering.
+  - name: colorbar_y
+    type: float
+    required: false
+    default: 0.5
+    description: Carried for parity with the R signature (plotly colorbar y-position); not used by the matplotlib rendering.
+  - name: three_dim_z
+    type: float
+    required: false
+    default: 0.0
+    description: Carried for parity with the R signature (plotly z constant for method="3d"); not used by the matplotlib rendering (flat 2-D projection).
+returns: >-
+  A new matplotlib.figure.Figure — a single scatter panel when
+  show_group=False, or a two-panel (dim-plot + score-plot) figure when
+  show_group=True.
+mutates: >-
+  execution_class=pure_function; takes no adata argument — operates purely
+  on the passed-in pandas.DataFrame (and group_by sequence); does not touch
+  adata.uns/obs/var; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.plotFeatures(df_score, method="normal", color_heatmap="Blues", point_size=2, plot_title="A title")'
+  - 'scc.plotFeatures(df_score, group_by=group_labels, show_group=True, plot_ncol=2)'
+  - 'scc.plotFeatures(df_score, cells_highlight=["c1", "c3", "c5"], method="normal")'
+failure_fixes:
+  - when: "method is not one of normal/3d/2d"
+    suggest:
+      - 'Pass method="normal", "3d", or "2d".'
+    explanation: "plotFeatures raises ValueError(\"`method` must be 'normal', '3d', or '2d'\") for any other value."
+  - when: "show_group=True is passed without group_by"
+    suggest:
+      - "Pass group_by= (a per-row cell-group label sequence) when show_group=True."
+    explanation: 'plotFeatures raises ValueError("show_group=True requires group_by").'
+related: []

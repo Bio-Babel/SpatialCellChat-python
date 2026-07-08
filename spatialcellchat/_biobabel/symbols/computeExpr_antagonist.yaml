@@ -1,0 +1,57 @@
+id: spatialcellchat.computeExpr_antagonist
+import_path: spatialcellchat._expr.computeExpr_antagonist
+kind: function
+signature: "computeExpr_antagonist(data_use: ArrayLike, pairLRsig: pd.DataFrame, cofactor_input: pd.DataFrame, index_antagonist: int, Kh: float, n: float) -> np.ndarray"
+purpose: "Hill-aggregated per-cell antagonist factor for one L-R pair; a port of computeExpr_antagonist (modeling.R:2527)."
+description: >
+  Same lookup/intersection plumbing as computeExpr_agonist (via the shared
+  `_hill_cofactor_one` helper) but uses the suppressive Hill kernel
+  Kh^n / (Kh^n + x^n) instead of the activating one. With one resolved
+  cofactor gene x: returns Kh^n / (Kh^n + x^n). With more than one:
+  returns the per-cell product across cofactors. With zero resolved
+  cofactors: returns an all-ones row.
+parameters:
+  - name: data_use
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Genes-by-cells expression matrix (row-named).
+  - name: pairLRsig
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: L-R interaction table; the `antagonist` column references cofactor_input's row index.
+  - name: cofactor_input
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB cofactor table.
+  - name: index_antagonist
+    type: int
+    required: true
+    default: null
+    description: 0-based row index into pairLRsig (Python equivalent of R's 1-based index.antagonist).
+  - name: Kh
+    type: float
+    required: true
+    default: null
+    description: Hill EC50 parameter.
+  - name: n
+    type: float
+    required: true
+    default: null
+    description: Hill coefficient.
+returns: >
+  A numpy.ndarray of shape (1, n_cells): the per-cell antagonist
+  multiplier.
+mutates: "execution_class=pure_function; no in-place mutation of `data_use`, `pairLRsig`, or `cofactor_input`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeExpr_antagonist(data_use, pairLRsig, cofactor_input, index_antagonist=1, Kh=0.5, n=1)"
+failure_fixes:
+  - when: 'ValueError: _hill_cofactor_one requires a row-named data_use'
+    suggest:
+      - pass data_use as a pandas.DataFrame indexed by gene symbol.
+related:
+  - spatialcellchat.computeCommunProb

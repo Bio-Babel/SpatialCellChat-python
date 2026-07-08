@@ -1,0 +1,70 @@
+id: spatialcellchat.spatial_hotspot_categorization
+title: Categorize spots into communication hot-spots via local Getis-Ord Gi, then test spatial co-occurrence
+description: >
+  Compute the local Getis-Ord Gi statistic on a signaling annotation's
+  summed per-spot incoming (or outgoing) centrality, label each spot
+  Hot/Cold/Other from the sign and significance of Gi, visualize the
+  labelling spatially, and test its spatial co-occurrence with cell-type
+  identity via Lee's statistic. Mirrors the "Hot-spots analysis" section of
+  the package tutorial.
+task_tags:
+  - spatial-hotspot-analysis
+when_to_use:
+  - >-
+    A spatial_ccc_inference_lowres / _highres run has already computed
+    per-cell L-R-pair or pathway network centrality, and the goal is to
+    find and characterise spatial hot-spots of a signaling annotation
+    (e.g. secreted vs. cell-cell-contact signaling) rather than inspect
+    one pathway's aggregate network.
+when_not_to_use:
+  - >-
+    Per-cell centrality has not yet been computed for the slot_name of
+    interest — run spatial_ccc_inference_lowres / _highres's
+    netAnalysis_computeCentrality step first.
+inputs:
+  - name: adata
+    kind: anndata.AnnData
+    description: AnnData with per-cell L-R-pair (or pathway) centrality already computed.
+    requirements:
+      - >-
+        Must already have uns.cellchat.net.centr.cell (or
+        uns.cellchat.netP.centr.cell) populated by
+        netAnalysis_computeCentrality(adata, do_group=False) (part of
+        spatial_ccc_inference_lowres / _highres).
+  - name: signaling_names
+    kind: list[str]
+    description: The L-R pair (or pathway) names to sum over for the hotspot score, e.g. all LR.sig.cell entries annotated "Secreted Signaling".
+steps:
+  - symbol: spatialcellchat.spatialGiPlot
+    purpose: Compute the local Gi statistic (and its p-value) for the summed incoming centrality of signaling_names, without plotting.
+    args:
+      adata: $inputs.adata
+      plot_title: Secreted Signaling
+      slot_name: net
+      signaling_name: $inputs.signaling_names
+      measure: (indeg,)
+      measure_name: (incoming,)
+      method: computation
+    notes:
+      - "Persists two columns into adata.obs regardless of method: `Getis.Ord.Gi.<plot_title>` and `Getis.Ord.Gi.<plot_title>.p` (the exact key depends on plot_title/measure_name/signaling_name — see spatialGiPlot's own contract)."
+      - Call once per signaling annotation of interest (e.g. once for "Secreted Signaling" LR names, once for "Cell-Cell Contact" LR names) with a distinct plot_title each time.
+  - symbol: spatialcellchat.spatialDimPlot
+    purpose: Visualize the Hot/Cold/Other categorical label built from the Gi sign and p-value.
+    args:
+      adata: $inputs.adata
+      group_by: SecretedHotspot
+      color_use: '["#cb181d", "#2171b5", "#E5E5E5"]'
+    notes:
+      - "The Hot/Cold/Other label itself is not written by any symbol call — the caller derives it from the obs columns spatialGiPlot just wrote (`sig = (p < 0.05) * g; adata.obs['SecretedHotspot'] = where(sig>0,'Hot',where(sig<0,'Cold','Other'))`) before calling this step, mirroring the tutorial exactly."
+  - symbol: spatialcellchat.spatialLeePlot
+    purpose: Test spatial co-occurrence between the Hot/Cold/Other label and cell-type identity via Lee's statistic.
+    args:
+      adata: $inputs.adata
+      group_by2: SecretedHotspot
+      cutoff_lee: 0.05
+      y_levels: (Hot, Cold, Other)
+templates: []
+outputs:
+  - "obs.Getis.Ord.Gi.<tag> / obs.Getis.Ord.Gi.<tag>.p: per-spot Gi statistic and p-value, from spatialGiPlot."
+  - "obs.SecretedHotspot (or an analogous caller-derived column): categorical Hot/Cold/Other spot label."
+  - "Spatial and Lee-statistic co-occurrence Figures, from spatialDimPlot / spatialLeePlot."

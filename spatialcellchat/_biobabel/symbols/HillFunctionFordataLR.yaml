@@ -1,0 +1,46 @@
+id: spatialcellchat.HillFunctionFordataLR
+import_path: spatialcellchat._hill.HillFunctionFordataLR
+kind: function
+signature: 'HillFunctionFordataLR(dataLR: sparse.spmatrix, Kh: float, n: float) -> sparse.csc_matrix'
+purpose: Apply a Hill function element-wise to every stored (non-zero) entry of a sparse ligand-receptor matrix.
+description: >
+  Direct port of R's HillFunctionFordataLR (modeling.R:369). Converts dataLR
+  to CSC (R's dgCMatrix), then for each stored value x replaces it with
+  x**n / (Kh**n + x**n), leaving the sparsity pattern exactly unchanged
+  (explicit zeros in the input's stored-value array remain explicit zeros).
+  Kh is the Hill function's EC50 parameter and n is the Hill coefficient;
+  neither has a default here because callers (e.g. computeCommunProb) always
+  pass both explicitly. Pure numerical helper with no adata / package-level
+  state.
+parameters:
+  - name: dataLR
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: Sparse ligand-receptor matrix; converted internally to CSC (R's dgCMatrix / CsparseMatrix).
+  - name: Kh
+    type: float
+    required: true
+    default: null
+    description: EC50 parameter of the Hill function (R default 0.5, not defaulted in this port).
+  - name: n
+    type: float
+    required: true
+    default: null
+    description: Hill coefficient (R default 1, not defaulted in this port).
+returns: >-
+  A new scipy.sparse.csc_matrix with the same shape and sparsity pattern as
+  dataLR, with the Hill function x**n / (Kh**n + x**n) applied element-wise
+  to the stored values. The input matrix is not mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'HillFunctionFordataLR(m, Kh=0.5, n=1)'
+  - 'HillFunctionFordataLR(m, Kh=0.3, n=2)'
+  - 'HillFunctionFordataLR(m, Kh=0.7, n=3)'
+failure_fixes: []
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.createPspatialFrom_dspatial

@@ -1,0 +1,59 @@
+id: spatialcellchat.colorRamp3
+import_path: spatialcellchat._palette.colorRamp3
+kind: function
+signature: "colorRamp3(breaks: Sequence[float], colors: Sequence[str], transparency: float = 0.0, space: str = \"RGB\") -> Callable[[Union[float, np.ndarray]], np.ndarray]"
+purpose: "Linear-interpolation colour ramp; a port of circlize::colorRamp3."
+description: >
+  Builds and returns a closure mapping numeric values to "#RRGGBBAA" hex
+  strings. Breaks are sorted and de-duplicated (mirroring R's `duplicated`);
+  at least two distinct break values are required. Colour anchors are
+  converted from sRGB to linear RGB, interpolated linearly in linear-RGB
+  space between the two breaks bracketing the query value (clipped to the
+  break range), then converted back to sRGB and hex. Only space="RGB" is
+  implemented (the only value used by all callers in this package); other
+  values raise NotImplementedError. NaN inputs to the returned closure map
+  to None.
+parameters:
+  - name: breaks
+    type: Sequence[float]
+    required: true
+    default: null
+    description: Numeric break points; need not be pre-sorted.
+  - name: colors
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Colour at each break (matplotlib-recognised names or "#RRGGBB" hex codes); must be the same length as breaks after accounting for duplicates.
+  - name: transparency
+    type: float
+    required: false
+    default: 0.0
+    description: Single value in [0, 1] applied uniformly to all output colours; 0 means fully opaque.
+  - name: space
+    type: str
+    required: false
+    default: "RGB"
+    description: Interpolation colour space; only "RGB" is supported by this port.
+returns: >
+  A callable `fun(x) -> numpy.ndarray` of "#RRGGBBAA" strings (or None for
+  NaN inputs), mapping a scalar or array of numeric values to colours by
+  interpolating between the sorted break anchors.
+mutates: "execution_class=pure_function; no in-place mutation of `breaks`/`colors`; each call returns a brand-new closure and each closure invocation returns a new ndarray; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "colorRamp3([-1, 0, 1], ['green', 'white', 'red'], space='RGB')(np.array([-0.5, 0.0, 0.5]))"
+  - "colorRamp3([0, 1], ['#000000', '#ffffff'], space='RGB')"
+  - "colorRamp3([0, 1], ['#ff0000', '#0000ff'], transparency=0.5, space='RGB')"
+failure_fixes:
+  - when: 'ValueError: Length of `breaks` should be equal to `colors`.'
+    suggest:
+      - pass one colour per distinct break value.
+  - when: 'ValueError: You should have at least two distinct break values.'
+    suggest:
+      - supply breaks with at least two unique numeric values.
+  - when: 'NotImplementedError: Only space=''RGB'' is supported in this port (matches all callers).'
+    suggest:
+      - do not pass space values other than 'RGB'.
+related:
+  - spatialcellchat.generate_RedsBlues_colormap

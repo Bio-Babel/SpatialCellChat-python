@@ -1,0 +1,52 @@
+id: spatialcellchat.createPspatialFrom_dspatial
+import_path: spatialcellchat._hill.createPspatialFrom_dspatial
+kind: function
+signature: 'createPspatialFrom_dspatial(d_spatial: sparse.spmatrix, distance_use: bool = True) -> sparse.csc_matrix'
+purpose: Convert a scaled sparse cell-cell distance matrix into a spatial communication-probability matrix.
+description: >
+  Direct port of R's createPspatialFrom_dspatial (modeling.R:337). d_spatial
+  is a sparse, square cell-cell distance matrix already scaled (typically by
+  computeCommunProb) so its minimum stored value is in [1, 2]. The
+  transformation: (1) reciprocate every stored entry (P@x <- 1 / d@x); (2)
+  compute the maximum of those reciprocals BEFORE filling the diagonal, then
+  fill the diagonal with that maximum (autocrine pairs get the strongest
+  spatial weight), matching R's evaluation order for
+  Matrix::diag(P) <- max(P@x); (3) if distance_use is False, every stored
+  entry (including the freshly-filled diagonal) is then overwritten with 1,
+  producing a binary connectivity matrix bounded by the interaction range
+  instead of an inverse-distance-weighted one. Pure numerical helper with no
+  adata / package-level state; the input matrix is not mutated.
+parameters:
+  - name: d_spatial
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: >-
+      Sparse, square cell-cell distance matrix (R's CsparseMatrix); stored
+      values must already be scaled to be >= 1 so the reciprocals fall in
+      (0, 1].
+  - name: distance_use
+    type: bool
+    required: false
+    default: true
+    description: >-
+      True keeps the probability inversely proportional to distance; False
+      makes it binary (every stored entry set to 1) after the diagonal is
+      filled.
+returns: >-
+  A new scipy.sparse.csc_matrix: the spatial probability matrix, with the
+  diagonal filled with the pre-fill maximum reciprocal distance, and (when
+  distance_use=False) every stored entry set to 1. The input matrix is not
+  mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'createPspatialFrom_dspatial(d, distance_use=True)'
+  - 'createPspatialFrom_dspatial(d, distance_use=False)'
+  - 'createPspatialFrom_dspatial(d)'
+failure_fixes: []
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.HillFunctionFordataLR

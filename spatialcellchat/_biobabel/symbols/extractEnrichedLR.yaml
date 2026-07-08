@@ -1,0 +1,132 @@
+id: spatialcellchat.extractEnrichedLR
+import_path: spatialcellchat.analysis_topics.extractEnrichedLR
+kind: function
+signature: >-
+  extractEnrichedLR(adata: Union[ad.AnnData, Sequence[ad.AnnData]], signaling:
+  Sequence[str], geneLR_return: bool = False, enriched_only: bool = True,
+  thresh: float = 0.05, do_group: bool = True, geneInfo:
+  Optional[pd.DataFrame] = None, complex_input: Optional[pd.DataFrame] =
+  None) -> Union[pd.DataFrame, Dict[str, Any]]
+purpose: Identify all enriched ligand-receptor pairs (and their expanded gene sets) for given signaling pathways.
+description: >
+  Direct port of R's extractEnrichedLR (analysis.R:826). Single-AnnData mode
+  (`adata` is one AnnData) reads uns["cellchat"]["DB"],
+  uns["cellchat"]["LR"], uns["cellchat"]["net"] and, per pathway in
+  `signaling`, calls the internal extractEnrichedLR_internal
+  (analysis.R:883): it looks up all L-R pairs in that pathway via searchPair
+  against DB["complex"]-expanded LRsig, and when enriched_only=True further
+  restricts to pairs marked significant by aggregateNet — using net["prob"]
+  masked by net["pval"] > thresh against net["LR.sig"] when do_group=True, or
+  net["prob.cell"] against net["LR.sig.cell"] when do_group=False (both raise
+  if the required net keys are absent). Ligand/receptor gene symbols are then
+  expanded through extractGeneSubset against DB["complex"]/DB["geneInfo"]
+  (overridable via `geneInfo`/`complex_input`) to build `geneLR`. Merged mode
+  (`adata` is a sequence of >1 AnnData) unions geneLR/pairLR per pathway
+  across datasets (first-occurrence order), mirroring R's
+  BiocGenerics::union over object@options$mode == "merged" (analysis.R:842-862).
+parameters:
+  - name: adata
+    type: Union[anndata.AnnData, Sequence[anndata.AnnData]]
+    required: true
+    default: null
+    description: >-
+      Single-mode: one AnnData with uns["cellchat"]["net"], ["LR"], ["DB"]
+      populated. Merged-mode: a sequence of per-dataset AnnData objects; results
+      are unioned across datasets per pathway.
+  - name: signaling
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Signaling pathway names to query.
+  - name: geneLR_return
+    type: bool
+    required: false
+    default: false
+    description: >-
+      If True, return a dict with keys "pairLR" (DataFrame) and "geneLR"
+      (list) instead of just the pairLR DataFrame.
+  - name: enriched_only
+    type: bool
+    required: false
+    default: true
+    description: If True, filter to L-R pairs marked significant by aggregateNet; if False, return every pair in the pathway from the database.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold, used only when enriched_only=True and do_group=True.
+  - name: do_group
+    type: bool
+    required: false
+    default: true
+    description: True reads net["LR.sig"] (group-level significance); False reads net["LR.sig.cell"] (cell-level).
+  - name: geneInfo
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Override DB["geneInfo"] used for gene-set expansion.
+  - name: complex_input
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Override DB["complex"] used for gene-set expansion.
+returns: >-
+  If geneLR_return=False, a one-column pandas.DataFrame with column
+  "interaction_name" listing every enriched (or all, if enriched_only=False)
+  L-R pair across the requested pathways. If geneLR_return=True, a dict
+  {"pairLR": that same DataFrame, "geneLR": list of expanded ligand/receptor
+  gene symbols}. No AnnData is mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.DB
+  - uns.cellchat.LR
+  - uns.cellchat.net
+writes: []
+examples:
+  - "scc.extractEnrichedLR(sub, signaling=[pathway_show], do_group=False, geneLR_return=True)"
+  - "scc.extractEnrichedLR(sub, signaling=['WNT'], enriched_only=True)['interaction_name']"
+  - "scc.extractEnrichedLR([adata1, adata2], signaling=['TGFb'], geneLR_return=True)"
+failure_fixes:
+  - when: "adata is an empty sequence"
+    suggest:
+      - "Pass at least one AnnData."
+    explanation: >-
+      extractEnrichedLR raises ValueError("`adata` must be a non-empty
+      sequence of AnnData.").
+  - when: "an element of adata is not an AnnData"
+    suggest:
+      - "Pass only anndata.AnnData objects (or a single AnnData, not a mixed sequence)."
+    explanation: >-
+      extractEnrichedLR raises TypeError("all elements of `adata` must be
+      AnnData objects.").
+  - when: "uns['cellchat']['DB'], ['LR'], or ['net'] is missing"
+    suggest:
+      - "Populate DB via load_db/setIdent-equivalent setup, and run the modeling pipeline (computeCommunProb, aggregateNet) before extractEnrichedLR."
+    explanation: >-
+      extractEnrichedLR raises ValueError("adata.uns['cellchat']['DB'] is
+      missing."), ValueError("adata.uns['cellchat']['LR'] is missing."), or
+      ValueError("adata.uns['cellchat']['net'] is missing.") depending on
+      which slot is absent.
+  - when: "enriched_only=True, do_group=True, and net['prob'] is missing"
+    suggest:
+      - "Run computeAvgCommunProb before extractEnrichedLR with enriched_only=True."
+    explanation: >-
+      extractEnrichedLR_internal raises ValueError("net['prob'] is missing;
+      run computeAvgCommunProb first.").
+  - when: "enriched_only=True, do_group=True, and net['LR.sig'] is missing"
+    suggest:
+      - "Run aggregateNet() before extractEnrichedLR with enriched_only=True."
+    explanation: >-
+      extractEnrichedLR_internal raises ValueError("Please run the
+      `aggregateNet` function!").
+  - when: "enriched_only=True, do_group=False, and net['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb (cell-level) before extractEnrichedLR with do_group=False."
+    explanation: >-
+      extractEnrichedLR_internal raises ValueError("net['prob.cell'] is
+      missing; run computeCommunProb first.").
+related:
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.computeAvgCommunProb
+  - spatialcellchat.identifyCellTopics

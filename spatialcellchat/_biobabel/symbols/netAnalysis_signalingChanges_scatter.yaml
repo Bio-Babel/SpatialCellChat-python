@@ -1,0 +1,214 @@
+id: spatialcellchat.netAnalysis_signalingChanges_scatter
+import_path: spatialcellchat.viz_embedding.netAnalysis_signalingChanges_scatter
+kind: function
+signature: >-
+  netAnalysis_signalingChanges_scatter(adata_list: Sequence[ad.AnnData],
+  idents_use: str, color_use: Sequence[str] = ("grey10", "#F8766D",
+  "#00BFC4"), comparison: Sequence[int] = (1, 2), signaling:
+  Optional[Sequence[str]] = None, signaling_label: Optional[Sequence[str]]
+  = None, top_label: float = 1.0, signaling_exclude: Optional[Sequence[str]]
+  = None, xlims: Optional[Tuple[float, float]] = None, ylims:
+  Optional[Tuple[float, float]] = None, slot_name: str = "netP",
+  dataset_names: Optional[Sequence[str]] = None, dot_size: float = 2.5,
+  point_shape: Sequence[str] = ("o", "s", "^", "D"), label_size: float =
+  3.0, dot_alpha: float = 0.6, x_measure: str = "outdeg", y_measure: str =
+  "indeg", xlabel: str = "Differential outgoing interaction strength",
+  ylabel: str = "Differential incoming interaction strength", title:
+  Optional[str] = None, font_size: float = 10.0, font_size_title: float =
+  10.0, do_label: bool = True, show_legend: bool = True, show_axes: bool =
+  True) -> Figure
+purpose: For one cell group, classify and scatter each pathway's differential outgoing/incoming signaling strength between two datasets.
+description: >
+  MULTI-DATASET function — the first parameter is a Sequence[AnnData], not
+  a single AnnData. Direct port of R's netAnalysis_signalingChanges_scatter
+  (analysis.R:2937). Requires len(adata_list) >= 2, else raises ValueError
+  (R parity: is.list(object@net[[1]]) discriminator at analysis.R:2940).
+  Delegates the numeric core to compute_signalingChanges_data, which:
+  computes joint cell-group levels via joint_idents_levels and raises
+  ValueError if idents_use is not among them; resolves the signaling list
+  (union of comparison datasets' pathways minus signaling_exclude, same
+  helper as netAnalysis_diff_signalingRole_scatter); builds the per-dataset
+  (n_sig, n_cell, 2) outgoing/incoming arrays via _build_mat_all_per_dataset
+  (same centr-slot requirement and error as the diff-scatter function);
+  extracts the idents_use row from each dataset's array as use1/use2; then
+  computes idx_specific = use1*use2, mat_sum = use1+use2 to flag
+  outgoing/incoming-specific pathways, mat_diff = use2-use1 filtered to
+  rows with nonzero row-sum (mat_diff_kept), and two integer codes per kept
+  pathway: specificity_out_in in {0,-1,1,2} (Shared / Incoming specific /
+  Outgoing specific / Incoming & Outgoing specific) and specificity in
+  {0,-1,1} (Shared / dataset-1-specific / dataset-2-specific, labelled with
+  dataset_names). The scatter plots one point per kept pathway at
+  (outgoing_diff, incoming_diff), coloured by specificity category (from
+  color_use) and shaped by specificity_out_in category (from point_shape),
+  with dashed grey guide lines at x=0/y=0. Labels are drawn for pathways
+  named in signaling_label, or (when signaling_label is None) for pathways
+  whose |x| or |y| exceeds the (1 - top_label) quantile of |outgoing|/|incoming|
+  values. Default title is f"Signaling changes of {idents_use}
+  ({dataset_names[i1]} vs. {dataset_names[i2]})".
+parameters:
+  - name: adata_list
+    type: Sequence[anndata.AnnData]
+    required: true
+    default: null
+    description: Per-dataset CellChat-state AnnDatas; must contain at least 2 elements or ValueError is raised. Each dataset referenced by comparison must have adata.uns['cellchat'][slot_name]['centr'] populated.
+  - name: idents_use
+    type: str
+    required: true
+    default: null
+    description: Cell-group label (must be in the joint cell levels across adata_list, else ValueError) whose per-pathway differential is plotted.
+  - name: color_use
+    type: Sequence[str]
+    required: false
+    default: ["grey10", "#F8766D", "#00BFC4"]
+    description: Palette for the 3 specificity categories (Shared, dataset-1-specific, dataset-2-specific).
+  - name: comparison
+    type: Sequence[int]
+    required: false
+    default: [1, 2]
+    description: 1-based indices into adata_list identifying the two datasets to difference (dataset 2 minus dataset 1).
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathways to include; defaults to the union of each comparison dataset's pathway list when None.
+  - name: signaling_label
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit pathway-name whitelist to label; overrides the top_label-quantile labelling rule when given.
+  - name: top_label
+    type: float
+    required: false
+    default: 1.0
+    description: Fraction (0,1] controlling how many top |differential| pathways are labelled when signaling_label is None.
+  - name: signaling_exclude
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathways to drop from the resolved signaling list; raises ValueError if this empties the list.
+  - name: xlims
+    type: Optional[Tuple[float, float]]
+    required: false
+    default: null
+    description: Explicit x-axis limits.
+  - name: ylims
+    type: Optional[Tuple[float, float]]
+    required: false
+    default: null
+    description: Explicit y-axis limits.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot (per dataset) whose ['centr'] centrality output is read.
+  - name: dataset_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-dataset display names used in the title and specificity category labels; defaults to ["d1", "d2", ...] via resolve_dataset_names.
+  - name: dot_size
+    type: float
+    required: false
+    default: 2.5
+    description: Base marker size multiplier (rendered as (dot_size**2)*18 points^2).
+  - name: point_shape
+    type: Sequence[str]
+    required: false
+    default: ["o", "s", "^", "D"]
+    description: Marker cycle mapped to the 4 specificity_out_in categories.
+  - name: label_size
+    type: float
+    required: false
+    default: 3.0
+    description: Base font size multiplier for repelled point labels.
+  - name: dot_alpha
+    type: float
+    required: false
+    default: 0.6
+    description: Marker face alpha.
+  - name: x_measure
+    type: str
+    required: false
+    default: outdeg
+    description: Centrality measure name used for the outgoing/x axis; must be present in each dataset's centr_names.
+  - name: y_measure
+    type: str
+    required: false
+    default: indeg
+    description: Centrality measure name used for the incoming/y axis; must be present in each dataset's centr_names.
+  - name: xlabel
+    type: str
+    required: false
+    default: Differential outgoing interaction strength
+    description: X-axis label.
+  - name: ylabel
+    type: str
+    required: false
+    default: Differential incoming interaction strength
+    description: Y-axis label.
+  - name: title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; auto-generated from idents_use, dataset_names and comparison when None.
+  - name: font_size
+    type: float
+    required: false
+    default: 10.0
+    description: Axis label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Title font size.
+  - name: do_label
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw repelled pathway-name labels.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw the color/shape legend (only shown if any legend handles exist).
+  - name: show_axes
+    type: bool
+    required: false
+    default: true
+    description: When False, turns off the axes frame/ticks entirely.
+returns: A matplotlib.figure.Figure with a single scatter Axes, one point per pathway with nonzero differential for idents_use.
+mutates: >-
+  execution_class=pure_function; reads each adata_list[i].uns['cellchat']
+  only, does not mutate any input AnnData; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.centr
+writes: []
+examples:
+  - "scc.netAnalysis_signalingChanges_scatter([adata_ctrl, adata_treat], idents_use='G0', comparison=[1, 2])"
+  - "scc.netAnalysis_signalingChanges_scatter([a, b], idents_use='G0', comparison=[1, 2], dataset_names=['pre', 'post'])"
+failure_fixes:
+  - when: "adata_list has fewer than 2 elements"
+    suggest:
+      - "Pass a list of at least two CellChat-state AnnDatas, e.g. [adata_ctrl, adata_treat]."
+    explanation: >-
+      Raises ValueError("netAnalysis_signalingChanges_scatter requires at
+      least 2 AnnDatas ...") mirroring R's single-dataset discriminator at
+      analysis.R:2940 (checked in
+      test_signalingChanges_scatter_single_adata_raises).
+  - when: "idents_use is not among the joint cell-group levels across adata_list"
+    suggest:
+      - "Check idents_use against the cell-group labels shared across all datasets in adata_list."
+    explanation: >-
+      Raises ValueError(f"idents_use={idents_use!r} not in joint cell levels
+      ...") (checked in
+      test_signalingChanges_scatter_invalid_idents_use_raises).
+  - when: "a dataset in comparison is missing uns['cellchat'][slot_name]['centr']"
+    suggest:
+      - "Run netAnalysis_computeCentrality on each dataset in adata_list separately before comparing them."
+    explanation: >-
+      Raises ValueError mentioning "run `netAnalysis_computeCentrality` for
+      each dataset separately" from _build_mat_all_per_dataset.
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.netAnalysis_diff_signalingRole_scatter
+  - spatialcellchat.netAnalysis_signalingRole_scatter

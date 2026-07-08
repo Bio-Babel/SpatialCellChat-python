@@ -1,0 +1,38 @@
+id: spatialcellchat.load_db
+import_path: spatialcellchat.database.load_db
+kind: function
+signature: 'def load_db(species: Literal["human", "mouse", "zebrafish"]) -> dict[str, pd.DataFrame]:'
+purpose: Load the bundled CellChatDB ligand-receptor database for one species.
+description: >
+  Loads a CellChatDB for the requested species. Validates ``species`` against
+  ``DB_SPECIES`` (``"human"``, ``"mouse"``, ``"zebrafish"``), then reads four
+  parquet files from the package's bundled ``resources/db/<species>/``
+  directory: ``interaction``, ``complex``, ``cofactor``, ``geneInfo``. The
+  ``"interaction"`` table is re-indexed by its ``interaction_name`` column
+  (the ``rowname`` parquet column is dropped) to match the R object's row
+  names; ``"complex"`` and ``"cofactor"`` are re-indexed by their ``rowname``
+  column. ``"geneInfo"`` is returned as-is.
+parameters:
+  - name: species
+    type: 'Literal["human", "mouse", "zebrafish"]'
+    required: true
+    default: null
+    description: Species code selecting which bundled CellChatDB to load.
+returns: >
+  A new dict with keys ``"interaction"``, ``"complex"``, ``"cofactor"``,
+  ``"geneInfo"``; each value is a ``pandas.DataFrame`` freshly read from the
+  bundled parquet resources for the given species.
+mutates: 'execution_class=pure_function; no in-place mutation (reads static bundled parquet resources into fresh DataFrames); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.load_db("human")'
+  - 'scc.load_db("mouse")'
+failure_fixes:
+  - when: ValueError "species must be one of (...)"
+    suggest:
+      - pass one of "human", "mouse", "zebrafish".
+related:
+  - spatialcellchat.subsetDB
+  - spatialcellchat.extractGene
+  - spatialcellchat.updateCellChatDB

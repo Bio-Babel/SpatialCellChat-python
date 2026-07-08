@@ -1,0 +1,148 @@
+id: spatialcellchat.netVisual_embeddingPairwiseZoomIn
+import_path: spatialcellchat.viz_embedding.netVisual_embeddingPairwiseZoomIn
+kind: function
+signature: >-
+  netVisual_embeddingPairwiseZoomIn(adata: ad.AnnData, slot_name: str =
+  "netP", type_: str = "functional", comparison: Optional[Sequence[int]] =
+  None, color_use: Optional[Sequence[str]] = None, nCol: int = 1,
+  point_shape: Optional[Sequence[str]] = None, pathway_remove:
+  Optional[Sequence[str]] = None, dot_size: Tuple[float, float] = (2.0,
+  6.0), label_size: float = 2.8, dot_alpha: float = 0.5, xlabel:
+  Optional[str] = None, ylabel: Optional[str] = None, do_label: bool =
+  True, show_legend: bool = False, show_axes: bool = True) -> Figure
+purpose: Per-cluster "zoomed in" faceting of the joint netVisual_embeddingPairwise manifold — one subplot per pathway cluster, with per-dataset marker shape within each subplot.
+description: >-
+  Like netVisual_embeddingPairwise, the first parameter is a single
+  `adata: ad.AnnData`, NOT a list of datasets — the pairwise comparison is
+  addressed via `comparison` (1-based dataset indices, default (1,)),
+  joined into a comparison_name string used to look up
+  uns['cellchat'][slot_name]['similarity'][type_]['dr'][comparison_name]
+  and ['group'][comparison_name] via the shared _build_embedding_df helper
+  (same raise conditions as netVisual_embedding/Pairwise: missing
+  adata.uns['cellchat']; missing similarity[type_] -> "run
+  computeNetSimilarity"; missing ['dr'][comparison_name] -> "run
+  netEmbedding"; missing ['group'][comparison_name] -> "run
+  netClustering"). Cluster IDs (from the "group" column) are rendered in
+  natsorted (numeric-aware) order into an nCol-column grid, one cluster per
+  Axes. Within each cluster's Axes, points are further split by the
+  "group" column (which dataset a pathway point came from, defaulting to
+  "1" when absent) and rendered with a different marker per point_shape
+  cycle entry, all coloured by that cluster's colour (from color_use or
+  ggPalette). Per-cluster repelled pathway labels are drawn when
+  do_label=True. Isolate-pathway auto-detection runs but is not annotated
+  on the figure (no "Isolate pathways" text, unlike
+  netVisual_embeddingPairwise).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Single AnnData whose adata.uns['cellchat'][slot_name]['similarity'][type_]['dr'][comparison_name] and ['group'][comparison_name] are populated for the requested comparison_name (built from `comparison`).
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot whose ['similarity'] sub-dict is read.
+  - name: type_
+    type: str
+    required: false
+    default: functional
+    description: Similarity type key ("functional" or "structural"); not validated directly, an unrecognised key surfaces as a missing-similarity ValueError.
+  - name: comparison
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 1-based dataset indices joined with "-" to form comparison_name (e.g. [1] -> "1", [1, 2] -> "1-2"); defaults to (1,) when None.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cluster colour palette; defaults to ggPalette(len(cluster_ids)) when None.
+  - name: nCol
+    type: int
+    required: false
+    default: 1
+    description: Number of subplot columns in the per-cluster grid.
+  - name: point_shape
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Marker cycle mapped to unique "group" (dataset) values within each cluster's subplot; defaults to ["o","s","^","D","v","P","X"] when None.
+  - name: pathway_remove
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit isolate-pathway list; auto-detected from the similarity matrix when None (not annotated on the figure by this function).
+  - name: dot_size
+    type: Tuple[float, float]
+    required: false
+    default: [2.0, 6.0]
+    description: (min, max) marker-size range mapped from normalised communication probability.
+  - name: label_size
+    type: float
+    required: false
+    default: 2.8
+    description: Base font size multiplier for repelled pathway labels.
+  - name: dot_alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Marker face alpha.
+  - name: xlabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: X-axis label applied to every subplot when given; no label drawn when None.
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: Y-axis label applied to every subplot when given; no label drawn when None.
+  - name: do_label
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw per-cluster repelled pathway-name labels.
+  - name: show_legend
+    type: bool
+    required: false
+    default: false
+    description: Reserved for R parity; no legend is drawn per-subplot in this implementation regardless of value.
+  - name: show_axes
+    type: bool
+    required: false
+    default: true
+    description: When False, turns off the axes frame/ticks on every subplot.
+returns: A matplotlib.figure.Figure with a nCol-column grid of subplots, one per pathway cluster, each showing per-dataset ("group") markers; unused grid cells are hidden.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'][slot_name]
+  only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.similarity.functional.dr.<comparison_name>
+  - uns.cellchat.netP.similarity.functional.group.<comparison_name>
+writes: []
+examples:
+  - "scc.netVisual_embeddingPairwiseZoomIn(adata, type_='functional', comparison=[1], nCol=2)"
+failure_fixes:
+  - when: "adata.uns['cellchat'] is missing"
+    suggest:
+      - "Run the CellChat pipeline (computeCommunProb etc.) first to populate adata.uns['cellchat']."
+    explanation: "Raises ValueError(\"adata.uns['cellchat'] is missing.\") from _ensure_cellchat."
+  - when: "similarity[type_] is missing"
+    suggest:
+      - "Run computeNetSimilarity(adata, type_='functional') (or 'structural') first."
+    explanation: "Raises ValueError(f\"similarity[{type_!r}] missing; run computeNetSimilarity.\")."
+  - when: "similarity[type_]['dr'][comparison_name] is missing"
+    suggest:
+      - "Run netEmbedding() for this comparison after computeNetSimilarity()."
+    explanation: "Raises ValueError mentioning \"run netEmbedding\" for the given comparison_name."
+  - when: "similarity[type_]['group'][comparison_name] is missing"
+    suggest:
+      - "Run netClustering() for this comparison after netEmbedding()."
+    explanation: "Raises ValueError mentioning \"run netClustering\" for the given comparison_name."
+related:
+  - spatialcellchat.computeNetSimilarity
+  - spatialcellchat.netEmbedding
+  - spatialcellchat.netClustering
+  - spatialcellchat.netVisual_embeddingPairwise
+  - spatialcellchat.netVisual_embeddingZoomIn

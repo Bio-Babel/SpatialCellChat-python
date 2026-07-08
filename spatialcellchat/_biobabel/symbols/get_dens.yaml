@@ -1,0 +1,56 @@
+id: spatialcellchat.get_dens
+import_path: spatialcellchat.analysis_network.get_dens
+kind: function
+signature: >-
+  get_dens(data: np.ndarray, dens: Mapping[str, Any], method: str = "wkde")
+  -> np.ndarray
+purpose: Look up precomputed 2-D density-grid values at arbitrary query coordinates.
+description: >
+  Direct port of R's get_dens (analysis.R:4259). Given a precomputed 2-D
+  density grid (dens) and (N, 2) query coordinates (data, only the first two
+  columns are used), finds the grid cell containing each query point via
+  numpy.searchsorted on the grid's x/y breakpoints and returns the
+  corresponding density value. For method="wkde", dens must have keys "x",
+  "y" (1-D breakpoint vectors) and "z" (a (len(y), len(x))-shaped grid of
+  densities, R kde2d/wkde convention). For method="ks", dens must have keys
+  "eval.points" (a 2-element list of 1-D vectors) and "estimate" (matching
+  grid array, ks::kde convention). Mirrors R's findInterval + matrix-indexing
+  semantics: points below the grid's lower bound in either axis are given
+  NaN (analogous to R's index-0 row-drop, but length-preserving); points at
+  or above the grid's upper bound are clamped to the last grid cell (matches
+  R's behaviour of using the last bin rather than NaN).
+parameters:
+  - name: data
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: (N, 2) query coordinates; only the first two columns are used.
+  - name: dens
+    type: "Mapping[str, Any]"
+    required: true
+    default: null
+    description: >-
+      Density-grid dict. For method="wkde": keys "x", "y", "z" (z is a
+      (len(y), len(x)) array of grid densities). For method="ks": keys
+      "eval.points" (list of two 1-D vectors) and "estimate" (matching grid
+      array).
+  - name: method
+    type: str
+    required: false
+    default: "wkde"
+    description: "'wkde' or 'ks'; selects which key layout dens follows."
+returns: A new length-N numpy.ndarray of density values evaluated at each row of data (NaN for points below the grid's lower bound on either axis).
+mutates: >-
+  execution_class=pure_function; operates only on the input data/dens; no
+  in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "get_dens(data, dens, method='wkde')"
+  - "get_dens(data, dens, method='ks')"
+failure_fixes:
+  - when: "method is neither 'wkde' nor 'ks'"
+    suggest:
+      - "Pass method='wkde' or method='ks' matching the layout of the dens dict."
+    explanation: get_dens raises ValueError(f"unknown method {method!r}; expected 'wkde' or 'ks'") for any other value.
+related: []

@@ -1,0 +1,80 @@
+id: spatialcellchat.identifyOverExpressedInteractions
+import_path: spatialcellchat.de.identifyOverExpressedInteractions
+kind: function
+signature: >-
+  identifyOverExpressedInteractions(adata: ad.AnnData, db: dict[str,
+  pd.DataFrame], *, features_name: str = "features", variable_both: bool =
+  True, features: Optional[Sequence[str]] = None) -> pd.DataFrame
+purpose: Filter the CellChatDB interaction table down to over-expressed ligand-receptor pairs.
+description: >
+  Direct port of R's identifyOverExpressedInteractions (utilities.R:1496). A
+  complex (a rowname of db["complex"]) qualifies as "sig" when at least one of
+  its subunits appears in the over-expressed gene set (features_sig, taken
+  from uns["cellchat"]["DE"][features_name] unless features is given) and
+  every subunit is present in adata.var_names; a complex qualifies as "use"
+  when every subunit is present in adata.var_names (regardless of
+  significance). A pair (ligand, receptor) from db["interaction"] is kept
+  when: variable_both=True - both members are in the union of the
+  over-expressed gene set and the sig-complex names; or variable_both=False -
+  every member is in the union of adata.var_names and the use-complex names
+  (i.e. present in the data universe) AND the pair has at least one member in
+  the sig universe. The filtered interaction table is written into
+  uns["cellchat"]["LR"]["LRsig"].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object whose uns["cellchat"]["DE"][features_name] over-expressed gene
+      list was populated by identifyOverExpressedGenes (unless features is
+      given). adata.var_names defines the data-universe gene set.
+  - name: db
+    type: dict[str, pandas.DataFrame]
+    required: true
+    default: null
+    description: CellChatDB dict; must contain "interaction" (with ligand/receptor columns) and "complex" (subunit columns) keys.
+  - name: features_name
+    type: str
+    required: false
+    default: features
+    description: Key under uns["cellchat"]["DE"] containing the over-expressed gene list to consume.
+  - name: variable_both
+    type: bool
+    required: false
+    default: true
+    description: >-
+      When True, require both ligand and receptor to be over-expressed (or a
+      sig complex). When False, require the pair to be fully present in the
+      data universe with at least one over-expressed member.
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Override the stored over-expressed gene set (uns["cellchat"]["DE"][features_name]) with this list.
+returns: >-
+  A pandas.DataFrame: the subset of db["interaction"] rows whose (ligand,
+  receptor) pair passes the variable_both filter. The same DataFrame is also
+  written into uns["cellchat"]["LR"]["LRsig"].
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['LR']['LRsig'] in
+  place (creating uns['cellchat']['LR'] if absent); returns_kind=new_object
+  (returns the filtered interaction DataFrame, not adata itself)
+requires:
+  - uns.cellchat.DE.features
+writes:
+  - uns.cellchat.LR.LRsig
+examples:
+  - 'scc.identifyOverExpressedInteractions(sub, db=db_use, variable_both=False)'
+  - 'de.identifyOverExpressedInteractions(adata.copy(), db, variable_both=True)'
+  - 'de.identifyOverExpressedInteractions(adata.copy(), db, variable_both=False, features=["TGFB1"])'
+failure_fixes:
+  - when: "features is None and uns['cellchat']['DE'][features_name] is missing"
+    suggest:
+      - "Run identifyOverExpressedGenes(adata, ...) first, or pass features= explicitly."
+    explanation: >-
+      Raises ValueError("adata.uns['cellchat']['DE']['<features_name>']
+      missing — run identifyOverExpressedGenes() first").
+related:
+  - spatialcellchat.identifyOverExpressedGenes
+  - spatialcellchat.computeCommunProb

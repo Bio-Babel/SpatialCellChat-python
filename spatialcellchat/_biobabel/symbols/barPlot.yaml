@@ -1,0 +1,129 @@
+id: spatialcellchat.barPlot
+import_path: spatialcellchat.viz_basic.barPlot
+kind: function
+signature: >-
+  barPlot(adata: ad.AnnData, features: Sequence[str], group_by:
+  Optional[str] = None, split_by: Optional[str] = None, color_use:
+  Optional[Union[Sequence[str], Dict[str, str]]] = None, method:
+  Literal["truncatedMean", "triMean", "median"] = "truncatedMean", trim:
+  float = 0.1, layer: Optional[str] = None, x_lab_rot: Union[bool, float] =
+  False, ncol: int = 1, size_text: int = 10, slot_name: str =
+  "data.signaling", **kwargs: Any) -> Figure
+purpose: Bar plot of average gene expression per cell group (one subplot per gene), optionally split by a second grouping/condition.
+description: >
+  Direct port of R's barPlot (visualization.R:6533). R reads from the
+  Seurat @data slot of the object passed in; plotGeneExpression builds that
+  Seurat object from chat@data.signaling, so by default this function reads
+  R's chat@data.signaling slot via
+  spatialcellchat._anndata.resolve_data_matrix(adata, slot_name) (post-ALRA
+  values are used when preProcessing has run); pass layer= to read an
+  explicit adata.layers[...] instead. group_by defaults to the first of
+  "cellchat_idents" / "active_ident" / "cell.type" found in adata.obs.columns
+  (raises ValueError if none is found and group_by is not given explicitly,
+  or if the given group_by is not a column). For each gene in features and
+  each group_by level, computes a per-group summary statistic
+  (method="truncatedMean" -> scipy.stats.trim_mean with proportiontocut=trim;
+  "triMean" -> spatialcellchat._utils.triMean; "median" -> numpy.median),
+  optionally crossed with split_by levels, assembles a long-form DataFrame,
+  and delegates each gene's panel to barplot_internal (x="labels",
+  fill="condition"). All axes but the last panel have remove_xtick=True.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with the expression layer/slot and the group_by (and optional split_by) obs column(s).
+  - name: features
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Gene names (must be present in adata.var_names); each gets its own subplot.
+  - name: group_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: >-
+      adata.obs column giving the x-axis cell groups. When None, the first
+      of "cellchat_idents" / "active_ident" / "cell.type" present in
+      adata.obs.columns is used; raises ValueError if none of these exist.
+  - name: split_by
+    type: Optional[str]
+    required: false
+    default: null
+    description: adata.obs column giving the bar-fill condition; raises ValueError if given but not in adata.obs.columns.
+  - name: color_use
+    type: Optional[Union[Sequence[str], Dict[str, str]]]
+    required: false
+    default: null
+    description: Colour palette forwarded to barplot_internal for the split_by (or group_by, when split_by is None) fill levels.
+  - name: method
+    type: 'Literal["truncatedMean", "triMean", "median"]'
+    required: false
+    default: truncatedMean
+    description: Aggregation function applied per gene per group; raises ValueError for any other value.
+  - name: trim
+    type: float
+    required: false
+    default: 0.1
+    description: proportiontocut passed to scipy.stats.trim_mean when method="truncatedMean".
+  - name: layer
+    type: Optional[str]
+    required: false
+    default: null
+    description: When set, reads adata.layers[layer] directly, bypassing slot_name resolution.
+  - name: x_lab_rot
+    type: Union[bool, float]
+    required: false
+    default: false
+    description: Forwarded to barplot_internal / _apply_xlabel_rot for x tick-label rotation.
+  - name: ncol
+    type: int
+    required: false
+    default: 1
+    description: Number of subplot columns; row count is ceil(len(features) / ncol).
+  - name: size_text
+    type: int
+    required: false
+    default: 10
+    description: Forwarded to barplot_internal for tick/legend font size.
+  - name: slot_name
+    type: str
+    required: false
+    default: data.signaling
+    description: R-style slot name resolved via spatialcellchat._anndata.resolve_data_matrix when layer is None.
+  - name: kwargs
+    type: Any
+    required: false
+    default: null
+    description: Forwarded to barplot_internal (e.g. color_use overrides, legend_title, stat_add).
+returns: >-
+  A new matplotlib.figure.Figure with one axes per feature (spare axes in
+  the trailing row are hidden), laid out via plt.subplots(nrow, ncol) and
+  fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; reads adata.obs[group_by]/[split_by],
+  adata.var_names, and either adata.layers[layer] or the resolved
+  data.signaling slot (via resolve_data_matrix); does not write back into
+  adata.uns/obs/var; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.barPlot(adata, features=["Tgfb1", "Tgfbr1"], method="truncatedMean", trim=0.1)'
+  - 'scc.barPlot(adata, features=["Tgfb1"], group_by="cellchat_idents", split_by="condition", ncol=2)'
+  - 'scc.barPlot(adata, features=["Tgfb1", "Tgfbr1"], method="median", slot_name="data.signaling")'
+failure_fixes:
+  - when: "method is not one of truncatedMean/triMean/median"
+    suggest:
+      - 'Pass method="truncatedMean", "triMean", or "median".'
+    explanation: 'barPlot raises ValueError("`method` must be truncatedMean / triMean / median, got ...") for any other value.'
+  - when: "group_by cannot be inferred and is not passed explicitly"
+    suggest:
+      - 'Pass group_by= naming an existing adata.obs column, or add one of "cellchat_idents"/"active_ident"/"cell.type" to adata.obs.'
+    explanation: 'barPlot raises ValueError("Could not infer group_by; pass an obs column name explicitly.") when none of the default candidate columns exist.'
+  - when: "split_by is given but not a column of adata.obs"
+    suggest:
+      - "Pass an existing adata.obs column name as split_by, or omit split_by."
+    explanation: 'barPlot raises ValueError(f"split_by={split_by!r} not in adata.obs").'
+related:
+  - spatialcellchat.barplot_internal
+  - spatialcellchat.preProcessing

@@ -1,0 +1,49 @@
+# Auto-generated stub for spatialcellchat.modeling_avg.computeAvgCommunProb_LR_Visium_Avg.
+# Review and fill: purpose, mutates, requires, writes, examples, failure_fixes, related.
+id: spatialcellchat.computeAvgCommunProb_LR_Visium_Avg
+import_path: spatialcellchat.modeling_avg.computeAvgCommunProb_LR_Visium_Avg
+kind: function
+signature: "computeAvgCommunProb_LR_Visium_Avg(prob: sparse.spmatrix, cell_type_proportion: np.ndarray, cell_type_onehot: np.ndarray) -> np.ndarray"
+purpose: Compute the Visium-resolution AVERAGE of communication probabilities aggregated to cell-type level.
+description: >
+  Pure-array helper (R: computeAvgCommunProb_LR_Visium_Avg, modeling.R:848)
+  used internally by computeAvgCommunProb_Visium's per-LR loop for
+  avg_type="avg". Same numerator as computeAvgCommunProb_LR_Visium_Sum
+  (cell_type_proportion^T @ prob @ cell_type_proportion), but divided
+  element-wise by the per-cell-type-pair communication LINK COUNT computed
+  from the binarised one-hot decomposition:
+  cell_type_onehot^T @ 1(prob) @ cell_type_onehot, where 1(prob) is prob
+  with all nonzero entries set to 1. NaN entries from zero-by-zero division
+  are replaced by 0 (this is the short-circuit exercised by
+  test_computeAvgCommunProb_Visium_avg_short_circuit, where a sender
+  cell-type with no spots having prob > 0 yields an all-zero row rather
+  than NaN). Does not read or write adata/uns state; operates purely on its
+  array arguments.
+parameters:
+  - name: prob
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: "(nC, nC) spot-level communication probability matrix for one ligand-receptor pair."
+  - name: cell_type_proportion
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: "(nC, nTypes) matrix of cell-type proportions per spot."
+  - name: cell_type_onehot
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: "(nC, nTypes) one-hot matrix derived from cell_type_proportion > 0 (R: cell.type.onehot)."
+returns: >
+  A dense (nTypes, nTypes) numpy.ndarray of cell-type-level communication
+  probability averages.
+mutates: "execution_class=pure; no mutation of adata or any input array; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeAvgCommunProb_LR_Visium_Avg(prob_cell_i, cell_type_proportion=decomp, cell_type_onehot=(decomp > 0).astype(float))"
+failure_fixes: []
+related:
+  - spatialcellchat.computeAvgCommunProb_Visium
+  - spatialcellchat.computeAvgCommunProb_LR_Visium_Sum

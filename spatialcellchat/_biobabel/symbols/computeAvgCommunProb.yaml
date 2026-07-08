@@ -1,0 +1,133 @@
+# Auto-generated stub for spatialcellchat.modeling_avg.computeAvgCommunProb.
+# Review and fill: purpose, mutates, requires, writes, examples, failure_fixes, related.
+id: spatialcellchat.computeAvgCommunProb
+import_path: spatialcellchat.modeling_avg.computeAvgCommunProb
+kind: function
+signature: "computeAvgCommunProb(adata: ad.AnnData, group_by: Optional[str] = None, avg_type: Literal['avg', 'sum'] = 'avg', min_percent: float = 0.1, min_cells_sr: int = 5, do_permutation: bool = True, nboot: int = 100, seed_use: int = 1, colocalization_use: bool = False, thresh_colo: float = 0.05) -> ad.AnnData"
+purpose: Compute group-level (cluster-level) cell-cell communication probabilities from precomputed cell-level probabilities.
+description: >
+  Mirrors R's computeAvgCommunProb (modeling.R:989). Intended for
+  high-resolution spatial platforms (e.g. Slide-seqV2, Stereo-seq, MERFISH)
+  where each cell has a hard group assignment, as opposed to
+  computeAvgCommunProb_Visium which is used for low-resolution Visium spots
+  with fractional cell-type decomposition.
+
+  Reads the precomputed per-LR sparse cell-cell probability matrices from
+  adata.uns['cellchat']['net']['tmp']['prob.cell'] (written by
+  computeCommunProb) together with the per-LR per-cell ligand/receptor
+  average-expression matrices in
+  adata.uns['cellchat']['net']['tmp']['Lavg'] / ['Ravg']. Resolves the
+  per-cell group factor from `group_by` (or adata.obs['active_ident'] when
+  group_by is None) and validates that the factor has no unused levels.
+
+  For each LR pair with at least one nonzero cell-level link, dispatches to
+  computeAvgCommunProb_LR_Avg (avg_type="avg") or
+  computeAvgCommunProb_LR_Sum (avg_type="sum") to aggregate the cell-level
+  probability matrix to a (nGroup, nGroup) group-level matrix, optionally
+  zeroing out group pairs that fail a spatial colocalization test
+  (colocalization_use=True, via computeColocalization on
+  adata.obsm['spatial']). When do_permutation=True, runs nboot permutations
+  of the group labels (shared permutation matrix across LR pairs) to
+  compute empirical p-values per (source, target, LR) entry, forcing p=1
+  wherever prob==0.
+
+  Writes the aggregated probability array, permutation p-values, LR
+  diagnostic counts, dimnames, and the call's parameters back into
+  adata.uns['cellchat']; mutates and returns the same AnnData object.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Spatial AnnData with computeCommunProb results stored in uns['cellchat']['net']['tmp']['prob.cell'] (list/dict of sparse (nC, nC) matrices, one per LR pair) and the dense 3-D array in uns['cellchat']['net']['prob.cell'].
+  - name: group_by
+    type: str
+    required: false
+    default: null
+    description: adata.obs column to use as the per-cell group factor. When None, defaults to adata.obs['active_ident'] (R's object@idents).
+  - name: avg_type
+    type: "Literal['avg', 'sum']"
+    required: false
+    default: avg
+    description: Aggregation rule. "avg" divides the per-group sum by the per-group communication-link count; "sum" returns the raw per-group sum.
+  - name: min_percent
+    type: float
+    required: false
+    default: 0.1
+    description: "Minimum fraction of expressing cells per group required for the per-group expression filter (R: min.percent)."
+  - name: min_cells_sr
+    type: int
+    required: false
+    default: 5
+    description: "Minimum sender/receiver cell count per group required for the per-group filter (R: min.cells.sr)."
+  - name: do_permutation
+    type: bool
+    required: false
+    default: true
+    description: "Whether to compute permutation-test p-values (R: do.permutation)."
+  - name: nboot
+    type: int
+    required: false
+    default: 100
+    description: "Number of permutations (R: nboot)."
+  - name: seed_use
+    type: int
+    required: false
+    default: 1
+    description: "RNG seed for the permutation test (R: seed.use). Note that R's Mersenne-Twister stream is non-portable, so p-values will not be bit-for-bit identical to R's."
+  - name: colocalization_use
+    type: bool
+    required: false
+    default: false
+    description: "Whether to mask out spatially-distant cell groups based on spatialcellchat.computeColocalization (R: colocalization.use). Requires adata.obsm['spatial'] when True."
+  - name: thresh_colo
+    type: float
+    required: false
+    default: 0.05
+    description: "Colocalization p-value threshold (R: thresh.colo)."
+returns: >
+  The same adata object (mutated in place) with
+  uns['cellchat']['net']['prob'] holding a (nGroup, nGroup, nLR) dense
+  array of group-level communication probabilities, and
+  uns['cellchat']['net']['pval'] holding the same-shape permutation
+  p-values (None when do_permutation=False).
+mutates: "execution_class=builder; mutates adata.uns['cellchat']['net']['prob'], ['net']['pval'], ['net']['dimnames'], ['net']['tmp']['LRsig.CCC.counts'], ['net']['tmp']['LRsig.GGC.counts'], ['net']['tmp']['LRsig.use.idx'], ['options']['parameter'], and (only when colocalization_use=True) ['images']['colocalization'] in place; returns_kind=same_object"
+requires:
+  - uns.cellchat.net.tmp.prob.cell
+  - uns.cellchat.net.tmp.Lavg
+  - uns.cellchat.net.tmp.Ravg
+writes:
+  - uns.cellchat.net.prob
+  - uns.cellchat.net.pval
+  - uns.cellchat.net.dimnames
+  - uns.cellchat.net.tmp.LRsig.CCC.counts
+  - uns.cellchat.net.tmp.LRsig.GGC.counts
+  - uns.cellchat.net.tmp.LRsig.use.idx
+  - uns.cellchat.options.parameter
+  - uns.cellchat.images.colocalization
+examples:
+  - "scc.computeAvgCommunProb(adata, group_by='cellchat_idents', avg_type='avg', do_permutation=False)"
+  - "scc.computeAvgCommunProb(adata, avg_type='sum', nboot=100, do_permutation=True, seed_use=1)"
+failure_fixes:
+  - when: 'RuntimeError: Please run `computeCommunProb` ...'
+    suggest:
+      - call spatialcellchat.computeCommunProb(adata, ...) first so it populates uns['cellchat']['net']['tmp']['prob.cell'].
+  - when: 'RuntimeError: computeAvgCommunProb requires ... ''Lavg'' and ''Ravg'''
+    suggest:
+      - ensure computeCommunProb ran to completion and wrote uns['cellchat']['net']['tmp']['Lavg']/['Ravg'].
+  - when: 'ValueError: ensure that the factor levels are correct'
+    suggest:
+      - drop unused categories from the group_by / active_ident column so its number of categories matches the number of levels actually present in the data (e.g. `adata.obs[col].cat.remove_unused_categories()`).
+  - when: 'ValueError: avg_type must be one of ''avg'', ''sum'''
+    suggest:
+      - pass avg_type='avg' or avg_type='sum'.
+  - when: 'ValueError: Each LR pair does not have any cell-level links/interactions'
+    suggest:
+      - every LR's prob.cell matrix is all-zero; rerun computeCommunProb with looser filtering or check the input expression data.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.computeAvgCommunProb_LR_Avg
+  - spatialcellchat.computeAvgCommunProb_LR_Sum
+  - spatialcellchat.computeAvgCommunProb_Visium
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.computeColocalization

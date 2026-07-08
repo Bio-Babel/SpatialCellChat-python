@@ -1,0 +1,201 @@
+id: spatialcellchat.netVisual_chord_gene
+import_path: spatialcellchat.viz_network.netVisual_chord_gene
+kind: function
+signature: >-
+  netVisual_chord_gene(adata: ad.AnnData, slot_name: str = "net", color_use:
+  Optional[Union[Sequence[str], Dict[str, str]]] = None, signaling:
+  Optional[Sequence[str]] = None, pairLR_use: Optional[pd.DataFrame] = None,
+  net: Optional[pd.DataFrame] = None, sources_use: Optional[Sequence] = None,
+  targets_use: Optional[Sequence] = None, lab_cex: float = 0.8, small_gap:
+  float = 1.0, big_gap: float = 10.0, annotation_track_height: float = 0.03,
+  link_visible: bool = True, scale: bool = False, directional: int = 1,
+  link_target_prop: bool = True, reduce: float = -1.0, transparency: float =
+  0.4, link_border: Optional[str] = None, title_name: Optional[str] = None,
+  legend_pos_x: float = 20.0, legend_pos_y: float = 20.0, show_legend: bool =
+  True, thresh: float = 0.05, figsize: Tuple[float, float] = (8.0, 8.0)) ->
+  Figure
+purpose: Chord diagram showing ligand -> receptor (or ligand -> pathway) connections between cell groups.
+description: >
+  Direct port of R's netVisual_chord_gene (visualization.R:3553). Unlike
+  netVisual_chord_cell (cell-group sectors), sectors here are per-ligand and
+  per-receptor (or per-pathway when slot_name="netP"), so the diagram shows
+  which specific genes/pathways mediate the cell-group communication.
+  Raises if pairLR_use is not a DataFrame, or if both pairLR_use and
+  signaling are given. If `net` is None, melts
+  adata.uns['cellchat']['net']['prob'] (zeroing entries with
+  pval > thresh when net['pval'] is present) into a long (source, target,
+  interaction_name, prob) frame using net['dimnames'], and left-joins in
+  interaction_name_2/pathway_name/ligand/receptor/annotation/evidence from
+  adata.uns['cellchat']['LR']['LRsig']; otherwise `net` is used as-is.
+  slot_name="netP" additionally re-aggregates prob by
+  (source_target, pathway_name), synthesising ligand=pathway_name and a
+  blank receptor. `signaling` (resolved via searchPair against LRsig) or
+  pairLR_use restrict to specific pathways/pairs (mutually exclusive,
+  raises if both given). sources_use/targets_use restrict cell groups.
+  Duplicate ligand/receptor names within the same source/target cell are
+  disambiguated with trailing spaces so pycirclize can render them as
+  distinct sectors, sector order is built by sorting per-source-cell then
+  per-target-cell by descending prob, and sector colours are derived from
+  the cell-group palette (source cell's colour for ligand sectors, target
+  cell's colour for receptor sectors). Raises if no signaling links survive
+  filtering. Reads adata.uns['cellchat'] only; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns['cellchat']['net']['prob'] and uns['cellchat']['LR']['LRsig'] populated (unless `net` is passed directly).
+  - name: slot_name
+    type: str
+    required: false
+    default: net
+    description: '"net" keeps per-L-R-pair ligand/receptor sectors; "netP" aggregates by pathway (ligand sector = pathway name, blank receptor sector).'
+  - name: color_use
+    type: Optional[Union[Sequence[str], Dict[str, str]]]
+    required: false
+    default: null
+    description: Per-cell-group base colours (ligand/receptor sectors inherit their source/target cell's colour). Defaults to scPalette(n).
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathway name(s) to restrict to, resolved via searchPair against LRsig. Mutually exclusive with pairLR_use.
+  - name: pairLR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Direct restriction table with an "interaction_name" or "pathway_name" column; must be a DataFrame (raises otherwise). Mutually exclusive with signaling.
+  - name: net
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Pre-built long-form (source, target, interaction_name/pathway_name, prob, ...) DataFrame, bypassing the adata.uns['cellchat']['net'] melt.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to these source cell groups.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to these target cell groups.
+  - name: lab_cex
+    type: float
+    required: false
+    default: 0.8
+    description: Sector label font-size scale.
+  - name: small_gap
+    type: float
+    required: false
+    default: 1.0
+    description: Gap (degrees) between adjacent sectors.
+  - name: big_gap
+    type: float
+    required: false
+    default: 10.0
+    description: Gap (degrees) at the sector-order wrap-around point.
+  - name: annotation_track_height
+    type: float
+    required: false
+    default: 0.03
+    description: Fractional radial height of the sector annotation track.
+  - name: link_visible
+    type: bool
+    required: false
+    default: true
+    description: Kept for R-argument parity.
+  - name: scale
+    type: bool
+    required: false
+    default: false
+    description: Row-normalise sector arc lengths.
+  - name: directional
+    type: int
+    required: false
+    default: 1
+    description: Link directionality style.
+  - name: link_target_prop
+    type: bool
+    required: false
+    default: true
+    description: Scale link width by the target's proportion of incoming weight.
+  - name: reduce
+    type: float
+    required: false
+    default: -1.0
+    description: Minimum-link-width-fraction pruning threshold; -1.0 disables pruning.
+  - name: transparency
+    type: float
+    required: false
+    default: 0.4
+    description: Link fill opacity.
+  - name: link_border
+    type: Optional[str]
+    required: false
+    default: null
+    description: Kept for R-argument parity.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title.
+  - name: legend_pos_x
+    type: float
+    required: false
+    default: 20.0
+    description: Legend x offset.
+  - name: legend_pos_y
+    type: float
+    required: false
+    default: 20.0
+    description: Legend y offset.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Draw a cell-group colour legend.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold; net['prob'] entries with pval > thresh are zeroed before melting (only when net= is not passed directly).
+  - name: figsize
+    type: Tuple[float, float]
+    required: false
+    default: (8.0, 8.0)
+    description: Matplotlib figure size in inches.
+returns: A new matplotlib.figure.Figure with one sector per ligand/receptor (or pathway) and chord links between them, coloured by cell group.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net'] and
+  ['LR']['LRsig'] only (unless net= is passed directly, bypassing adata
+  entirely); does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "scc.netVisual_chord_gene(sub, signaling=['TNF'])"
+  - "scc.netVisual_chord_gene(sub, slot_name='netP', sources_use=['A'])"
+  - "scc.netVisual_chord_gene(sub, pairLR_use=pairLR_df, thresh=0.05)"
+failure_fixes:
+  - when: "pairLR_use is passed but is not a pandas.DataFrame"
+    suggest:
+      - "Pass pairLR_use as a DataFrame with an 'interaction_name' or 'pathway_name' column."
+    explanation: >-
+      Raises ValueError("pairLR.use should be a data frame with a single
+      column named either 'interaction_name' or 'pathway_name'").
+  - when: "both pairLR_use and signaling are passed"
+    suggest:
+      - "Pass only one of pairLR_use or signaling, not both."
+    explanation: >-
+      Raises ValueError("Please do not assign values to 'signaling' when
+      using 'pairLR.use'").
+  - when: "no signaling links survive filtering"
+    suggest:
+      - "Lower thresh, or relax sources_use/targets_use/signaling/pairLR_use."
+    explanation: "Raises ValueError(\"No signaling links are inferred!\")."
+related:
+  - spatialcellchat.netVisual_chord_cell
+  - spatialcellchat.netVisual_chord_cell_internal
+  - spatialcellchat.searchPair

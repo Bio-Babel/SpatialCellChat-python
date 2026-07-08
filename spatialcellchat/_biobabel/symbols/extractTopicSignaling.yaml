@@ -1,0 +1,132 @@
+id: spatialcellchat.extractTopicSignaling
+import_path: spatialcellchat.analysis_topics.extractTopicSignaling
+kind: function
+signature: >-
+  extractTopicSignaling(adata: ad.AnnData, dims: Sequence[int] = (1, 2, 3, 4,
+  5), nfeatures: int = 30, nTop: int = 10, feature_cat: Literal["LR-pair",
+  "ligand", "signaling"] = "LR-pair", reduction: str = "topic", pattern:
+  Literal["incoming", "outgoing"] = "incoming", slot_name: str = "net",
+  projected: bool = False, balanced: bool = False, species:
+  Literal["mouse", "human"] = "mouse", db: Optional[Dict[str, pd.DataFrame]]
+  = None, simplify: bool = True) -> Union[pd.DataFrame, Dict[str, pd.DataFrame]]
+purpose: Extract and rank the top loading features per NMF topic dimension.
+description: >
+  Direct port of R's extractTopicSignaling (analysis.R:3869). R operates on a
+  Seurat DimReduc object via Seurat::Loadings + Seurat::TopFeatures; this
+  Python port reads the (nLR, k) loadings DataFrame from
+  uns["cellchat"][slot_name]["topic"][pattern]["signaling"] (or
+  ["signaling.projected"] when projected=True and present), written by
+  identifyCellTopics — raises if slot["topic"][pattern] is absent. For each
+  1-based dim in `dims`, the top `nfeatures` L-R pairs are selected by
+  |loading| (or split positive/negative when balanced=True), mirroring
+  Seurat's Top() selector; the union of selected features across all dims is
+  looked up against the CellChatDB interaction table (ligand, receptor,
+  pathway_name), then optionally aggregated by ligand (feature_cat="ligand",
+  mean score per ligand) or by pathway (feature_cat="signaling", mean score
+  per pathway_name) — feature_cat="LR-pair" keeps individual pairs
+  ungrouped. Each per-dim table is ranked by |score| descending, truncated to
+  `nTop` rows, and tagged with a "reduction" column (f"{reduction}_{dim}").
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"][slot_name]["topic"][pattern]["signaling"] populated by identifyCellTopics.
+  - name: dims
+    type: Sequence[int]
+    required: false
+    default: (1, 2, 3, 4, 5)
+    description: 1-based topic (NMF factor) indices to extract.
+  - name: nfeatures
+    type: int
+    required: false
+    default: 30
+    description: Number of features selected per topic before aggregation/truncation.
+  - name: nTop
+    type: int
+    required: false
+    default: 10
+    description: Final number of rows kept per topic after aggregation and ranking.
+  - name: feature_cat
+    type: 'Literal["LR-pair", "ligand", "signaling"]'
+    required: false
+    default: LR-pair
+    description: Aggregation level — individual L-R pairs, mean-by-ligand, or mean-by-pathway.
+  - name: reduction
+    type: str
+    required: false
+    default: topic
+    description: Logical reduction name used as the prefix for the output "reduction" column (mirrors Seurat's Key(object[[reduction]])).
+  - name: pattern
+    type: 'Literal["incoming", "outgoing"]'
+    required: false
+    default: incoming
+    description: Which pattern's topic loadings to read from slot["topic"][pattern].
+  - name: slot_name
+    type: str
+    required: false
+    default: net
+    description: Which uns["cellchat"] slot holds the topic result.
+  - name: projected
+    type: bool
+    required: false
+    default: false
+    description: If True, prefer topic["signaling.projected"] when present; otherwise falls back to topic["signaling"].
+  - name: balanced
+    type: bool
+    required: false
+    default: false
+    description: If True, split nfeatures evenly between the most positive and most negative loadings for each dim.
+  - name: species
+    type: 'Literal["mouse", "human"]'
+    required: false
+    default: mouse
+    description: Species used to resolve the default CellChatDB when `db` is not supplied.
+  - name: db
+    type: Optional[Dict[str, pandas.DataFrame]]
+    required: false
+    default: null
+    description: Override CellChatDB; must have an "interaction" DataFrame with ligand/receptor/pathway_name columns.
+  - name: simplify
+    type: bool
+    required: false
+    default: true
+    description: If True, return a single concatenated DataFrame across dims; if False, return a dict keyed by "<reduction>_<dim>".
+returns: >-
+  If simplify=True (default), a single pandas.DataFrame concatenating the
+  per-dim top-feature tables (columns include feature, score, ligand,
+  receptor, pathway_name, absolute.v, rank, reduction). If simplify=False, a
+  dict[str, pandas.DataFrame] keyed by "<reduction>_<dim>". No AnnData is
+  mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.net.topic.incoming
+  - uns.cellchat.net.topic.outgoing
+writes: []
+examples:
+  - "scc.extractTopicSignaling(adata, dims=[1, 2, 3], feature_cat='LR-pair', pattern='incoming')"
+  - "scc.extractTopicSignaling(adata, feature_cat='ligand', simplify=False)"
+failure_fixes:
+  - when: "feature_cat is not 'LR-pair', 'ligand', or 'signaling'"
+    suggest:
+      - "Pass feature_cat='LR-pair', feature_cat='ligand', or feature_cat='signaling'."
+    explanation: >-
+      extractTopicSignaling raises ValueError("`feature_cat` must be
+      'LR-pair', 'ligand', or 'signaling'.").
+  - when: "slot['topic'][pattern] is missing"
+    suggest:
+      - "Run identifyCellTopics(adata, slot_name=slot_name, pattern=pattern, topic_k=(k,)) with a single k first."
+    explanation: >-
+      extractTopicSignaling raises ValueError("adata.uns['cellchat']['<slot_name>']['topic']['<pattern>']
+      is missing; run `identifyCellTopics` first.").
+  - when: "topic[loadings_key] is not a pandas.DataFrame"
+    suggest:
+      - "Ensure identifyCellTopics wrote the 'signaling' loadings as a DataFrame (its default output format)."
+    explanation: >-
+      extractTopicSignaling raises TypeError("topic['<pattern>']['<loadings_key>']
+      must be a pandas DataFrame.").
+related:
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.identifyTopicCommunities
+  - spatialcellchat.extractEnrichedLR

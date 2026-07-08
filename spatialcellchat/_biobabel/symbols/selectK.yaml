@@ -1,0 +1,98 @@
+id: spatialcellchat.selectK
+import_path: spatialcellchat.analysis_topics.selectK
+kind: function
+signature: >-
+  selectK(adata: ad.AnnData, slot_name: str = "netP", pattern:
+  Literal["outgoing", "incoming"] = "outgoing", title_name: Optional[str] =
+  None, do_facet: bool = True, k_range: Sequence[int] = tuple(range(2, 11)),
+  nrun: int = 30, seed_use: int = 10) -> Dict[str, Any]
+purpose: Select the number of NMF communication patterns via cophenetic-correlation + silhouette diagnostics.
+description: >
+  Direct port of R's selectK (analysis.R:941), but returns the diagnostic
+  statistics dict instead of R's ggplot object (a separate slice-6a plot
+  helper renders the figure). Requires slot["prob"]
+  (uns["cellchat"][slot_name]["prob"]); raises if absent. Reduces the (K, K,
+  nLR) prob tensor via the same _prepare_pattern_data step used by
+  identifyCommunicationPatterns (sum over receivers/senders per `pattern`,
+  column-max normalise, drop all-zero rows) into the NMF input matrix, then
+  sweeps k_range via spatialcellchat._nmf._consensus_nmf(method='lee') to
+  compute per-k cophenetic correlation and silhouette curves and pick k_hat.
+  Per an intentional R-bug-fix documented in the source: SpatialCellChat's
+  analysis.R:962 calls NMF::nmfEstimateRank with an undefined variable
+  (data_sr) and hard-codes range=20:30, nrun=30 (ignoring the user's k.range
+  and nrun arguments) — a fork-side regression relative to upstream
+  CellChat::analysis.R:320. This Python port honours the documented intent
+  (upstream CellChat + the function's own docstring) and actually uses the
+  caller-supplied `k_range` and `nrun`.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"][slot_name]["prob"] populated.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Which uns["cellchat"] slot's "prob" tensor to use as NMF input.
+  - name: pattern
+    type: 'Literal["outgoing", "incoming"]'
+    required: false
+    default: outgoing
+    description: '"outgoing" sums prob over receivers; "incoming" sums over senders.'
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: 'Title stored in the returned dict for the plot helper; defaults to f"{pattern} signaling \n".'
+  - name: do_facet
+    type: bool
+    required: false
+    default: true
+    description: Carried through to the returned dict for the plot helper.
+  - name: k_range
+    type: Sequence[int]
+    required: false
+    default: tuple(range(2, 11))
+    description: Candidate NMF ranks to evaluate.
+  - name: nrun
+    type: int
+    required: false
+    default: 30
+    description: Number of NMF restarts per candidate k.
+  - name: seed_use
+    type: int
+    required: false
+    default: 10
+    description: Base RNG seed.
+returns: >-
+  A dict {"data": (rows_kept, nLR) ndarray fed to NMF, "k": list[int] of
+  candidate ranks, "cophenetic": ndarray, "silhouette": ndarray, "k_hat": int
+  (the recommended rank), "title": str, "do_facet": bool, "pattern": str}. No
+  AnnData is mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.prob
+  - uns.cellchat.net.prob
+writes: []
+examples:
+  - "scc.selectK(adata, slot_name='netP', pattern='outgoing', k_range=range(2, 11), nrun=30)"
+  - "scc.selectK(adata, slot_name='netP', pattern='incoming')"
+failure_fixes:
+  - when: "uns['cellchat'][slot_name] is missing"
+    suggest:
+      - "Verify slot_name matches a populated slot ('netP' or 'net')."
+    explanation: >-
+      selectK's internal _get_slot raises ValueError("adata.uns['cellchat']['<slot_name>']
+      is missing; run the appropriate upstream function first.").
+  - when: "uns['cellchat'][slot_name]['prob'] is missing"
+    suggest:
+      - "Run computeCommunProbPathway (for netP) or computeAvgCommunProb (for net) before selectK."
+    explanation: >-
+      selectK raises ValueError("adata.uns['cellchat']['<slot_name>']['prob']
+      is missing.").
+related:
+  - spatialcellchat.identifyCommunicationPatterns
+  - spatialcellchat.suggestK1
+  - spatialcellchat.suggestK

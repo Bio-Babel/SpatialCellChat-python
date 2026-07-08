@@ -1,0 +1,63 @@
+# Auto-generated stub for spatialcellchat.modeling_avg.computeAvgCommunProb_LR_Avg.
+# Review and fill: purpose, mutates, requires, writes, examples, failure_fixes, related.
+id: spatialcellchat.computeAvgCommunProb_LR_Avg
+import_path: spatialcellchat.modeling_avg.computeAvgCommunProb_LR_Avg
+kind: function
+signature: "computeAvgCommunProb_LR_Avg(prob: sparse.spmatrix, group: Union[Sequence, pd.Categorical], dataLR: np.ndarray, min_percent: float = 0.1, min_cells_sr: int = 5) -> np.ndarray"
+purpose: Compute per-group AVERAGE of communication probabilities for one ligand-receptor pair.
+description: >
+  Pure-array helper (R: computeAvgCommunProb_LR_Avg, modeling.R:1318) used
+  internally by computeAvgCommunProb's per-LR loop for avg_type="avg".
+  Identical setup to computeAvgCommunProb_LR_Sum (one-hot group matrix,
+  per-group expression filter via format(x, digits=1) >= min_percent, and
+  per-group sender/receiver cell-count filter via the binarised prob matrix
+  >= min_cells_sr), but the per-group SUM of prob is additionally divided
+  element-wise by the per-group communication LINK COUNT (the same
+  crossprod computed against the binarised prob matrix), turning the sum
+  into an average. NaN entries from zero-by-zero division are replaced by
+  0. If the expression filter zeroes out every (sender, receiver) pair, the
+  function short-circuits and returns the all-zero mask directly. Does not
+  read or write adata/uns state; operates purely on its array arguments.
+parameters:
+  - name: prob
+    type: scipy.sparse.spmatrix
+    required: true
+    default: null
+    description: "(nC, nC) cell-cell communication probability matrix for one ligand-receptor pair (R's prob.cell_[[i]])."
+  - name: group
+    type: Union[Sequence, pandas.Categorical]
+    required: true
+    default: null
+    description: Per-cell group labels; coerced to pandas.Categorical if not already one. The categories define the row/column order of the output.
+  - name: dataLR
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: "(nC, 2) matrix; column 0 is per-cell ligand expression, column 1 is per-cell receptor expression (R's cbind(dataLavg[i, ], dataRavg[i, ]))."
+  - name: min_percent
+    type: float
+    required: false
+    default: 0.1
+    description: "Minimum fraction of expressing cells per group required to pass the expression filter (R: min.percent)."
+  - name: min_cells_sr
+    type: int
+    required: false
+    default: 5
+    description: "Minimum sender/receiver cell count per group in the binarised prob matrix (R: min.cells.sr)."
+returns: >
+  A dense (nGroup, nGroup) numpy.ndarray of group-level communication
+  probability averages, ordered by group.categories. Returned as an
+  all-zero matrix when the per-group expression filter eliminates every
+  (sender, receiver) pair.
+mutates: "execution_class=pure; no mutation of adata or any input array; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeAvgCommunProb_LR_Avg(prob_cell_i, group=adata.obs['active_ident'], dataLR=np.column_stack([dataLavg[i, :], dataRavg[i, :]]), min_percent=0.1, min_cells_sr=5)"
+failure_fixes:
+  - when: 'ValueError: dataLR must be shape (nC, 2)'
+    suggest:
+      - pass a (n_cells, 2) array with columns [ligand_expr, receptor_expr] aligned to `group`'s length.
+related:
+  - spatialcellchat.computeAvgCommunProb
+  - spatialcellchat.computeAvgCommunProb_LR_Sum

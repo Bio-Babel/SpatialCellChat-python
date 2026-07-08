@@ -1,0 +1,101 @@
+id: spatialcellchat.suggestK
+import_path: spatialcellchat.analysis_topics.suggestK
+kind: function
+signature: >-
+  suggestK(adata: ad.AnnData, kTest: Sequence[int] = tuple(range(5, 51, 5)),
+  nRandomStart: int = 10, lambda_: float = 5.0, nIteration: int = 30,
+  nCores: int = 1, verbose: bool = True, layer: str = "X", L1:
+  Sequence[float] = (0.0, 0.0), seed_use: int = 666) -> Dict[str, Any]
+purpose: Sweep candidate NMF ranks for an AnnData's expression matrix as an iNMF-rank stand-in.
+description: >
+  Direct port of R's suggestK (analysis.R:1014). R calls rliger::runINMF for
+  integrative NMF on a Liger object; there is no pure-Python iNMF in the
+  SpatialCellChat pipeline (it is only used in tutorial code), so this
+  Python port instead reads adata.X (or adata.layers[layer] when layer !=
+  "X"), densifies if sparse, transposes to (features x cells), and delegates
+  directly to suggestK1 with the same rank-sweep/cross-validation contract.
+  When both entries of L1 are zero, lambda_ is used as a soft-equivalent L1
+  strength (L1 = [lambda_/100, lambda_/100]); otherwise the caller-supplied
+  L1 is forwarded unchanged. `nCores` and `verbose` are accepted for API
+  parity but are currently unused (each NMF call runs sequentially,
+  and no progress output is printed).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object whose expression matrix (adata.X or the named layer) is factorised.
+  - name: kTest
+    type: Sequence[int]
+    required: false
+    default: tuple(range(5, 51, 5))
+    description: Candidate ranks, forwarded to suggestK1's k_test.
+  - name: nRandomStart
+    type: int
+    required: false
+    default: 10
+    description: Restarts per k, forwarded to suggestK1's reps.
+  - name: lambda_
+    type: float
+    required: false
+    default: 5.0
+    description: Soft L1-strength substitute used only when L1 == (0, 0); otherwise ignored.
+  - name: nIteration
+    type: int
+    required: false
+    default: 30
+    description: Maximum NMF iterations per run, forwarded to suggestK1's maxit.
+  - name: nCores
+    type: int
+    required: false
+    default: 1
+    description: Reserved for future parallelism; currently unused (sequential NMF calls).
+  - name: verbose
+    type: bool
+    required: false
+    default: true
+    description: Kept for API parity; currently unused.
+  - name: layer
+    type: str
+    required: false
+    default: X
+    description: Which matrix to factorise — "X" uses adata.X, otherwise adata.layers[layer].
+  - name: L1
+    type: Sequence[float]
+    required: false
+    default: (0.0, 0.0)
+    description: L1 strengths for (W, H); replaced by a lambda_-derived value when both entries are zero.
+  - name: seed_use
+    type: int
+    required: false
+    default: 666
+    description: RNG seed, forwarded to suggestK1.
+returns: >-
+  A dict {"stats": pandas.DataFrame, "figure": None}, matching suggestK1's
+  return contract exactly (suggestK delegates to suggestK1 internally). No
+  AnnData is mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.suggestK(adata, kTest=range(5, 51, 5), nRandomStart=10)"
+  - "scc.suggestK(adata, layer='counts', lambda_=5.0)"
+failure_fixes:
+  - when: "layer is not 'X' and adata.layers[layer] does not exist"
+    suggest:
+      - "Pass layer='X' or a valid key in adata.layers."
+    explanation: >-
+      suggestK raises the standard KeyError from adata.layers[layer] when
+      the layer is absent (no custom message is added).
+  - when: "kTest has 1 or fewer values, or the transposed matrix fails suggestK1's checks"
+    suggest:
+      - "Pass at least two candidate ranks in kTest."
+    explanation: >-
+      suggestK delegates to suggestK1, which raises ValueError('Please
+      provide more than one `k` for cross validate.') under the same
+      condition.
+related:
+  - spatialcellchat.suggestK1
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.selectK

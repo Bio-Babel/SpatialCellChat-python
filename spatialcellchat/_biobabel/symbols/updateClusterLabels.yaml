@@ -1,0 +1,101 @@
+id: spatialcellchat.updateClusterLabels
+import_path: spatialcellchat.preprocessing.updateClusterLabels
+kind: function
+signature: >-
+  updateClusterLabels(adata: ad.AnnData, old_cluster_name:
+  Optional[Sequence[str]] = None, new_cluster_name: Optional[Sequence[str]] =
+  None, new_order: Optional[Sequence[str]] = None, new_cluster_metaname: str
+  = "new.labels", ident_key: str = "cellchat_idents") -> ad.AnnData
+purpose: Rename and/or reorder cell-group identity labels, keeping downstream CellChat network slots consistent.
+description: >
+  Direct port of R's updateClusterLabels (utilities.R:995). Ensures
+  adata.obs[ident_key] is categorical (coercing if not). old_cluster_name
+  defaults to the current categories of adata.obs[ident_key]. If
+  new_cluster_name is given, it must have the same length as
+  old_cluster_name; a mapping dict is built and applied via .map(), the
+  relabeled series is written both to adata.obs[new_cluster_metaname] and
+  back onto adata.obs[ident_key] (as a fresh Categorical). If new_order is
+  given, adata.obs[ident_key] is re-cast as Categorical with
+  categories=new_order. After relabeling/reordering, "0" is rejected as a
+  category value.
+
+  R parity for downstream re-runs (utilities.R:1014-1019): if
+  adata.uns["cellchat"] already has a "net" key (i.e. the CellChat pipeline
+  has already been run), this function additionally calls
+  computeCommunProbPathway(adata), then aggregateNet(adata), and — if
+  "netP" is present in adata.uns["cellchat"] — netAnalysis_computeCentrality
+  (slot_name="netP"), so those slots stay coherent with the new labels. When
+  no "net" slot exists yet, only the relabel/reorder takes effect and none
+  of the three downstream functions are invoked (test-verified). Those
+  downstream functions are imported locally (inside the function body) to
+  avoid a circular import with spatialcellchat.modeling /
+  spatialcellchat.analysis_network.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object, modified in place.
+  - name: old_cluster_name
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Current labels; defaults to the existing categories in adata.obs[ident_key].
+  - name: new_cluster_name
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Replacement labels matching old_cluster_name element-wise (must be same length).
+  - name: new_order
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Target category order to apply to adata.obs[ident_key] after any renaming.
+  - name: new_cluster_metaname
+    type: str
+    required: false
+    default: '"new.labels"'
+    description: Column name under which the renamed series is also kept in adata.obs; must not already exist.
+  - name: ident_key
+    type: str
+    required: false
+    default: '"cellchat_idents"'
+    description: Column in adata.obs that holds the active cell identities.
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData).
+mutates: >-
+  execution_class=builder; mutates adata.obs[ident_key] and
+  adata.obs[new_cluster_metaname] in place; when
+  adata.uns["cellchat"]["net"] already exists, additionally triggers
+  computeCommunProbPathway/aggregateNet/(conditionally)
+  netAnalysis_computeCentrality, which themselves mutate
+  adata.uns["cellchat"]["net"]/["netP"] state to stay consistent with the
+  relabeled identities; returns_kind=same_object
+requires:
+  - "adata.obs must already contain the ident_key column"
+  - "new_cluster_metaname must not already exist in adata.obs"
+  - "len(new_cluster_name) must equal len(old_cluster_name) when new_cluster_name is given"
+  - "resulting category labels must not include the literal string '0'"
+writes:
+  - obs.cellchat_idents
+  - obs.new.labels
+examples:
+  - pp.updateClusterLabels(A, old_cluster_name=["A", "B", "C"], new_cluster_name=["X", "Y", "Z"])
+  - pp.updateClusterLabels(A, old_cluster_name=["A", "B", "C"], new_cluster_name=["A", "B", "C"], new_order=["C", "A", "B"])
+failure_fixes:
+  - when: KeyError "adata.obs is missing the active identity column '{ident_key}'."
+    suggest:
+      - set adata.obs[ident_key] (e.g. adata.obs["cellchat_idents"]) before calling, or pass the correct ident_key.
+  - when: ValueError "Please define another `new_cluster_metaname` as '{name}' already exists in adata.obs."
+    suggest:
+      - pass a new_cluster_metaname that is not already an adata.obs column.
+  - when: ValueError "`new_cluster_name` and `old_cluster_name` must have the same length."
+    suggest:
+      - make the two sequences the same length.
+  - when: ValueError "Cell labels cannot contain `0`!"
+    suggest:
+      - avoid mapping any cluster to the literal label "0".
+related:
+  - spatialcellchat.computeCommunProbPathway
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.netAnalysis_computeCentrality

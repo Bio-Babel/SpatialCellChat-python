@@ -1,0 +1,64 @@
+id: spatialcellchat.searchPair
+import_path: spatialcellchat.database.searchPair
+kind: function
+signature: >-
+  def searchPair(signaling: str | Sequence[str], pairLR_use: pd.DataFrame, key:
+  Literal["pathway_name", "ligand"] = "pathway_name", matching_exact: bool = False,
+  pair_only: bool = True) -> pd.DataFrame:
+purpose: Subset an L-R pair table to rows matching one or more signaling names.
+description: >
+  For each entry in `signaling`, matches it against `pairLR_use[key]` (regex
+  substring match by default, or exact equality when `matching_exact=True`),
+  raising `ValueError` if a given signal has no match. Row matches for all
+  requested signals are concatenated (union, in signal order). If
+  `pair_only=True` (default), only `interaction_name`, `pathway_name`,
+  `ligand`, `receptor` columns are kept; otherwise all columns are kept. All
+  values are coerced to string (mirrors R's `matrix(unlist(...))` coercion),
+  and the result is indexed by `interaction_name`.
+parameters:
+  - name: signaling
+    type: str | Sequence[str]
+    required: true
+    default: null
+    description: Signal name(s) to look up in the `key` column.
+  - name: pairLR_use
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: L-R pair table, typically CellChatDB["interaction"] or an extractGene*/searchPair output.
+  - name: key
+    type: '"pathway_name" | "ligand"'
+    required: false
+    default: '"pathway_name"'
+    description: Column to match `signaling` against.
+  - name: matching_exact
+    type: bool
+    required: false
+    default: 'False'
+    description: If False, match by substring (regex, unanchored); if True, match by exact equality.
+  - name: pair_only
+    type: bool
+    required: false
+    default: 'True'
+    description: If True, keep only interaction_name/pathway_name/ligand/receptor columns.
+returns: >
+  A new pandas.DataFrame indexed by `interaction_name`, containing the union
+  of matched rows across all requested `signaling` entries, with all values
+  cast to string.
+mutates: 'execution_class=pure_function; no in-place mutation (operates on `.loc` slices of `pairLR_use` and returns a freshly concatenated frame); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.searchPair("TGFb", db["interaction"])'
+  - 'scc.searchPair(["TGFb", "WNT"], db["interaction"])'
+  - 'scc.searchPair("TGFB1", db["interaction"], key="ligand")'
+failure_fixes:
+  - when: ValueError "`key` should be one of 'pathway_name', 'ligand'."
+    suggest:
+      - pass key="pathway_name" or key="ligand".
+  - when: ValueError "Cannot find <signal>. Please input a correct name!"
+    suggest:
+      - the requested signaling name has no match in `pairLR_use[key]`; check spelling/case or try a broader `key`.
+related:
+  - spatialcellchat.load_db
+  - spatialcellchat.extractGeneSubsetFromPair

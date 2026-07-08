@@ -1,0 +1,148 @@
+id: spatialcellchat.spatial_ccc_inference_lowres
+title: Infer cell-cell communication from low-resolution spot-based spatial data (10X Visium)
+description: >
+  End-to-end SpatialCellChat inference pipeline for low-resolution,
+  multi-cell-per-spot platforms (10X Visium and similar), where a
+  cell-type deconvolution matrix is available. Preprocesses expression
+  down to the signaling-gene set, identifies spatially variable genes and
+  over-expressed L-R interactions, computes cell(spot)-level communication
+  probability, filters it, aggregates to cell-type-level probability using
+  the deconvolution proportions, derives the pathway-level network, and
+  computes per-spot network centrality. Mirrors Part I/II of the package
+  tutorial (SpatialCellChat_analysis_of_spatial_transcriptomics_data.ipynb).
+task_tags:
+  - infer-cell-cell-communication
+  - spatial-communication-probability
+when_to_use:
+  - >-
+    The platform is low-resolution / multi-cell-per-spot (10X Visium,
+    ST, etc.) and a per-spot cell-type proportion matrix (from RCTD,
+    spotlight, cell2location, or similar deconvolution) is available.
+when_not_to_use:
+  - >-
+    The platform is single-cell resolution (Slide-seqV2, Stereo-seq,
+    MERFISH) with one cell type per location — use
+    spatial_ccc_inference_highres instead, which skips the deconvolution
+    matrix and uses the per-cell/per-spot ident labels directly.
+inputs:
+  - name: adata
+    kind: anndata.AnnData
+    description: >-
+      Spatial AnnData with raw counts in adata.X, obsm['spatial'] spot
+      coordinates, and an obs cluster-label column (conventionally
+      "cellchat_idents").
+    requirements:
+      - >-
+        Caller must set adata.obs['cellchat_idents'] (or another column
+        passed as group_by) before this workflow, and must set
+        adata.uns['cellchat']['spatial.factors'] = {"ratio": <pixel-to-um
+        factor>, "tol": <contact tolerance>} and
+        adata.uns['cellchat']['DB'] = db_use (see
+        ligand_receptor_db_query) before computeCommunProb is reached.
+  - name: db_use
+    kind: dict
+    description: Filtered CellChatDB dict, from ligand_receptor_db_query.
+    requirements:
+      - Must be registered on adata.uns['cellchat']['DB'] by the caller before identifyOverExpressedInteractions/computeCommunProb run.
+  - name: cell_type_decomposition
+    kind: pandas.DataFrame
+    description: Per-spot cell-type proportion matrix (rows = spots matching the subsetted AnnData's obs_names, columns = the group_by factor's levels).
+    requirements:
+      - Row index must exactly match the subsetted AnnData's obs_names; columns must match the resolved group factor's levels.
+steps:
+  - symbol: spatialcellchat.normalizeData
+    purpose: Library-size normalise and log1p the raw counts.
+    args:
+      adata: $inputs.adata
+    notes:
+      - Mutates adata.X in place and stashes raw counts into adata.layers['counts'].
+  - symbol: spatialcellchat.subsetData
+    purpose: Subset to the CellChatDB gene universe and return a fresh signaling-only AnnData.
+    args:
+      adata: $inputs.adata
+      db: $inputs.db_use
+    notes:
+      - Returns a NEW AnnData (does not mutate adata); all subsequent steps operate on this returned object, referenced below as $steps.subsetData.output.
+      - "Per the tutorial's documented pattern, the caller must manually carry the CellChat state forward: sub.uns['cellchat'] = adata.uns['cellchat']. subsetData itself does not do this."
+  - symbol: spatialcellchat.preProcessing
+    purpose: ALRA-impute the signaling-gene expression matrix.
+    args:
+      adata: $steps.subsetData.output
+    notes:
+      - Overwrites layers['data_signaling'] on the subsetted AnnData with the ALRA-imputed matrix.
+  - symbol: spatialcellchat.identifyOverExpressedGenes
+    purpose: Identify spatially variable signaling genes via the MERINGUE Moran's-I-style test.
+    args:
+      adata: $steps.subsetData.output
+      selection_method: meringue
+    notes:
+      - Requires obsm['spatial'] on the subsetted AnnData (carried over from adata by AnnData's slicing/copy semantics).
+      - This is typically the slowest step in preprocessing.
+  - symbol: spatialcellchat.identifyOverExpressedInteractions
+    purpose: Filter db_use down to L-R pairs with at least one spatially variable member.
+    args:
+      adata: $steps.subsetData.output
+      db: $inputs.db_use
+      variable_both: false
+  - symbol: spatialcellchat.computeCommunProb
+    purpose: Compute the spot-level communication probability for every significant L-R pair.
+    args:
+      adata: $steps.subsetData.output
+      distance_use: true
+      scale_distance: 0.2
+      contact_dependent: true
+      interaction_range: 250
+      contact_range: 10
+    notes:
+      - This is the most expensive per-spot step; runtime scales with #spots x #LR pairs.
+  - symbol: spatialcellchat.filterProbability
+    purpose: Drop spot-level communications below a per-LR null quantile.
+    args:
+      adata: $steps.subsetData.output
+  - symbol: spatialcellchat.filterCommunication
+    purpose: Drop L-R pairs supported by too few spot-level links or sender/receiver spots (cell-level pass).
+    args:
+      adata: $steps.subsetData.output
+      min_cells: null
+      min_links: 10
+      min_cells_sr: 10
+  - symbol: spatialcellchat.computeAvgCommunProb_Visium
+    purpose: Aggregate spot-level probability to cell-type-level probability using the deconvolution proportions.
+    args:
+      adata: $steps.subsetData.output
+      cell_type_decomposition: $inputs.cell_type_decomposition
+      avg_type: avg
+      nboot: 100
+      do_permutation: true
+    notes:
+      - For high-resolution platforms with a hard per-cell group assignment instead of a proportion matrix, use spatial_ccc_inference_highres's computeAvgCommunProb step instead.
+  - symbol: spatialcellchat.filterCommunication
+    purpose: Drop cell-type-level communications backed by too few cells per group (group-level pass).
+    args:
+      adata: $steps.subsetData.output
+      min_cells: 10
+      min_links: null
+      min_cells_sr: null
+  - symbol: spatialcellchat.computeCommunProbPathway
+    purpose: Aggregate the L-R-level network to pathway-level probability.
+    args:
+      adata: $steps.subsetData.output
+  - symbol: spatialcellchat.aggregateNet
+    purpose: Collapse the L-R-level tensor to per-cell-group-pair count/weight matrices.
+    args:
+      adata: $steps.subsetData.output
+  - symbol: spatialcellchat.netAnalysis_computeCentrality
+    purpose: Compute per-spot (cell-level) L-R-pair network centrality.
+    args:
+      adata: $steps.subsetData.output
+      slot_name: net
+      do_group: false
+      degree_only: true
+    notes:
+      - Also commonly run with do_group=true (group-level) and/or slot_name="netP" (pathway-level) for group-level visualizations; see netAnalysis_computeCentrality's own contract for all four combinations demonstrated in the tutorial.
+templates:
+  - spatialcellchat.spatial_ccc_inference_lowres_template
+outputs:
+  - "uns.cellchat.net.count / uns.cellchat.net.weight: per-cell-group-pair interaction count/weight matrices."
+  - "uns.cellchat.netP.prob: pathway-level communication-probability tensor."
+  - "uns.cellchat.net.centr.cell: per-spot L-R-pair network centrality (feeds spatial_hotspot_categorization and communication_pattern_topics)."

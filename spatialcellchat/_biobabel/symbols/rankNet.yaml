@@ -1,0 +1,191 @@
+id: spatialcellchat.rankNet
+import_path: spatialcellchat.analysis_ranking.rankNet
+kind: function
+signature: >-
+  rankNet(adata: Union[ad.AnnData, Sequence[ad.AnnData]], slot_name: str =
+  "netP", measure: str = "weight", mode: str = "comparison", comparison:
+  Optional[Sequence[int]] = None, do_group: bool = True, sources_use:
+  Optional[Sequence] = None, targets_use: Optional[Sequence] = None,
+  signaling: Optional[Sequence[str]] = None, pairLR: Optional[Sequence[str]] =
+  None, signaling_type: Optional[Sequence[str]] = None, do_stat: bool = False,
+  cutoff_pvalue: float = 0.05, tol: float = 0.05, thresh: float = 0.05,
+  show_raw: bool = False, stacked: bool = False, dataset_names:
+  Optional[Sequence[str]] = None) -> pd.DataFrame
+purpose: Rank signaling pathways (or L-R pairs) by total information flow / interaction count.
+description: >
+  Direct port of R's rankNet (analysis.R:415); the plot-constructing portion
+  of R is omitted and the underlying, already-sorted/zero-filtered data frame
+  is returned instead. In mode="single" (one AnnData, or a length-1 list), the
+  requested slot's "prob" (do_group=True) or "prob.cell" (do_group=False) is
+  read, entries with pval > thresh are zeroed when a pval array is present
+  (netP typically has none), measure="count" binarises prob>0, then per-
+  pathway/pair sums (pSum_orig) are computed and, for measure="weight" +
+  do_group, rescaled via -1/log(x) with a synthetic de-tie ramp for
+  inf/negative values; rows are sorted ascending by contribution and rows with
+  zero contribution dropped. In mode="comparison" (a list of AnnData, one per
+  dataset), the same per-dataset extraction runs for every index in
+  `comparison` (1-based, default 1..len(adata)), the ranking values are
+  de-tied jointly across datasets, results are combined into a long-form
+  data frame with a `contribution.relative.<i>` column per non-reference
+  dataset and complex multi-key sort rules (2/3/4/N-way branches), rows whose
+  total contribution across all datasets is zero are dropped, and — when
+  do_stat=True and exactly 2 datasets are compared with identical cell-group
+  counts — a paired Wilcoxon `pvalues` column is added. `signaling`/`pairLR`
+  restrict to specific pathway/LR names (mutually exclusive with slot_name,
+  raises if mismatched); `signaling_type` restricts via the interaction
+  table's `annotation` column instead. `sources_use`/`targets_use` zero out
+  rows/columns of `prob` outside the given cell groups before summing.
+  `cutoff_pvalue`, `show_raw`, `stacked` are plot-only R arguments kept for
+  signature parity but unused in the returned data frame.
+parameters:
+  - name: adata
+    type: Union[anndata.AnnData, Sequence[anndata.AnnData]]
+    required: true
+    default: null
+    description: >-
+      mode="single": one AnnData (or list of length 1) with the requested slot
+      populated. mode="comparison": a list of AnnData, one per dataset.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" ranks pathways (netP prob/pval); "net" ranks L-R pairs (net prob/pval).'
+  - name: measure
+    type: str
+    required: false
+    default: weight
+    description: '"weight" (information-flow ranking, rescaled) or "count" (number of significant interactions).'
+  - name: mode
+    type: str
+    required: false
+    default: comparison
+    description: '"single" or "comparison" — see `adata`.'
+  - name: comparison
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 1-based indices into the AnnData list; defaults to all datasets in comparison mode, [1] in single mode.
+  - name: do_group
+    type: bool
+    required: false
+    default: true
+    description: Use "prob" (group-level, True) or "prob.cell" (cell-level, False).
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to interactions from these cell groups (names or 1-based indices); zeroes other rows of prob.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to interactions to these cell groups; zeroes other columns of prob.
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict to these pathway names; only valid when slot_name="netP" (raises if slot_name="net").
+  - name: pairLR
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict to these L-R pair names; only valid when slot_name="net" (raises if slot_name="netP").
+  - name: signaling_type
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict via the interaction table's "annotation" column (e.g. "Secreted Signaling").
+  - name: do_stat
+    type: bool
+    required: false
+    default: false
+    description: Add a "pvalues" column (paired Wilcoxon) when exactly 2 datasets are compared with matching cell-group counts.
+  - name: cutoff_pvalue
+    type: float
+    required: false
+    default: 0.05
+    description: Plot-only text-color threshold; unused in the returned data frame.
+  - name: tol
+    type: float
+    required: false
+    default: 0.05
+    description: Plot-only threshold; unused in the returned data frame.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: 'prob[pval > thresh] = 0 masking threshold when a pval array is present.'
+  - name: show_raw
+    type: bool
+    required: false
+    default: false
+    description: Unused; kept for API parity with R.
+  - name: stacked
+    type: bool
+    required: false
+    default: false
+    description: Unused; kept for API parity with R (plot-stacking only).
+  - name: dataset_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Override dataset labels used in the "group" column.
+returns: >-
+  A long-form pandas.DataFrame with one row per (pathway or L-R pair,
+  dataset): columns "name" (categorical), "contribution", "contribution.scaled",
+  "group", plus "contribution.relative.<i>" for i=1..len(comparison)-1 in
+  comparison mode, and "pvalues" when do_stat=True. No AnnData is mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.prob
+  - uns.cellchat.net.prob
+writes: []
+examples:
+  - "scc.rankNet(sub, mode='single', slot_name='netP', measure='weight', signaling_type=['Secreted Signaling'])"
+  - "scc.rankNet([adata1, adata2], mode='comparison', slot_name='netP', measure='weight')"
+  - "scc.rankNet(sub, mode='single', slot_name='net', measure='count', sources_use=['A'], targets_use=['B'])"
+failure_fixes:
+  - when: "measure is not 'weight' or 'count'"
+    suggest:
+      - "Pass measure='weight' or measure='count'."
+    explanation: >-
+      rankNet raises ValueError("measure must be 'weight' or 'count', got
+      ...").
+  - when: "mode is not 'single' or 'comparison'"
+    suggest:
+      - "Pass mode='single' or mode='comparison'."
+    explanation: >-
+      rankNet raises ValueError("mode must be 'single' or 'comparison', got
+      ...").
+  - when: "slot_name is not 'netP' or 'net'"
+    suggest:
+      - "Pass slot_name='netP' or slot_name='net'."
+    explanation: >-
+      rankNet raises ValueError("slot_name must be 'netP' or 'net', got
+      ...").
+  - when: "the selected slot's prob has zero total after masking/use-filtering"
+    suggest:
+      - "Check that computeAvgCommunProb/computeCommunProbPathway populated prob, and that sources_use/targets_use aren't over-restrictive."
+    explanation: >-
+      rankNet raises ValueError("No inferred communications for the
+      input!") when prob.sum() == 0 after masking.
+  - when: "signaling passed with slot_name='net', or pairLR passed with slot_name='netP'"
+    suggest:
+      - "Use slot_name='netP' with `signaling`, and slot_name='net' with `pairLR`."
+    explanation: >-
+      rankNet raises ValueError("You need to set `slot.name == 'net'` if
+      showing specific L-R pairs ") or ValueError("You need to set
+      `slot.name == 'netP'` if showing specific signaling pathways ").
+  - when: "do_stat=True but the compared datasets have different cellular compositions"
+    suggest:
+      - "Set do_stat=False, or compare datasets with the same number of cell groups."
+    explanation: >-
+      rankNet raises ValueError("Statistical test is not applicable to
+      datasets with different cellular compositions! Please set
+      `do_stat=False`").
+related:
+  - spatialcellchat.compareInteractions
+  - spatialcellchat.rankNetPairwise
+  - spatialcellchat.rankSimilarity
+  - spatialcellchat.computeCommunProbPathway

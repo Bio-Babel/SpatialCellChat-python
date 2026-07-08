@@ -1,0 +1,44 @@
+id: spatialcellchat.computeExpr_LR
+import_path: spatialcellchat._expr.computeExpr_LR
+kind: function
+signature: "computeExpr_LR(geneLR: Sequence[str], data_use: ArrayLike, complex_input: pd.DataFrame) -> np.ndarray"
+purpose: "Compute per-cell ligand-or-receptor expression for an L-R pair table; a port of computeExpr_LR (modeling.R:2288)."
+description: >
+  For each entry of geneLR: if it is present in data_use's row index, its
+  row is copied directly; otherwise it is treated as a complex name and
+  dispatched to computeExpr_complex (wrapping the array as a DataFrame
+  indexed by gene symbol). Requires a row-named data_use (a DataFrame, or
+  an anonymous array with a `_gene_index` attribute); raises ValueError
+  otherwise.
+parameters:
+  - name: geneLR
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Ligand or receptor names from a pairLR table; each entry can be a gene symbol or a complex name.
+  - name: data_use
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Genes-by-cells expression matrix; row labels (gene symbols) are required, so pass a DataFrame or an array carrying a `_gene_index` attribute.
+  - name: complex_input
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB complex frame, forwarded to computeExpr_complex for complex-name entries.
+returns: >
+  A numpy.ndarray of shape (len(geneLR), n_cells); each row is the
+  per-cell expression of the corresponding ligand, receptor, or complex.
+mutates: "execution_class=pure_function; no in-place mutation of `data_use` or `complex_input`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeExpr_LR(['G1', 'CPX_AB', 'G6', 'CPX_CDE'], data_use, complex_input)"
+failure_fixes:
+  - when: 'ValueError: computeExpr_LR requires a row-named data_use; either pass a DataFrame
+  or attach a `_gene_index` attribute'
+    suggest:
+      - pass data_use as a pandas.DataFrame indexed by gene symbol.
+related:
+  - spatialcellchat.computeExpr_complex
+  - spatialcellchat.computeCommunProb

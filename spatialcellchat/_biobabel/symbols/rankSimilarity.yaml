@@ -1,0 +1,98 @@
+id: spatialcellchat.rankSimilarity
+import_path: spatialcellchat.analysis_ranking.rankSimilarity
+kind: function
+signature: >-
+  rankSimilarity(adata: ad.AnnData, slot_name: str = "netP", type: str =
+  "functional", comparison1: Optional[Sequence[int]] = None, comparison2:
+  Sequence[int] = (1, 2), dataset_names: Optional[Sequence[str]] = None) ->
+  pd.DataFrame
+purpose: Rank shared signaling pathways by their Euclidean distance in a joint similarity embedding.
+description: >
+  Direct port of the data-construction part of R's rankSimilarity
+  (analysis.R:1755); plot construction is omitted. Reads the embedding matrix
+  at uns["cellchat"][slot_name]["similarity"][type]["dr"][comparison_name]
+  (comparison_name = "-".join(str(c) for c in comparison1), e.g. "1-2"), whose
+  row names encode "<pathway>--<dataset>". comparison1 defaults to
+  [1..K] where K is the number of unique datasets in
+  uns["cellchat"]["meta"]["datasets"] (or the number of embedding entries if
+  meta is absent); dataset_names resolves the names referenced by comparison1,
+  falling back to uns["cellchat"][slot_name]["__dataset_names__"] or the
+  slot's own non-"similarity" keys. comparison2 (1-based, into comparison1)
+  selects exactly two of those datasets. Rows are split by the "--<dataset>"
+  suffix into per-dataset sub-matrices, restricted to the pathways
+  (row-name prefixes before "--") present in both datasets (order follows the
+  first dataset's rows), and the per-pathway Euclidean distance between the
+  two sub-matrices is computed and sorted ascending.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Holds the merged similarity object; "dataset" labels are the suffix
+      after "--" in the embedding matrix's row names.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" or "net" — which slot''s similarity embedding to read.'
+  - name: type
+    type: str
+    required: false
+    default: functional
+    description: '"functional" or "structural" — which similarity type to use.'
+  - name: comparison1
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: >-
+      1-based indices of datasets contributing to the embedding; the
+      embedding key is "-".join(comparison1). Defaults to [1..K] datasets
+      from uns["cellchat"]["meta"]["datasets"].
+  - name: comparison2
+    type: Sequence[int]
+    required: false
+    default: (1, 2)
+    description: 1-based indices into comparison1 selecting the two datasets to compare.
+  - name: dataset_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Override the dataset-name vector used to slice embedding rows by the "--<dataset>" suffix.
+returns: >-
+  A pandas.DataFrame with columns "name" (categorical pathway name) and
+  "dist" (Euclidean distance), one row per pathway present in both compared
+  datasets, sorted ascending by dist. No AnnData is mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.similarity
+  - uns.cellchat.net.similarity
+writes: []
+examples:
+  - "scc.rankSimilarity(adata, slot_name='netP', type='functional', comparison1=[1, 2], comparison2=[1, 2])"
+  - "scc.rankSimilarity(adata, slot_name='netP', type='structural')"
+failure_fixes:
+  - when: "uns['cellchat'][slot_name] is missing"
+    suggest:
+      - "Verify slot_name matches a populated slot ('netP' or 'net')."
+    explanation: >-
+      rankSimilarity raises ValueError("adata.uns['cellchat']['<slot_name>']
+      missing").
+  - when: "slot['similarity'], similarity[type], or similarity[type]['dr'] is missing"
+    suggest:
+      - "Run the similarity/joint-manifold computation step (computeNetSimilarity + runUMAP-style embedding) before rankSimilarity."
+    explanation: >-
+      rankSimilarity raises ValueError("adata.uns['cellchat']['<slot_name>']['similarity']
+      missing"), ValueError("similarity['<type>'] missing"), or
+      ValueError("similarity['<type>']['dr'] missing") depending on which
+      level is absent.
+  - when: "the embedding key for comparison1 (e.g. '1-2') is missing from similarity[type]['dr']"
+    suggest:
+      - "Pass a comparison1 matching the datasets actually embedded together, or recompute the embedding for that dataset combination."
+    explanation: >-
+      rankSimilarity raises ValueError("similarity['<type>']['dr']['<name>']
+      missing").
+related:
+  - spatialcellchat.rankNet
+  - spatialcellchat.compareInteractions

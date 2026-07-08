@@ -1,0 +1,238 @@
+id: spatialcellchat.netVisual_aggregate
+import_path: spatialcellchat.viz_network.netVisual_aggregate
+kind: function
+signature: >-
+  netVisual_aggregate(adata: ad.AnnData, signaling: str, signaling_name:
+  Optional[str] = None, color_use: Optional[Sequence[str]] = None, thresh:
+  float = 0.05, vertex_receiver: Optional[Sequence[int]] = None,
+  sources_use: Optional[Sequence] = None, targets_use: Optional[Sequence] =
+  None, idents_use: Optional[Sequence] = None, top: float = 1.0,
+  remove_isolate: bool = False, vertex_weight: Union[float, Sequence[float],
+  str] = 1.0, vertex_weight_max: Optional[float] = None, vertex_size_max:
+  Optional[float] = None, weight_scale: bool = True, edge_weight_max:
+  Optional[float] = None, edge_width_max: float = 8.0, layout: str = "circle",
+  pt_title: float = 12.0, title_space: float = 6.0, vertex_label_cex: float =
+  0.8, alpha_image: float = 0.15, point_size: float = 1.5, group:
+  Optional[Dict[str, str]] = None, cell_order: Optional[Sequence[str]] =
+  None, small_gap: float = 1.0, big_gap: float = 10.0, scale: bool = False,
+  reduce: float = -1.0, show_legend: bool = False, legend_pos_x: float =
+  20.0, legend_pos_y: float = 20.0) -> Figure
+purpose: Sum a signaling pathway's L-R pairs into one aggregate network and render it.
+description: >
+  Direct port of R's netVisual_aggregate (visualization.R:1255). Resolves
+  the L-R pairs of `signaling` from adata.uns['cellchat']['LR']['LRsig']
+  via searchPair(key='pathway_name', pair_only=True), reads
+  adata.uns['cellchat']['net']['prob'] (zeroing entries where
+  net['pval'] > thresh when present), restricts to the pathway's pairs
+  found in net['dimnames'] with nonzero total probability (raises if none
+  survive), sums the surviving pairs' probability over the L-R axis into
+  one (K, K) aggregate matrix, then dispatches on `layout`: "circle" ->
+  netVisual_circle; "hierarchy" -> netVisual_hierarchy1 (requires
+  vertex_receiver, raises otherwise); "spatial" -> netVisual_spatial (reads
+  adata.obsm['spatial'] and, when vertex_weight is "incoming"/"outgoing",
+  adata.uns['cellchat']['netP']['centr']); "chord" ->
+  netVisual_chord_cell_internal. Unlike `netVisual`, there is no
+  out_format/out_dir file-writing branch and no "heatmap" layout option.
+  Reads adata.uns['cellchat'] only; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns['cellchat']['net']['prob'] and uns['cellchat']['LR']['LRsig'] populated.
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Pathway name to look up in the LR table's pathway_name column.
+  - name: signaling_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Display name for the pathway in titles; defaults to signaling.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colours forwarded to the chosen layout's renderer.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold; net['prob'] entries with pval > thresh are zeroed before summing.
+  - name: vertex_receiver
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 0-based target-group indices; required when layout="hierarchy" (raises otherwise).
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these source cell groups.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these target cell groups.
+  - name: idents_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to those whose source OR target is in this set (layout="circle"/"spatial").
+  - name: top
+    type: float
+    required: false
+    default: 1.0
+    description: Keep only edge weights >= the (1-top) quantile; forwarded to the layout renderer.
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop cell groups with no surviving edges.
+  - name: vertex_weight
+    type: Union[float, Sequence[float], str]
+    required: false
+    default: 1.0
+    description: Per-group vertex size driver; None defaults to per-group cell counts. "incoming"/"outgoing" (layout="spatial" only) resolves a centrality vector from uns['cellchat']['netP']['centr'].
+  - name: vertex_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Normalisation max for vertex_weight.
+  - name: vertex_size_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Max vertex marker scale factor.
+  - name: weight_scale
+    type: bool
+    required: false
+    default: true
+    description: Scale edge width by weight/edge_weight_max instead of weight directly.
+  - name: edge_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Edge-width normalisation max; defaults to the max summed probability.
+  - name: edge_width_max
+    type: float
+    required: false
+    default: 8.0
+    description: Maximum additional edge linewidth contribution.
+  - name: layout
+    type: str
+    required: false
+    default: circle
+    description: 'One of "circle", "hierarchy", "spatial", "chord" (raises ValueError otherwise).'
+  - name: pt_title
+    type: float
+    required: false
+    default: 12.0
+    description: Title font size (points).
+  - name: title_space
+    type: float
+    required: false
+    default: 6.0
+    description: Vertical spacing reserved for the title.
+  - name: vertex_label_cex
+    type: float
+    required: false
+    default: 0.8
+    description: Vertex label font-size scale forwarded to the layout renderer.
+  - name: alpha_image
+    type: float
+    required: false
+    default: 0.15
+    description: Background image/spot opacity (layout="spatial" only).
+  - name: point_size
+    type: float
+    required: false
+    default: 1.5
+    description: Background spot marker size (layout="spatial" only).
+  - name: group
+    type: Optional[Dict[str, str]]
+    required: false
+    default: null
+    description: Cell-group -> higher-level group mapping forwarded to layout="chord".
+  - name: cell_order
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit sector display order forwarded to layout="chord".
+  - name: small_gap
+    type: float
+    required: false
+    default: 1.0
+    description: Chord sector gap (degrees), layout="chord" only.
+  - name: big_gap
+    type: float
+    required: false
+    default: 10.0
+    description: Chord wrap-around gap (degrees), layout="chord" only.
+  - name: scale
+    type: bool
+    required: false
+    default: false
+    description: Row-normalise chord sector arc lengths, layout="chord" only.
+  - name: reduce
+    type: float
+    required: false
+    default: -1.0
+    description: Chord minimum-link-width pruning threshold, layout="chord" only.
+  - name: show_legend
+    type: bool
+    required: false
+    default: false
+    description: Draw a legend, layout="chord" only.
+  - name: legend_pos_x
+    type: float
+    required: false
+    default: 20.0
+    description: Chord legend x offset.
+  - name: legend_pos_y
+    type: float
+    required: false
+    default: 20.0
+    description: Chord legend y offset.
+returns: A new matplotlib.figure.Figure for the requested layout, rendering the pathway's aggregate (L-R-summed) communication network.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net'],
+  ['LR']['LRsig'], adata.obsm['spatial'] (layout="spatial"), and
+  ['netP']['centr'] (layout="spatial" with vertex_weight="incoming"/"outgoing")
+  only; does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "scc.netVisual_aggregate(sub, signaling=pathway_show, layout='circle')"
+  - "scc.netVisual_aggregate(sub, signaling='TNF', layout='hierarchy', vertex_receiver=[0, 1])"
+  - "scc.netVisual_aggregate(sub, signaling='TNF', layout='spatial', vertex_weight='incoming')"
+failure_fixes:
+  - when: "layout is not one of 'circle','hierarchy','spatial','chord'"
+    suggest:
+      - "Pass one of the supported layout values."
+    explanation: "Raises ValueError(f\"Unknown layout: {layout}\")."
+  - when: "layout='hierarchy' but vertex_receiver is None"
+    suggest:
+      - "Pass vertex_receiver= (0-based target-group indices) when layout='hierarchy'."
+    explanation: "Raises ValueError(\"vertex_receiver required for hierarchy layout\")."
+  - when: "layout='spatial' with vertex_weight in ('incoming','outgoing') but uns['cellchat']['netP']['centr'] is missing"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata, slot_name='netP', do_group=True) first."
+    explanation: >-
+      Raises ValueError("Please run `netAnalysis_computeCentrality` to
+      compute the network centrality scores!").
+  - when: "no significant L-R pair of `signaling` survives thresholding"
+    suggest:
+      - "Lower thresh, or verify the pathway via subsetCommunication."
+    explanation: "Raises ValueError(f\"There is no significant communication of {signaling}\")."
+related:
+  - spatialcellchat.netVisual
+  - spatialcellchat.netVisual_individual
+  - spatialcellchat.netVisual_circle
+  - spatialcellchat.netVisual_hierarchy1
+  - spatialcellchat.netVisual_spatial
+  - spatialcellchat.netVisual_chord_cell_internal
+  - spatialcellchat.computeCommunProb

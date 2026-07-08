@@ -1,0 +1,122 @@
+id: spatialcellchat.aggregateNet
+import_path: spatialcellchat.modeling.aggregateNet
+kind: function
+signature: >-
+  aggregateNet(adata: ad.AnnData, sources_use: Optional[Sequence] = None,
+  targets_use: Optional[Sequence] = None, signaling: Optional[Sequence[str]] =
+  None, pairLR_use: Optional[pd.DataFrame] = None, remove_isolate: bool =
+  True, thresh: float = 0.05, return_object: bool = True) ->
+  Union[ad.AnnData, Dict[str, Any]]
+purpose: Aggregate the L-R-pair net into per-cell-pair count / weight matrices.
+description: >
+  Direct port of R's aggregateNet (modeling.R:2077-2146). Writes
+  net["count"], net["weight"], net["LR.sig"] and (if net["prob.cell"] is
+  present) net["count.cell"], net["weight.cell"], net["LR.sig.cell"] into
+
+  adata.uns["cellchat"]["net"]. Two mutually exclusive branches for
+  count/weight: (1) the no-filter branch (sources_use, targets_use,
+  signaling, pairLR_use all None) requires net["prob"] to already exist
+  (raises otherwise); it zeroes prob where pval >= thresh (treating a
+  missing net["pval"] as all-1, i.e. no permutation was run), then sets
+  net["count"] = count of prob>0 summed over the LR axis and net["weight"]
+  = sum of prob over the LR axis, and net["LR.sig"] to the pair names with
+  nonzero total prob. (2) the filter / long-table branch calls
+  subsetCommunication(adata, slot_name="net", ...) internally, groups by
+  source_target pair to get counts and summed prob, cross-tabulates into
+  dense (nGroups, nGroups) count/weight matrices (optionally dropping
+  isolate groups with remove_isolate=True), and writes those to
+  net["count"]/net["weight"]. In both branches, if net["prob.cell"] (the
+  sparse cell-level array) is present, a parallel cell-level branch derives
+  net["count.cell"] (binary co-signaling count per cell pair),
+  net["weight.cell"] (summed prob per cell pair), and net["LR.sig.cell"]
+  (pair names with nonzero cell-level total).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"]["net"] populated.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: >-
+      Cell-group restriction on the "source" side (names or indices). If any
+      of sources_use/targets_use/signaling/pairLR_use is given, the
+      filter/long-table branch is used instead of the no-filter branch.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Cell-group restriction on the "target" side.
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathway names to restrict to (passed through to subsetCommunication).
+  - name: pairLR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: Direct LR pair restriction table (passed through to subsetCommunication).
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: true
+    description: >-
+      In the filter/long-table branch, whether to drop cell groups that do
+      not appear as a source/target in the filtered results before building
+      the count/weight cross-tabs.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: Significance threshold for zeroing/filtering prob entries by pval.
+  - name: return_object
+    type: bool
+    required: false
+    default: true
+    description: If True return the mutated adata; if False return the raw net dict instead.
+returns: >-
+  If return_object=True (default), the mutated adata (same object). If
+  return_object=False, the raw net dict (adata.uns["cellchat"]["net"]) after
+  mutation. Either way, net["count"], net["weight"], net["LR.sig"] are
+  written, and net["count.cell"], net["weight.cell"], net["LR.sig.cell"] are
+  additionally written when net["prob.cell"] is present.
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['net'] (count, weight,
+  LR.sig, and count.cell/weight.cell/LR.sig.cell when prob.cell is present) in
+  place; returns_kind=same_object
+requires:
+  - uns.cellchat.net
+writes:
+  - uns.cellchat.net.count
+  - uns.cellchat.net.weight
+  - uns.cellchat.net.LR.sig
+  - uns.cellchat.net.count.cell
+  - uns.cellchat.net.weight.cell
+  - uns.cellchat.net.LR.sig.cell
+examples:
+  - "scc.aggregateNet(sub)"
+  - >-
+    modeling.aggregateNet(adata, sources_use=["A"], targets_use=["B", "C"],
+    thresh=0.05)
+  - "modeling.aggregateNet(adata, return_object=False)"
+failure_fixes:
+  - when: "uns['cellchat']['net'] is missing"
+    suggest:
+      - "Run computeCommunProb() first."
+    explanation: >-
+      aggregateNet raises ValueError("aggregateNet requires
+      uns['cellchat']['net']") when net is absent.
+  - when: "no-filter branch called (sources_use/targets_use/signaling/pairLR_use all None) but net['prob'] is missing"
+    suggest:
+      - "Run computeAvgCommunProb (or computeAvgCommunProb_Visium) first, or pass sources_use/targets_use/signaling/pairLR_use to take the long-table branch instead."
+    explanation: >-
+      aggregateNet raises ValueError("aggregateNet (no-filter branch)
+      requires net['prob']; run computeAvgCommunProb first or pass
+      sources_use/targets_use/signaling/pairLR_use to take the long-table
+      branch") when the no-filter branch is entered without net['prob'].
+related:
+  - spatialcellchat.subsetCommunication
+  - spatialcellchat.computeCommunProb

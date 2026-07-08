@@ -1,0 +1,199 @@
+id: spatialcellchat.netVisual_hierarchy1
+import_path: spatialcellchat.viz_network.netVisual_hierarchy1
+kind: function
+signature: >-
+  netVisual_hierarchy1(net: Union[np.ndarray, pd.DataFrame], vertex_receiver:
+  Sequence[int], color_use: Optional[Sequence[str]] = None, title_name:
+  Optional[str] = None, sources_use: Optional[Sequence] = None, targets_use:
+  Optional[Sequence] = None, remove_isolate: bool = False, top: float = 1.0,
+  weight_scale: bool = False, vertex_weight: Union[float, Sequence[float]] =
+  20, vertex_weight_max: Optional[float] = None, vertex_size_max:
+  Optional[float] = None, edge_weight_max: Optional[float] = None,
+  edge_width_max: float = 8.0, alpha_edge: float = 0.6, label_dist: float =
+  2.8, space_v: float = 1.5, space_h: float = 1.6, shape: Optional[str] =
+  None, label_edge: bool = False, edge_curved: float = 0.0, margin: float =
+  0.2, vertex_label_cex: float = 0.6, vertex_label_color: str = "black",
+  arrow_width: float = 1.0, arrow_size: float = 0.2, edge_label_color: str =
+  "black", edge_label_cex: float = 0.5, figsize: Tuple[float, float] = (6.0,
+  6.0)) -> Figure
+purpose: Hierarchy-layout graph showing sources signaling into the vertex_receiver targets.
+description: >
+  Direct port of R's netVisual_hierarchy1 (visualization.R:1610). Delegates
+  to the shared internal `_hierarchy_plot(side=1, ...)`. Takes a square
+  weighted adjacency matrix `net` directly (not an AnnData). Thresholds
+  `net` to its top `top` quantile, applies sources_use/targets_use
+  filtering, optionally drops isolated groups, then reorders rows as
+  `[vertex_receiver groups] + [remaining groups]` and restricts columns to
+  `vertex_receiver` (1-based indices), producing a 3-column layout: a left
+  column of the vertex_receiver groups (as sources), a right column of the
+  remaining groups (as sources), and a central "target" column of blank-
+  labelled duplicate nodes representing the vertex_receiver groups as
+  recipients. Vertex sizes come from `vertex_weight`; edges are drawn as
+  curved arrows from left/right source columns into the central target
+  column, with "Source"/"Target" column headers and directional arrow
+  indicators above the plot. Pure function of its `net` input; does not
+  read or mutate any AnnData.
+parameters:
+  - name: net
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Square weighted adjacency matrix; DataFrame index/columns define the cell-group axis.
+  - name: vertex_receiver
+    type: Sequence[int]
+    required: true
+    default: null
+    description: 1-based indices of the cell groups acting as signal receivers (drawn as the left source column and the central target column).
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colours. Defaults to scPalette(n).
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; rendered as "{title_name} signaling network".
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these source cell groups (names or 1-based indices).
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these target cell groups (names or 1-based indices).
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop cell groups whose row-sum and column-sum are both zero after filtering.
+  - name: top
+    type: float
+    required: false
+    default: 1.0
+    description: Keep only edge weights >= the (1-top) quantile of net.
+  - name: weight_scale
+    type: bool
+    required: false
+    default: false
+    description: Scale edge width by weight/edge_weight_max instead of weight directly.
+  - name: vertex_weight
+    type: Union[float, Sequence[float]]
+    required: false
+    default: 20
+    description: Per-group vertex size driver (scalar or per-group sequence).
+  - name: vertex_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Normalisation max for vertex_weight. Defaults to max(vertex_weight).
+  - name: vertex_size_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Max vertex marker scale factor. Auto-selected as 5.0 for a uniform vertex_weight, else 15.0.
+  - name: edge_weight_max
+    type: Optional[float]
+    required: false
+    default: null
+    description: Normalisation max for edge width. Defaults to the max entry of the expanded 3-column net matrix.
+  - name: edge_width_max
+    type: float
+    required: false
+    default: 8.0
+    description: Maximum additional edge linewidth contribution.
+  - name: alpha_edge
+    type: float
+    required: false
+    default: 0.6
+    description: Edge colour alpha (opacity).
+  - name: label_dist
+    type: float
+    required: false
+    default: 2.8
+    description: Multiplier (with space_h) controlling how far source-column vertex labels are offset from their node.
+  - name: space_v
+    type: float
+    required: false
+    default: 1.5
+    description: Vertical spacing between stacked vertices within a column.
+  - name: space_h
+    type: float
+    required: false
+    default: 1.6
+    description: Horizontal spacing between the left/central/right columns.
+  - name: shape
+    type: Optional[str]
+    required: false
+    default: null
+    description: Accepted for R API parity; not used by this implementation.
+  - name: label_edge
+    type: bool
+    required: false
+    default: false
+    description: Draw rounded edge-weight text labels at edge midpoints.
+  - name: edge_curved
+    type: float
+    required: false
+    default: 0.0
+    description: Bezier curvature factor for edges (0 = straight line).
+  - name: margin
+    type: float
+    required: false
+    default: 0.2
+    description: Accepted for R API parity; axis limits for this layout are fixed by space_h/space_v rather than margin.
+  - name: vertex_label_cex
+    type: float
+    required: false
+    default: 0.6
+    description: Vertex label font-size scale; labels are hidden when <= 0.
+  - name: vertex_label_color
+    type: str
+    required: false
+    default: "black"
+    description: Vertex label text colour.
+  - name: arrow_width
+    type: float
+    required: false
+    default: 1.0
+    description: Arrowhead line-width multiplier.
+  - name: arrow_size
+    type: float
+    required: false
+    default: 0.2
+    description: Arrowhead size multiplier.
+  - name: edge_label_color
+    type: str
+    required: false
+    default: "black"
+    description: Edge label text colour.
+  - name: edge_label_cex
+    type: float
+    required: false
+    default: 0.5
+    description: Edge label font-size scale.
+  - name: figsize
+    type: Tuple[float, float]
+    required: false
+    default: (6.0, 6.0)
+    description: Matplotlib figure size in inches.
+returns: >-
+  A new matplotlib.figure.Figure with a 3-column hierarchy layout (source
+  columns on the left/right, a central target column), curved directed
+  edges, and Source/Target headers with directional arrow indicators.
+mutates: >-
+  execution_class=pure_function; reads only the `net` matrix argument (no
+  AnnData involved); returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.netVisual_hierarchy1(net_df, vertex_receiver=[1], title_name='TGFb')"
+  - "scc.netVisual_hierarchy1(net_df, vertex_receiver=[2, 3], remove_isolate=True)"
+failure_fixes: []
+related:
+  - spatialcellchat.netVisual_hierarchy2
+  - spatialcellchat.netVisual
+  - spatialcellchat.netVisual_aggregate
+  - spatialcellchat.netVisual_individual

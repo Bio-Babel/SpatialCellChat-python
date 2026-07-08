@@ -1,0 +1,137 @@
+id: spatialcellchat.netAnalysis_river
+import_path: spatialcellchat.viz_embedding.netAnalysis_river
+kind: function
+signature: >-
+  netAnalysis_river(adata: ad.AnnData, slot_name: str = "netP", pattern:
+  str = "outgoing", cutoff: float = 0.5, sources_use: Optional[Sequence] =
+  None, targets_use: Optional[Sequence] = None, signaling:
+  Optional[Sequence[str]] = None, color_use: Optional[Sequence[str]] =
+  None, color_use_pattern: Optional[Sequence[str]] = None,
+  color_use_signaling: Union[str, Sequence[str]] = "grey50", do_order: bool
+  = False, main_title: Optional[str] = None, font_size: float = 2.5,
+  font_size_title: float = 12.0) -> Figure
+purpose: Alluvial (river) diagram of communication-pattern structure — cell groups vs. patterns, and optionally patterns vs. signaling pathways.
+description: >
+  Mirrors R's netAnalysis_river (visualization.R:3793). `pattern` must be
+  "outgoing" or "incoming" (else ValueError). Reads
+  adata.uns['cellchat'][slot_name]['pattern'][pattern] (written by
+  identifyCommunicationPatterns), raising ValueError if that key is
+  missing. Extracts ['pattern']['cell'] (data1, a CellGroup x Pattern x
+  Contribution long table) and optionally ['pattern']['signaling'] (data2,
+  a Pattern x Signaling x Contribution long table). sources_use/targets_use
+  filter data1's CellGroup column (numeric entries are 1-based indices
+  into the idents levels via _get_idents_levels). Contribution values below
+  `cutoff` are zeroed before drawing. color_use_pattern defaults to a
+  stride-2 split of ggPalette so outgoing/incoming get disjoint hues;
+  color_use defaults to scPalette(len(cells_level)) restricted to the cell
+  groups actually present in the data. When do_order=True and there are
+  >=2 cell groups present, cell groups are reordered by average-linkage
+  hierarchical clustering of the CellGroup x Pattern contribution matrix,
+  cut into k = (number of patterns with nonzero contribution) clusters.
+  When data2 is None, draws a single CellGroup-Pattern alluvial pair. When
+  data2 is present, draws two side-by-side alluvial pairs
+  (CellGroup-Pattern and Pattern-Signaling, the latter filtered to
+  `signaling` when given and using color_use_signaling — a single colour
+  string applied to all signaling flows, or a per-pathway colour sequence).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with adata.uns['cellchat'][slot_name]['pattern'][pattern] populated (written by identifyCommunicationPatterns).
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot whose ['pattern'] sub-dict is read.
+  - name: pattern
+    type: str
+    required: false
+    default: outgoing
+    description: Which communication-pattern result to plot; must be "outgoing" or "incoming", else ValueError.
+  - name: cutoff
+    type: float
+    required: false
+    default: 0.5
+    description: Contribution values below this threshold are zeroed before drawing flows.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict data1's CellGroup values to this set; numeric entries are interpreted as 1-based indices into the idents levels.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Additional restriction applied to data1's CellGroup values (same semantics as sources_use, applied sequentially).
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict the Pattern-Signaling alluvial (data2) to these pathway names; only used when data2 is present.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colour map; defaults to scPalette(len(cells_level)) restricted to cell groups present in the data.
+  - name: color_use_pattern
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-pattern colour map; defaults to a stride-2 split of ggPalette(nPatterns*2) (even indices for outgoing, odd for incoming).
+  - name: color_use_signaling
+    type: Union[str, Sequence[str]]
+    required: false
+    default: grey50
+    description: Colour for the Pattern-Signaling alluvial flows; a single string applies to all pathways, a sequence is cycled per pathway.
+  - name: do_order
+    type: bool
+    required: false
+    default: false
+    description: When True, reorders cell groups (and their colours) by average-linkage hierarchical clustering of the CellGroup x Pattern contribution matrix.
+  - name: main_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Figure suptitle; defaults to a pattern-specific description ("Outgoing communication patterns of secreting cells" / "Incoming communication patterns of target cells") when None.
+  - name: font_size
+    type: float
+    required: false
+    default: 2.5
+    description: Base font size multiplier for stratum/flow labels (rendered at font_size*3.0 points).
+  - name: font_size_title
+    type: float
+    required: false
+    default: 12.0
+    description: Font size for the figure suptitle.
+returns: >-
+  A matplotlib.figure.Figure containing a single alluvial Axes
+  (CellGroup-Pattern) when the signaling pattern data is absent, or two
+  side-by-side alluvial Axes (CellGroup-Pattern and Pattern-Signaling) when
+  present.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'][slot_name]
+  only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.pattern.outgoing
+writes: []
+examples:
+  - "scc.netAnalysis_river(adata, pattern='outgoing', cutoff=0.1)"
+  - "scc.netAnalysis_river(adata, pattern='incoming', cutoff=0.1, signaling=['TGFb', 'WNT'])"
+  - "scc.netAnalysis_river(adata, pattern='outgoing', do_order=True)"
+failure_fixes:
+  - when: "pattern is not 'outgoing' or 'incoming'"
+    suggest:
+      - "Pass pattern='outgoing' or pattern='incoming'."
+    explanation: >-
+      Raises ValueError("pattern must be 'outgoing' or 'incoming'.") (checked
+      in test_netAnalysis_river_invalid_pattern_raises).
+  - when: "adata.uns['cellchat'][slot_name]['pattern'][pattern] is missing"
+    suggest:
+      - "Run identifyCommunicationPatterns(adata, pattern=pattern) first."
+    explanation: >-
+      Raises ValueError(f"adata.uns['cellchat']['{slot_name}']['pattern']
+      [{pattern!r}] missing.") (checked in
+      test_netAnalysis_river_missing_pattern_raises).
+related:
+  - spatialcellchat.identifyCommunicationPatterns

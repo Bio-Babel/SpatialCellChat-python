@@ -1,0 +1,75 @@
+id: spatialcellchat.runPCA
+import_path: spatialcellchat.preprocessing.runPCA
+kind: function
+signature: >-
+  runPCA(adata: ad.AnnData, do_fast: bool = True, dimPC: int = 50, seed_use:
+  int = 42, weight_by_var: bool = True, layer_in: Optional[str] =
+  "data_scale", obsm_key: str = "X_pca") -> ad.AnnData
+purpose: Compute principal components of a (cells x features) matrix and store the embedding on adata.
+description: >
+  Direct port of R's runPCA (utilities.R:1750). Reads layer_in (default
+  "data_scale", the layer written by scaleData) or adata.X when
+  layer_in=None, and computes dimPC components (capped at n_vars - 1, like
+  R's dimPC <- min(dimPC, ncol(data.use) - 1)). do_fast=True uses
+  sklearn.utils.extmath.randomized_svd (mirroring R's irlba::irlba);
+  do_fast=False centres the matrix and uses numpy.linalg.svd (mirroring
+  stats::prcomp, which centres by default). When weight_by_var=True, scores
+  are multiplied by the singular values (fast path) or additionally by the
+  squared singular values (full path) — exactly matching the R source's two
+  distinct weighting formulas per branch. sdev is computed as d / sqrt(n_obs - 1).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object, modified in place.
+  - name: do_fast
+    type: bool
+    required: false
+    default: true
+    description: Use truncated randomized SVD (mirrors R's irlba::irlba) instead of full SVD/prcomp.
+  - name: dimPC
+    type: int
+    required: false
+    default: 50
+    description: Number of components to keep; capped at n_vars - 1.
+  - name: seed_use
+    type: int
+    required: false
+    default: 42
+    description: Random seed for the fast (randomized SVD) path.
+  - name: weight_by_var
+    type: bool
+    required: false
+    default: true
+    description: Whether to weight scores by (fast path) singular values or (full path) squared singular values.
+  - name: layer_in
+    type: Optional[str]
+    required: false
+    default: '"data_scale"'
+    description: Layer to read (defaults to the layer written by scaleData); pass None to use adata.X.
+  - name: obsm_key
+    type: str
+    required: false
+    default: '"X_pca"'
+    description: obsm key that will receive the cell embeddings.
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData).
+mutates: >-
+  execution_class=builder; mutates adata.obsm[obsm_key], adata.varm["PCs"],
+  and adata.uns["pca"] (with "variance" and "variance_ratio") in place;
+  returns_kind=same_object
+requires: []
+writes:
+  - obsm.X_pca
+  - varm.PCs
+  - uns.pca
+examples:
+  - pp.runPCA(A, dimPC=5, layer_in="scaled")
+  - pp.runPCA(A, do_fast=False, dimPC=5, weight_by_var=False, layer_in="scaled")
+failure_fixes: []
+related:
+  - spatialcellchat.scaleData
+  - spatialcellchat.runUMAP
+  - spatialcellchat.sketchData
+  - spatialcellchat.sketchDataAdata

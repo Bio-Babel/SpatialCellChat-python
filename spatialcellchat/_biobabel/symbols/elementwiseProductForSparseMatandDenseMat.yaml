@@ -1,0 +1,35 @@
+id: spatialcellchat.elementwiseProductForSparseMatandDenseMat
+import_path: spatialcellchat.elementwiseProductForSparseMatandDenseMat
+kind: function
+signature: 'elementwiseProductForSparseMatandDenseMat(SparseMat: ''sparse.spmatrix'',
+  DenseMat: ''ArrayLike'') -> ''sparse.csc_matrix'''
+purpose: Elementwise product of a sparse matrix and a dense matrix.
+description: >
+  Direct port of R's elementwiseProductForSparseMatandDenseMat
+  (modeling.R:390). Converts SparseMat to COO form and, for each stored
+  non-zero entry (i, j), multiplies its value by DenseMat[i, j]. DenseMat
+  must have the exact same shape as SparseMat; a mismatch raises
+  ValueError. Returns the result as a new CSC sparse matrix; implicit
+  (unstored) zero entries of SparseMat remain zero.
+parameters:
+- name: SparseMat
+  type: sparse.spmatrix
+  required: true
+  default: null
+- name: DenseMat
+  type: ArrayLike
+  required: true
+  default: null
+mutates: "execution_class=pure_function; no in-place mutation of `SparseMat` or `DenseMat`; returns_kind=new_object"
+returns: sparse.csc_matrix
+requires: []
+writes: []
+examples:
+  - "elementwiseProductForSparseMatandDenseMat(SparseMat, DenseMat=np.arange(1, 10, dtype=float).reshape(3, 3, order='F'))"
+  - "elementwiseProductForSparseMatandDenseMat(SparseMat, DenseMat=np.arange(1, 13, dtype=float).reshape(3, 4, order='F'))"
+failure_fixes:
+  - when: 'ValueError: DenseMat shape (...) does not match SparseMat shape (...)'
+    suggest:
+      - pass a DenseMat with the exact same shape as SparseMat.
+related:
+  - spatialcellchat.computeCommunProb

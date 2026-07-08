@@ -1,0 +1,124 @@
+id: spatialcellchat.plotStatistics_Gi
+import_path: spatialcellchat.viz_basic.plotStatistics_Gi
+kind: function
+signature: >-
+  plotStatistics_Gi(df_score: pd.DataFrame, group_by: Optional[Sequence] =
+  None, group_highlight: Optional[Sequence[bool]] = None, n: int = 12,
+  method: Literal["normal", "scoring", "3d"] = "normal", gstar: bool = False,
+  p_value: Optional[float] = None, plot_title: Optional[str] = None,
+  point_size: float = 2.0, nohighlight_alpha: float = 0.65,
+  show_colorscale: bool = True, legend_group: str = "Gi",
+  legend_group_title: str = "Gi's value", scene_name: str = "scene1",
+  colorbar_y: float = 0.5, three_dim_z: float = 0.0) -> Figure
+purpose: Plot the Getis-Ord Gi (or Gi*) local spatial-autocorrelation statistic (or the raw score) over a spatial layout.
+description: >
+  Direct port of R's plotStatistics_Gi (visualization.R:8828). Builds a
+  k-nearest-neighbours binary weights matrix via
+  libpysal.weights.KNN.from_array(coords, k=n) (transform="B") from the
+  first two columns of df_score, then computes the local-G statistic via
+  esda.getisord.G_Local(score, W, transform="B", star=gstar,
+  permutations=0), storing g_local.Zs as "statistic_G" and g_local.p_norm as
+  "p_norm" on a copy of df_score. method="scoring" renders the raw "score"
+  column on a reversed-Spectral colormap (ignores gstar/p_value/statistic_G).
+  method="normal" (and "3d", rendered identically as a flat-Z 2-D
+  projection) renders "statistic_G" on a centered
+  spatialcellchat._themes.generate_RedsBlues_colormap scale; when p_value is
+  given, points with p_norm >= p_value are drawn as unfilled grey-outlined
+  markers instead of being coloured by statistic_G. Title defaults to
+  "Spatial statistics with Gi"/"Gi*" (plus a "(Normal, p.value=...)" suffix
+  when p_value is set), overridden entirely by plot_title when given.
+parameters:
+  - name: df_score
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Data frame whose first two columns are used as (x, y) coordinates and third as the score; columns are renamed positionally to (x, y, score).
+  - name: group_by
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Carried for parity with the R signature; not drawn by the current matplotlib rendering.
+  - name: group_highlight
+    type: Optional[Sequence[bool]]
+    required: false
+    default: null
+    description: Carried for parity with the R signature; not used by the current matplotlib rendering.
+  - name: n
+    type: int
+    required: false
+    default: 12
+    description: Number of nearest neighbours (k) used to build the KNN spatial-weights matrix.
+  - name: method
+    type: 'Literal["normal", "scoring", "3d"]'
+    required: false
+    default: normal
+    description: '"scoring" plots the raw score column; "normal"/"3d" plot the computed Gi/Gi* statistic (both render identically to 2-D in this port).'
+  - name: gstar
+    type: bool
+    required: false
+    default: false
+    description: Whether to compute Gi* (star=True, includes the point itself) instead of Gi.
+  - name: p_value
+    type: Optional[float]
+    required: false
+    default: null
+    description: Significance cutoff on p_norm; points with p_norm >= p_value are drawn as unfilled/outlined instead of colour-mapped (only applies to method != "scoring").
+  - name: plot_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Overrides the auto-generated title entirely when given.
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Base marker size (actual scatter size is point_size * 10).
+  - name: nohighlight_alpha
+    type: float
+    required: false
+    default: 0.65
+    description: Carried for parity with the R signature; not used by the current matplotlib rendering.
+  - name: show_colorscale
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw a colourbar.
+  - name: legend_group
+    type: str
+    required: false
+    default: Gi
+    description: Carried for parity with the R signature (plotly legend group name); not used by the matplotlib rendering.
+  - name: legend_group_title
+    type: str
+    required: false
+    default: Gi's value
+    description: Carried for parity with the R signature; not used by the matplotlib rendering.
+  - name: scene_name
+    type: str
+    required: false
+    default: scene1
+    description: Carried for parity with the R signature (plotly 3d scene name); not used by the matplotlib rendering.
+  - name: colorbar_y
+    type: float
+    required: false
+    default: 0.5
+    description: Carried for parity with the R signature; not used by the matplotlib rendering.
+  - name: three_dim_z
+    type: float
+    required: false
+    default: 0.0
+    description: Carried for parity with the R signature (plotly z constant for method="3d"); not used by the matplotlib rendering (flat 2-D projection).
+returns: A new matplotlib.figure.Figure with the single scatter panel (score, or Gi/Gi* statistic), laid out via plt.subplots() and fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; takes no adata argument — computes purely
+  from df_score (via libpysal/esda) and returns a new Figure; the internal
+  df is a copy (df_score.copy()), so the caller's df_score is not mutated;
+  returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.plotStatistics_Gi(df_score, n=5, method="normal")'
+  - 'scc.plotStatistics_Gi(df_score, n=5, method="normal", p_value=0.5, plot_title="Hot spots")'
+  - 'scc.plotStatistics_Gi(df_score, n=4, method="scoring")'
+failure_fixes: []
+related: []

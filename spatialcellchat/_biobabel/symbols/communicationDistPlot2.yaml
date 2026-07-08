@@ -1,0 +1,76 @@
+id: spatialcellchat.communicationDistPlot2
+import_path: spatialcellchat.viz_basic.communicationDistPlot2
+kind: function
+signature: >-
+  communicationDistPlot2(adata: ad.AnnData, signaling_type: Literal["All",
+  "Secreted", "Contact"] = "All", enriched_only: bool = True,
+  density_alpha: float = 0.5) -> Figure
+purpose: Plot the density of cell-cell distances for secreted-signaling vs. contact-dependent communication (Secreted/Contact split).
+description: >
+  Direct port of R's communicationDistPlot2 (spatial.R:11). Reads
+  uns["cellchat"]["images"]["result.computeCellDistance"] (set by
+  computeCommunProb; raises ValueError if absent), taking its "d.spatial"
+  sparse distance matrix and "adj.contact" sparse binary mask; the
+  contact-distance matrix is d.spatial elementwise-multiplied by
+  adj.contact. When enriched_only=True (default), restricts to the
+  (i, j) coordinates present in uns["cellchat"]["net"]["prob.cell"]
+  (raises ValueError if that slot is missing), replacing exact-zero
+  distances with NaN; when False, uses every non-zero entry of the sparse
+  matrices directly. interaction_range is read from
+  uns["cellchat"]["options"]["parameter"]["interaction.range"] (default
+  250.0 if absent) and sets the x-axis limit/tick spacing of each density
+  panel. Renders one (signaling_type="Secreted"/"Contact") or two
+  (signaling_type="All") stacked seaborn.kdeplot density panels via the
+  internal _density_panel helper (falls back to a single axvline when a
+  panel has exactly one finite value).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with uns["cellchat"]["images"]["result.computeCellDistance"] (and, when enriched_only=True, uns["cellchat"]["net"]["prob.cell"]) populated by computeCommunProb.
+  - name: signaling_type
+    type: 'Literal["All", "Secreted", "Contact"]'
+    required: false
+    default: All
+    description: Which density panel(s) to draw; "All" draws both stacked vertically.
+  - name: enriched_only
+    type: bool
+    required: false
+    default: true
+    description: When True, restrict distances to interactions in net["prob.cell"] (significantly enriched pairs only); when False, use all non-zero distance/contact entries.
+  - name: density_alpha
+    type: float
+    required: false
+    default: 0.5
+    description: Fill alpha for the kernel-density panels.
+returns: >-
+  A new matplotlib.figure.Figure with one axes (signaling_type="Secreted"
+  or "Contact") or two stacked axes (signaling_type="All"), laid out via
+  plt.subplots() and fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; reads
+  uns["cellchat"]["images"]["result.computeCellDistance"],
+  uns["cellchat"]["options"]["parameter"], and (when enriched_only=True)
+  uns["cellchat"]["net"]["prob.cell"] via
+  spatialcellchat._anndata.cellchat_dict; does not write back into
+  adata.uns/obs/var; returns_kind=new_object
+requires:
+  - uns.cellchat.images.result.computeCellDistance
+  - uns.cellchat.net.prob.cell
+examples:
+  - 'scc.communicationDistPlot2(adata, signaling_type="All", enriched_only=True, density_alpha=0.4)'
+  - 'scc.communicationDistPlot2(adata, signaling_type="Secreted")'
+  - 'scc.communicationDistPlot2(adata, signaling_type="Contact", enriched_only=False)'
+failure_fixes:
+  - when: "uns['cellchat']['images']['result.computeCellDistance'] is missing"
+    suggest:
+      - "Run computeCommunProb before calling communicationDistPlot2."
+    explanation: "communicationDistPlot2 raises ValueError(\"communicationDistPlot2 requires uns['cellchat']['images']['result.computeCellDistance'] (set by computeCommunProb)\")."
+  - when: "enriched_only=True but uns['cellchat']['net']['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb (which populates net['prob.cell']) before calling with enriched_only=True, or pass enriched_only=False."
+    explanation: "communicationDistPlot2 raises ValueError(\"enriched_only=True requires net['prob.cell']\")."
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.communicationDistPlot

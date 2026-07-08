@@ -1,0 +1,136 @@
+id: spatialcellchat.netAnalysis_signalingRole_network
+import_path: spatialcellchat.viz_embedding.netAnalysis_signalingRole_network
+kind: function
+signature: >-
+  netAnalysis_signalingRole_network(adata: ad.AnnData, signaling:
+  Sequence[str], slot_name: str = "netP", measure: Sequence[str] =
+  ("outdeg", "indeg", "flowbet", "info"), measure_name: Sequence[str] =
+  ("Sender", "Receiver", "Mediator", "Influencer"), color_use:
+  Optional[Sequence[str]] = None, color_heatmap: str = "BuGn", width: float
+  = 6.5, height: float = 1.4, font_size: float = 8.0, font_size_title:
+  float = 10.0, cluster_rows: bool = False, cluster_cols: bool = False) ->
+  Figure
+purpose: Per-pathway heatmap of row-normalised centrality (Sender/Receiver/Mediator/Influencer) across cell groups, one mini-heatmap per signaling pathway.
+description: >
+  Mirrors R's netAnalysis_signalingRole_network (analysis.R:2559). Reads
+  adata.uns['cellchat'][slot_name]['centr'], raising ValueError (message
+  mentions netAnalysis_computeCentrality) if that key is absent or falsy.
+  Filters `measure` down to the subset present in the centr's centr_names
+  (raises ValueError if none match) and `signaling` down to pathways
+  present in centr's signaling_names (raises ValueError if none match).
+  For each kept pathway, builds a (len(available_measures),
+  len(node_names)) matrix from centr['values'], row-normalises by each
+  row's max (rmax treated as 1.0 when zero to avoid division by zero), and
+  renders it as an imshow heatmap with the color_heatmap-derived colormap
+  (via _safe_brewer, a ColorBrewer palette with a matplotlib-colormap
+  fallback). Below each heatmap body, a colour strip encodes cell-group
+  identity using color_use (or scPalette(len(node_names)) when None); a
+  colorbar titled "Importance" is drawn to the right with ticks at the
+  panel's min/max normalised value. Panels are stacked vertically, one per
+  pathway in signaling order, sized from width/height (interpreted as
+  centimetres for the heatmap body, R parity). cluster_rows/cluster_cols
+  are accepted for R parity but are not applied (rows/cols are always
+  drawn in centr/measure/node order; no dendrogram reordering is
+  performed in this port).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with adata.uns['cellchat'][slot_name]['centr'] populated (written by netAnalysis_computeCentrality).
+  - name: signaling
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Pathway names to render, one heatmap panel per pathway found in centr['signaling_names']; raises ValueError if none are found.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot whose ['centr'] centrality output is read.
+  - name: measure
+    type: Sequence[str]
+    required: false
+    default: ["outdeg", "indeg", "flowbet", "info"]
+    description: Centrality measure keys to show as heatmap rows; filtered to those present in centr['centr_names'] (raises ValueError if none match).
+  - name: measure_name
+    type: Sequence[str]
+    required: false
+    default: ["Sender", "Receiver", "Mediator", "Influencer"]
+    description: Display labels for the row measures, aligned positionally with `measure`.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colour strip palette; defaults to scPalette(len(node_names)) when None.
+  - name: color_heatmap
+    type: str
+    required: false
+    default: BuGn
+    description: ColorBrewer palette name (with matplotlib-colormap fallback via _safe_brewer) used for the heatmap body colormap.
+  - name: width
+    type: float
+    required: false
+    default: 6.5
+    description: Heatmap body width in centimetres (converted to inches for the matplotlib figure).
+  - name: height
+    type: float
+    required: false
+    default: 1.4
+    description: Heatmap body height in centimetres per panel (converted to inches).
+  - name: font_size
+    type: float
+    required: false
+    default: 8.0
+    description: Font size for row/column tick labels and the colorbar.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Font size for each panel's "{pathway} signaling pathway network" title.
+  - name: cluster_rows
+    type: bool
+    required: false
+    default: false
+    description: Reserved for R parity; not applied in this port (rows are always in `measure` order).
+  - name: cluster_cols
+    type: bool
+    required: false
+    default: false
+    description: Reserved for R parity; not applied in this port (columns are always in `node_names` order).
+returns: >-
+  A matplotlib.figure.Figure with one stacked heatmap panel (body + cell-
+  group colour strip + "Importance" colorbar) per kept signaling pathway.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'][slot_name]
+  only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.centr
+writes: []
+examples:
+  - "scc.netAnalysis_signalingRole_network(sub, signaling=[pathway_show], slot_name='netP', measure=('outdeg','indeg'), measure_name=('Sender','Receiver'), width=8, height=3, font_size=10)"
+  - "scc.netAnalysis_signalingRole_network(adata, signaling=['TGFb', 'WNT'])"
+failure_fixes:
+  - when: "adata.uns['cellchat'][slot_name]['centr'] is missing"
+    suggest:
+      - "Run netAnalysis_computeCentrality() first."
+    explanation: >-
+      Raises ValueError("Please run `netAnalysis_computeCentrality` to
+      compute the network centrality scores!") (checked in
+      test_signalingRole_network_missing_centr_raises).
+  - when: "none of `signaling` are found in centr['signaling_names']"
+    suggest:
+      - "Check the pathway names against adata.uns['cellchat'][slot_name]['centr']['signaling_names']."
+    explanation: >-
+      Raises ValueError(f"signaling {signaling!r} not in pathways.") (checked
+      in test_signalingRole_network_invalid_signaling_raises).
+  - when: "none of `measure` are found in centr['centr_names']"
+    suggest:
+      - "Use measure keys written by netAnalysis_computeCentrality (e.g. 'outdeg', 'indeg', 'flowbet', 'info')."
+    explanation: >-
+      Raises ValueError(f"None of measure {measure!r} are in centr names
+      {centr_names!r}").
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.netAnalysis_contribution
+  - spatialcellchat.netAnalysis_signalingRole_scatter

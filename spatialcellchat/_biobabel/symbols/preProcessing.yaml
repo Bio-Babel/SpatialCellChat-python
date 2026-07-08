@@ -1,0 +1,68 @@
+id: spatialcellchat.preProcessing
+import_path: spatialcellchat.preprocessing.preProcessing
+kind: function
+signature: >-
+  preProcessing(adata: ad.AnnData, layer_in: Optional[str] = None, layer_out:
+  str = "data_signaling", K: Optional[int] = None, noise_start:
+  Optional[int] = None, quantile_prob: float = 1e-5) -> ad.AnnData
+purpose: Run ALRA-based imputation on the expression matrix and write the imputed result to a layer.
+description: >
+  Direct port of R's preProcessing (utilities.R:744). Reads layer_in (or
+  adata.X when layer_in=None) as a dense (cells x genes) array — the layout
+  ALRA expects. K defaults to round(0.9 * min(shape)) when min(shape) < 100,
+  else 100 (mirrors formals(ALRA::choose_k)$K); noise_start defaults to
+  min(round(0.8 * K), 80). _alra.choose_k is bootstrapped 10 times and the
+  median chosen rank k_med is used; _alra.alra(A, k=k_med, q=10,
+  quantile_prob=quantile_prob) is then run once, and its
+  "A_norm_rank_k_cor_sc" (cells x genes) result is written to
+  adata.layers[layer_out]. If K/noise_start are too small for the input
+  shape, _alra.choose_k raises (not caught or overridden here — the same
+  failure mode as the R reference).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object, modified in place.
+  - name: layer_in
+    type: Optional[str]
+    required: false
+    default: null
+    description: Layer to read; None uses adata.X.
+  - name: layer_out
+    type: str
+    required: false
+    default: '"data_signaling"'
+    description: Layer name to overwrite with the ALRA-imputed values.
+  - name: K
+    type: Optional[int]
+    required: false
+    default: null
+    description: Override the ALRA rank-search ceiling otherwise derived from the input shape.
+  - name: noise_start
+    type: Optional[int]
+    required: false
+    default: null
+    description: Override the noise-singular-value start index otherwise derived from K.
+  - name: quantile_prob
+    type: float
+    required: false
+    default: 1.0e-05
+    description: Per-gene mirror-trick threshold quantile (R's quantile.prob).
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData).
+mutates: >-
+  execution_class=builder; mutates adata.layers[layer_out] and
+  adata.uns["alra_k"] in place; returns_kind=same_object
+requires: []
+writes:
+  - layers.data_signaling
+  - uns.alra_k
+examples:
+  - scc.preProcessing(sub)
+  - pp.preProcessing(A, layer_out="data_signaling", quantile_prob=1e-5)
+failure_fixes: []
+related:
+  - spatialcellchat.normalizeData
+  - spatialcellchat.subsetData
+  - spatialcellchat.projectData

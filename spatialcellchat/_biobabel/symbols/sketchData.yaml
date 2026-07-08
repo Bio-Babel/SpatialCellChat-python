@@ -1,0 +1,91 @@
+id: spatialcellchat.sketchData
+import_path: spatialcellchat.preprocessing.sketchData
+kind: function
+signature: >-
+  sketchData(adata: ad.AnnData, percent: float, idents: Optional[Sequence[str]]
+  = None, do_PCA: bool = True, dimPC: int = 30, ident_key: str =
+  "cellchat_idents") -> List[str]
+purpose: Geometric-sketch downsampling of cells; returns the kept cell names (not an AnnData).
+description: >
+  Direct port of R's sketchData (utilities.R:867), which returns a character
+  vector of selected cell names (R's sketch.cells). Requires the geosketch
+  Python package (imported at call time; ImportError if absent — the same
+  package R imports through reticulate). If idents is given, cells are
+  first restricted to adata.obs[ident_key].isin(idents) via
+  sub = adata[mask].copy() (a fresh copy); otherwise sub is adata itself
+  (no copy). sketch_size = int(percent * sub.n_obs). If do_PCA, runPCA(sub,
+  dimPC=dimPC, layer_in=None) is called to obtain PCs; otherwise sub.X is
+  used directly. geosketch.gs(X_pcs, sketch_size) selects the row indices,
+  and the corresponding sub.obs_names are returned as a plain list.
+
+  R-bug deviation (documented in-source): R's non-Seurat branch reads
+  `sketch.size <- as.integer(percent * nrow(X))` where X is undefined in
+  that scope (a runtime error in R). This Python port instead uses
+  sub.n_obs directly, the evident intent of the R comment
+  "# Sketch percent of data.".
+
+  Important verified side effect: when idents is None (default) AND
+  do_PCA=True (default) — the common case — sub is the SAME object as the
+  input adata (no copy is made). The internal runPCA(sub, ...) call
+  therefore mutates the caller's adata in place, writing
+  adata.obsm["X_pca"], adata.varm["PCs"] and adata.uns["pca"], even though
+  the function's own return value is just a list of cell names. When idents
+  is given, PCA instead runs on an internal adata[mask].copy(), and the
+  input adata's PCA-related slots are left untouched.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Input object. Not copied when idents is None (see side-effect note in
+      description); copied internally when idents is given.
+  - name: percent
+    type: float
+    required: true
+    default: null
+    description: Fraction of (possibly ident-restricted) cells to keep.
+  - name: idents
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Identity classes (from adata.obs[ident_key]) to retain prior to sketching.
+  - name: do_PCA
+    type: bool
+    required: false
+    default: true
+    description: Whether to run runPCA before sketching (uses PCs) instead of the raw matrix.
+  - name: dimPC
+    type: int
+    required: false
+    default: 30
+    description: Number of PCs to compute/use when do_PCA is True.
+  - name: ident_key
+    type: str
+    required: false
+    default: '"cellchat_idents"'
+    description: Column in adata.obs consulted when idents is set.
+returns: >-
+  A plain list[str] of cell names selected by the geometric sketch
+  (R-parity with sketch.cells) — NOT an AnnData.
+mutates: >-
+  execution_class=builder (side-effect only, not a value-returning
+  builder of an AnnData); returns_kind=other (list[str]). When idents=None
+  and do_PCA=True (both defaults), mutates the input adata in place via the
+  internal runPCA call (writes obsm["X_pca"], varm["PCs"], uns["pca"]).
+  When idents is given, PCA runs on an internal copy and the input adata is
+  left unmutated.
+requires:
+  - "the geosketch package must be importable"
+  - "adata.obs[ident_key] must exist when idents is provided"
+writes:
+  - obsm.X_pca
+  - varm.PCs
+  - uns.pca
+examples:
+  - cells = scc.sketchData(adata, percent=0.1)
+  - cells = pp.sketchData(adata, percent=0.2, idents=["FIB", "ENDO"], do_PCA=True, dimPC=30)
+failure_fixes: []
+related:
+  - spatialcellchat.runPCA
+  - spatialcellchat.sketchDataAdata

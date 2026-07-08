@@ -1,0 +1,80 @@
+id: spatialcellchat.mergeInteractions
+import_path: spatialcellchat.analysis_ranking.mergeInteractions
+kind: function
+signature: >-
+  mergeInteractions(adata: ad.AnnData, group_merged: Sequence) -> ad.AnnData
+purpose: Aggregate per-cell-group count/weight matrices into per-merged-cell-type matrices.
+description: >
+  Direct port of R's mergeInteractions (analysis.R:2192). Reads the (K, K)
+  matrices uns["cellchat"]["net"]["count"] and ["weight"] (written by
+  aggregateNet) and a length-K group_merged mapping from each of the K cell
+  groups to a coarser cell-type label. group_merged is coerced to a
+  pandas.Categorical (the R factor() analogue); its unique categories (L of
+  them) define the aggregated axis. For every pair of merged levels (i, j),
+  count.merged[i, j] and weight.merged[i, j] are the sums of count/weight over
+  all original (row, col) pairs whose group codes are (i, j). Both merged
+  matrices are written as pandas.DataFrame with rows/columns indexed by the
+  merged group levels.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object with uns["cellchat"]["net"]["count"] and ["weight"] already
+      populated by aggregateNet.
+  - name: group_merged
+    type: Sequence
+    required: true
+    default: null
+    description: >-
+      Length-K sequence mapping each of the K cell groups to a merged
+      cell-type label; coerced to pandas.Categorical if not already one.
+returns: >-
+  The same adata object, mutated in place. uns["cellchat"]["net"]["count.merged"]
+  and ["weight.merged"] are (L, L) pandas.DataFrame objects indexed/columned
+  by the merged group levels; ["group.merged"] is the resolved
+  pandas.Categorical group factor of length K.
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['net'] (count.merged,
+  weight.merged, group.merged) in place; returns_kind=same_object
+requires:
+  - uns.cellchat.net.count
+  - uns.cellchat.net.weight
+writes:
+  - uns.cellchat.net.count.merged
+  - uns.cellchat.net.weight.merged
+  - uns.cellchat.net.group.merged
+examples:
+  - "scc.mergeInteractions(adata, ['TypeA', 'TypeA', 'TypeB', 'TypeB'])"
+  - "scc.mergeInteractions(adata, pd.Categorical(['g1', 'g1', 'g2', 'g2', 'g3', 'g3']))"
+failure_fixes:
+  - when: "uns['cellchat']['net'] is missing"
+    suggest:
+      - "Populate uns['cellchat']['net'] first (e.g. via computeCommunProb)."
+    explanation: >-
+      mergeInteractions raises ValueError("mergeInteractions requires
+      uns['cellchat']['net']") when net is absent.
+  - when: "net['count'] or net['weight'] is missing"
+    suggest:
+      - "Run aggregateNet() before mergeInteractions."
+    explanation: >-
+      mergeInteractions raises ValueError("mergeInteractions requires
+      net['count'] and net['weight']; run aggregateNet first").
+  - when: "net['count'] and net['weight'] have different shapes, or net['count'] is not square"
+    suggest:
+      - "Verify aggregateNet produced consistent (K, K) count/weight matrices."
+    explanation: >-
+      mergeInteractions raises ValueError("net['count'] and net['weight']
+      must have the same shape") or ValueError("net['count'] must be square
+      (K, K)").
+  - when: "group_merged length does not match K"
+    suggest:
+      - "Pass exactly one merged-group label per row/column of net['count']."
+    explanation: >-
+      mergeInteractions raises ValueError("group_merged has length ...,
+      expected ... (matching net['count'])") on a length mismatch.
+related:
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.getMaxWeight
+  - spatialcellchat.compareInteractions

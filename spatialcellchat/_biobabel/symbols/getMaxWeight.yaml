@@ -1,0 +1,90 @@
+id: spatialcellchat.getMaxWeight
+import_path: spatialcellchat.analysis_ranking.getMaxWeight
+kind: function
+signature: >-
+  getMaxWeight(adata_list: Sequence[ad.AnnData], slot_name: Union[str,
+  Sequence[str]] = ("idents", "net"), attribute: Union[str, Sequence[str]] =
+  ("idents", "count")) -> np.ndarray
+purpose: Compute the maximum value of one or more measures across a list of datasets.
+description: >
+  Direct port of R's getMaxWeight (analysis.R:2159). `slot_name` and
+  `attribute` are coerced to equal-length lists and each (slot, attr) pair is
+  resolved against every AnnData in adata_list, then reduced with max() across
+  datasets:
+
+  - slot_name="idents": per-dataset largest cluster size (max(table(idents))),
+  where idents is resolved from uns["cellchat"]["net"]["meta"]["idents"],
+  falling back to obs["cellchat_idents"] then obs["idents"].
+
+  - slot_name="net" and attribute in {"count", "weight", "count.merged",
+  "weight.merged"}: max(net[attribute]) per dataset, read from
+  uns["cellchat"]["net"].
+
+  - otherwise (slot_name in {"net", "netP"} and attribute is a pathway name or
+  interaction_name): attribute is validated against the first dataset's
+  uns["cellchat"]["DB"]["interaction"] pathway_name/interaction_name columns,
+  then max(slot["prob"][:, :, k]) per dataset where k is the resolved index
+  into the pathway/interaction name list (netP uses netP["pathways"]; net uses
+  net["dimnames"]["interaction_name"]).
+
+  Returns a plain numpy array (R returns a named vector; the name dimension is
+  dropped in the Python port).
+parameters:
+  - name: adata_list
+    type: Sequence[anndata.AnnData]
+    required: true
+    default: null
+    description: >-
+      Already-populated CellChat AnnData objects. Idents resolved from
+      uns["cellchat"]["net"]["meta"]["idents"], obs["cellchat_idents"], or
+      obs["idents"]; "net"/"netP" read from the matching uns["cellchat"] slot;
+      "DB" read from uns["cellchat"]["DB"].
+  - name: slot_name
+    type: Union[str, Sequence[str]]
+    required: false
+    default: '("idents", "net")'
+    description: Which slot to read for each measure; must align in length with attribute.
+  - name: attribute
+    type: Union[str, Sequence[str]]
+    required: false
+    default: '("idents", "count")'
+    description: Specific measure to read for each slot_name entry (see description).
+returns: >-
+  A numpy.ndarray of length len(attribute), one max value per (slot_name,
+  attribute) pair, reduced across all datasets in adata_list. No AnnData is
+  mutated.
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires:
+  - uns.cellchat.net
+writes: []
+examples:
+  - "scc.getMaxWeight([adata1, adata2], slot_name='idents', attribute='idents')"
+  - "scc.getMaxWeight([adata1, adata2], slot_name=['net', 'net'], attribute=['count', 'weight'])"
+  - "scc.getMaxWeight([adata1, adata2], slot_name='netP', attribute='WNT')"
+failure_fixes:
+  - when: "slot_name and attribute have different lengths"
+    suggest:
+      - "Pass slot_name and attribute as sequences of the same length (one attribute per slot)."
+    explanation: >-
+      getMaxWeight raises ValueError("slot_name and attribute must have the
+      same length, got ... and ...") on a mismatch.
+  - when: "attribute is not a known pathway_name or interaction_name"
+    suggest:
+      - "Check uns['cellchat']['DB']['interaction']['pathway_name']/['interaction_name'] on the first dataset for the valid attribute values."
+    explanation: >-
+      getMaxWeight raises ValueError("attribute '...' is not a known
+      pathway_name or interaction_name in DB['interaction']") when the
+      pathway/LR-pair branch cannot resolve the attribute against the first
+      dataset's DB.
+  - when: "net['<attribute>'] missing in one of the AnnData objects"
+    suggest:
+      - "Run aggregateNet() on every AnnData in adata_list first."
+    explanation: >-
+      getMaxWeight raises ValueError("net['...'] missing in one of the
+      AnnData objects") for the count/weight/count.merged/weight.merged
+      branch when a dataset lacks that key.
+related:
+  - spatialcellchat.compareInteractions
+  - spatialcellchat.mergeInteractions
+  - spatialcellchat.rankNet

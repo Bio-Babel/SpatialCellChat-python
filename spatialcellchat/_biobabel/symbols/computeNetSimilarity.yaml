@@ -1,0 +1,95 @@
+id: spatialcellchat.computeNetSimilarity
+import_path: spatialcellchat.analysis_network.computeNetSimilarity
+kind: function
+signature: >-
+  computeNetSimilarity(adata: ad.AnnData, slot_name: str = "netP", type_: str
+  = "functional", k: Optional[int] = None, thresh: Optional[float] = None) ->
+  ad.AnnData
+purpose: Compute the pairwise signaling-network similarity matrix for a single dataset.
+description: >
+  Direct port of R's computeNetSimilarity (analysis.R:1315). Reads the
+  (K, K, N) prob array from uns["cellchat"][slot_name]["prob"] (N =
+  number of signaling pathways / LR pairs). Optionally trims weak
+  interactions below a thresh quantile of nonzero entries. For
+  type_="functional", pairwise similarity is a Jaccard-style overlap of
+  binarised (>0) adjacency matrices; for type_="structural", pairwise
+  distance is computeNetD_structure(Gi, Gj) and similarity = 1 - distance.
+  The raw similarity S is then smoothed via a shared-nearest-neighbour graph
+  (buildSNN) with k neighbours (defaults to ceil(sqrt(N)), +1 if N>25) and
+  elementwise-multiplied by the SNN adjacency. The result is written as a
+  pandas.DataFrame indexed/columned by pathway_names (falling back to
+  integer-string labels if pathway_names is absent or mismatched in length).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object whose uns["cellchat"][slot_name]["prob"] array of shape (K, K, N) is consumed.
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: Slot to read prob from ("netP" for pathway-level data or "net" for L-R-pair-level data).
+  - name: type_
+    type: str
+    required: false
+    default: "functional"
+    description: "'functional' or 'structural'; selects which similarity kernel to use."
+  - name: k
+    type: Optional[int]
+    required: false
+    default: null
+    description: >-
+      Number of nearest neighbours for SNN smoothing. Defaults to
+      ceil(sqrt(N)) for N<=25, ceil(sqrt(N))+1 otherwise.
+  - name: thresh
+    type: Optional[float]
+    required: false
+    default: null
+    description: Quantile in [0, 0.25] used to trim weak interactions before the per-pair similarity computation.
+returns: >-
+  The mutated adata (same object). Writes
+  uns["cellchat"][slot_name]["similarity"][type_]["matrix"]["single"] as a
+  pandas.DataFrame.
+mutates: >-
+  execution_class=builder; mutates
+  adata.uns['cellchat'][slot_name]['similarity'][type_]['matrix']['single']
+  in place; returns_kind=same_object
+requires:
+  - uns.cellchat.netP.prob
+  - uns.cellchat.net.prob
+writes:
+  - uns.cellchat.netP.similarity.functional.matrix.single
+  - uns.cellchat.netP.similarity.structural.matrix.single
+  - uns.cellchat.net.similarity.functional.matrix.single
+  - uns.cellchat.net.similarity.structural.matrix.single
+examples:
+  - "scc.computeNetSimilarity(adata, slot_name='netP', type_='functional')"
+  - "scc.computeNetSimilarity(adata, slot_name='netP', type_='structural', thresh=0.1)"
+  - "scc.computeNetSimilarity(adata, slot_name='net', k=5)"
+failure_fixes:
+  - when: "uns['cellchat'][slot_name]['prob'] is missing"
+    suggest:
+      - "Run computeCommunProb / computeAvgCommunProb (for slot_name='net') or computeCommunProbPathway (for slot_name='netP') first."
+    explanation: >-
+      computeNetSimilarity raises ValueError(f"adata.uns['cellchat']['{slot_name}']['prob']
+      is required (run computeCommunProb / computeCommunProbPathway first).")
+      when prob is absent.
+  - when: "prob is not a 3-D array"
+    suggest:
+      - "Ensure prob has shape (K, K, N); do not pass a 2-D matrix."
+    explanation: >-
+      computeNetSimilarity raises ValueError("`prob` must be a 3-D array of
+      shape (K, K, N).") when prob.ndim != 3.
+  - when: "type_ is neither 'functional' nor 'structural'"
+    suggest:
+      - "Pass type_='functional' or type_='structural'."
+    explanation: >-
+      The internal _build_signaling_similarity_matrix helper raises
+      ValueError(f"Unknown type {type_!r}; expected 'functional' or
+      'structural'.") for any other value.
+related:
+  - spatialcellchat.computeNetD_structure
+  - spatialcellchat.computeCommunProbPathway
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.netEmbedding

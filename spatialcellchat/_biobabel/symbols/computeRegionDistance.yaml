@@ -1,0 +1,111 @@
+id: spatialcellchat.computeRegionDistance
+import_path: spatialcellchat.spatial.computeRegionDistance
+kind: function
+signature: >-
+  computeRegionDistance(coordinates: Union[np.ndarray, pd.DataFrame,
+  ad.AnnData], group: Union[Sequence, pd.Categorical], trim: float = 0.1,
+  interaction_length: Optional[float] = None, spot_size: Optional[float] =
+  None, spot_size_fullres: Optional[float] = None, k_min: int = 10) ->
+  pd.DataFrame
+purpose: Compute a symmetric pairwise region-to-region (group-to-group) distance matrix from spatial coordinates.
+description: >
+  Direct port of R's computeRegionDistance (modeling.R:2700). group is
+  coerced to a pandas.Categorical; the result is always
+  nlevels(group) x nlevels(group), indexed by all categories (including any
+  with zero observed cells, whose row/column stays NaN — a Tier-2 deviation
+  from R, which errors on BiocNeighbors::queryKNN for empty levels; the
+  Python port instead safely leaves those entries NaN). For each ordered
+  pair of levels (i, j) with at least one cell each, a 1-NN query
+  (sklearn.neighbors.KDTree) finds, for every cell in level i, its nearest
+  cell in level j; the resulting distances are reduced via a truncated mean
+  (trim fraction removed from each end, matching R's mean(x, trim=)). When
+  both spot_size and spot_size_fullres are given (interaction_length is then
+  required), distances are first rescaled by spot_size / spot_size_fullres,
+  an adjacency mask is computed (rescaled distance - interaction_length <
+  spot_size / 2, with at least k_min unique matched neighbours required per
+  pair), and matrix entries failing the adjacency mask are set to NaN. The
+  final matrix is symmetrised via (D + D.T) / 2 (and, when the adjacency
+  mask is active, additionally masked by the AND of both directions'
+  adjacency). When coordinates is an AnnData, its obsm["spatial"] supplies
+  the coordinates and the result DataFrame is additionally stashed under
+  uns["cellchat"]["spatial"]["computeRegionDistance"].
+parameters:
+  - name: coordinates
+    type: Union[numpy.ndarray, pandas.DataFrame, anndata.AnnData]
+    required: true
+    default: null
+    description: >-
+      (n, 2) coordinate matrix, or an AnnData whose obsm["spatial"] holds
+      those coordinates.
+  - name: group
+    type: Union[Sequence, pandas.Categorical]
+    required: true
+    default: null
+    description: >-
+      Per-cell group/region labels, coerced to a pandas.Categorical if not
+      already one; its categories define the rows/columns of the result.
+  - name: trim
+    type: float
+    required: false
+    default: 0.1
+    description: "Truncated-mean trim fraction applied to each end of the sorted per-pair distances (R: trim)."
+  - name: interaction_length
+    type: Optional[float]
+    required: false
+    default: null
+    description: >-
+      Adjacency-mask distance threshold (R: interaction.length). Required
+      when both spot_size and spot_size_fullres are supplied.
+  - name: spot_size
+    type: Optional[float]
+    required: false
+    default: null
+    description: "Spot size in the target (rescaled) unit (R: spot.size)."
+  - name: spot_size_fullres
+    type: Optional[float]
+    required: false
+    default: null
+    description: "Spot size in the original (full-resolution) unit used to derive the rescale factor (R: spot.size.fullres)."
+  - name: k_min
+    type: int
+    required: false
+    default: 10
+    description: "Minimum number of unique interacting neighbours required per region pair for the adjacency mask to keep that pair (R: k.min)."
+returns: >-
+  A new pandas.DataFrame, square (nlevels x nlevels), indexed and columned
+  by the categories of group, holding the symmetrised truncated-mean
+  region-to-region distances (NaN where a level has zero cells, or where
+  the adjacency mask rejects the pair).
+mutates: >-
+  execution_class=builder (only when coordinates is an anndata.AnnData);
+  mutates adata.uns['cellchat']['spatial']['computeRegionDistance'] in
+  place; returns_kind=new_object (the returned DataFrame is always a new
+  object; when coordinates is a plain ndarray/DataFrame there is no
+  mutation at all — execution_class=pure_function in that case)
+requires:
+  - obsm.spatial
+writes:
+  - uns.cellchat.spatial.computeRegionDistance
+examples:
+  - "res = computeRegionDistance(coords, group)"
+  - "res = computeRegionDistance(coords, group, trim=0.0, interaction_length=100, spot_size=65, spot_size_fullres=100, k_min=1)"
+  - "res = computeRegionDistance(adata, adata.obs['active_ident'])"
+failure_fixes:
+  - when: "spot_size and spot_size_fullres are both given but interaction_length is None"
+    suggest:
+      - "Pass interaction_length together with spot_size and spot_size_fullres."
+    explanation: >-
+      computeRegionDistance raises ValueError("computeRegionDistance
+      requires `interaction_length` when both `spot_size` and
+      `spot_size_fullres` are provided.") in that case.
+  - when: "coordinates does not coerce to a two-column (n, 2) matrix"
+    suggest:
+      - "Pass an (n, 2) array/DataFrame of x/y coordinates, or an AnnData with a two-column obsm['spatial']."
+    explanation: >-
+      computeRegionDistance (via the shared _coords_to_array helper) raises
+      ValueError("Please check the input 'coordinates' and make sure it is
+      a two column matrix.") when the coerced array is not 2-D with exactly
+      2 columns.
+related:
+  - spatialcellchat.computeCellDistance
+  - spatialcellchat.computeColocalization

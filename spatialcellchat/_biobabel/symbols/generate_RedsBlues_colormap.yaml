@@ -1,0 +1,44 @@
+id: spatialcellchat.generate_RedsBlues_colormap
+import_path: spatialcellchat._themes.generate_RedsBlues_colormap
+kind: function
+signature: "generate_RedsBlues_colormap(vec: Sequence[float], mid_color: str = \"#E5E5E5\", switch_RedsBlues: bool = False) -> np.ndarray"
+purpose: "99-colour Reds/Blues ramp anchored at zero, a port of generate_RedsBlues_colormap from visualization.R."
+description: >
+  Drops NaNs from vec and computes its min/max. If the data is entirely
+  non-negative, builds a colorRamp3 ramp from mid_color at 0 up through
+  six Reds anchors at max(vec). If entirely non-positive, ramps from
+  reversed Blues anchors at min(vec) up to mid_color at 0. If the data
+  spans both signs, concatenates a Blues-to-mid_color ramp (min..0) with a
+  mid_color-to-Reds ramp (0..max), so mid_color sits exactly at zero.
+  switch_RedsBlues swaps which palette (Reds vs Blues) is used on which
+  side. The resulting colorRamp3 closure is sampled at 99 evenly spaced
+  points across [min(vec), max(vec)].
+parameters:
+  - name: vec
+    type: Sequence[float]
+    required: true
+    default: null
+    description: Numeric vector defining the colour range; NaNs are dropped before computing min/max.
+  - name: mid_color
+    type: str
+    required: false
+    default: "#E5E5E5"
+    description: Colour anchored at zero (or at the single extreme for sign-uniform vectors).
+  - name: switch_RedsBlues
+    type: bool
+    required: false
+    default: false
+    description: Swap the Reds and Blues anchor sets.
+returns: >
+  A numpy.ndarray of 99 "#RRGGBBAA" hex strings sampling the colour ramp
+  across the range of vec.
+mutates: "execution_class=pure_function; no in-place mutation of `vec`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "generate_RedsBlues_colormap([0, 0.5, 1, 2, 5])"
+  - "generate_RedsBlues_colormap([-5, -2, 0, 2, 5])"
+  - "generate_RedsBlues_colormap([-3, -1, 0, 1, 3], switch_RedsBlues=True)"
+failure_fixes: []
+related:
+  - spatialcellchat.colorRamp3

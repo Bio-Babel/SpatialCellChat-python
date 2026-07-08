@@ -1,0 +1,100 @@
+id: spatialcellchat.suggestK1
+import_path: spatialcellchat.analysis_topics.suggestK1
+kind: function
+signature: >-
+  suggestK1(Mat: np.ndarray, k_test: Sequence[int] = tuple(range(5, 51, 5)),
+  reps: int = 10, p: float = 0.3, tol: float = 1e-6, maxit: int = 100, L1:
+  Sequence[float] = (0.0, 0.0), seed_use: int = 666) -> Dict[str, Any]
+purpose: Cross-validate the NMF rank choice for a features-by-samples matrix via held-out block reconstruction error.
+description: >
+  Direct port of R's suggestK1 (analysis.R:3738), which cross-validates
+  RcppML::nmf's rank choice. Per the project's Tier-2 design contract, the
+  underlying NMF fit is sklearn's solver='cd' with L1 regularisation. For
+  each candidate k in k_test, `reps` random seeds (sampled without
+  replacement from 1..10000 using `seed_use`) are used to fit NMF on the
+  full `Mat`; a held-out sub-block of rows/columns (proportion `p` of each
+  axis, or the full matrix when p=0) is reconstructed from the fitted W/H
+  (after redistributing the NMF scale factor symmetrically between W and H)
+  and the Frobenius-norm reconstruction error, normalised by the sub-block
+  size, is recorded per (k, seed) pair. Also fixes a documented R-side bug:
+  SpatialCellChat's suggestK1 (analysis.R:3772-3779/3815-3822) declares an
+  `L1` parameter in its signature/docstring but never forwards it to
+  RcppML::nmf — an unintended fork regression with no upstream
+  jinworks/CellChat equivalent to compare against. This Python port honours
+  the documented intent and actually forwards `L1` to the NMF fit.
+parameters:
+  - name: Mat
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: (features x samples) non-negative matrix to factorise; a pandas.DataFrame is also accepted.
+  - name: k_test
+    type: Sequence[int]
+    required: false
+    default: tuple(range(5, 51, 5))
+    description: Candidate ranks; must contain more than one value.
+  - name: reps
+    type: int
+    required: false
+    default: 10
+    description: Random restarts (distinct seeds) per candidate k.
+  - name: p
+    type: float
+    required: false
+    default: 0.3
+    description: Proportion of rows/columns sampled for the held-out reconstruction block; use p=0 to score on the full matrix.
+  - name: tol
+    type: float
+    required: false
+    default: 1e-6
+    description: NMF convergence tolerance.
+  - name: maxit
+    type: int
+    required: false
+    default: 100
+    description: Maximum NMF iterations.
+  - name: L1
+    type: Sequence[float]
+    required: false
+    default: (0.0, 0.0)
+    description: L1 strengths for (W, H), forwarded to the underlying NMF fit.
+  - name: seed_use
+    type: int
+    required: false
+    default: 666
+    description: RNG seed controlling the per-rep seed sample.
+returns: >-
+  A dict {"stats": pandas.DataFrame with columns k, seed_use, objErr, iter
+  (one row per (k, rep) run), "figure": None}. The Python port always leaves
+  "figure" as None; a separate slice-6a plotting helper materialises the
+  diagnostic figure from result["stats"].
+mutates: >-
+  execution_class=pure_function; no in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.suggestK1(Mat, k_test=range(5, 51, 5), reps=10, p=0.3)"
+  - "scc.suggestK1(Mat, k_test=[10, 20, 30], p=0.0)"
+failure_fixes:
+  - when: "Mat is not a numpy.ndarray or pandas.DataFrame"
+    suggest:
+      - "Pass Mat as a 2-D numpy array or pandas DataFrame."
+    explanation: >-
+      suggestK1 raises ValueError("Please check your input. It must be a
+      matrix.").
+  - when: "k_test has 1 or fewer values"
+    suggest:
+      - "Pass at least two candidate ranks in k_test."
+    explanation: >-
+      suggestK1 raises ValueError("Please provide more than one `k` for
+      cross validate.").
+  - when: "p is outside [0, 1)"
+    suggest:
+      - "Pass p in [0, 1), e.g. the default 0.3."
+    explanation: >-
+      suggestK1 raises ValueError("Please check your `p`. It must be in
+      [0,1).").
+related:
+  - spatialcellchat.suggestK
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.selectK

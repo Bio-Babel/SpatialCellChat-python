@@ -1,0 +1,155 @@
+id: spatialcellchat.vizDimLoadings
+import_path: spatialcellchat.viz_basic.vizDimLoadings
+kind: function
+signature: >-
+  vizDimLoadings(adata: ad.AnnData, dims: Sequence[int] = tuple(range(1, 6)),
+  nfeatures: int = 30, nTop: int = 10, feature_cat: Literal["LR-pair",
+  "ligand", "signaling"] = "LR-pair", col: Optional[Dict[str, str]] = None,
+  reduction: str = "pca", projected: bool = False, balanced: bool = False,
+  species: Literal["mouse", "human"] = "mouse", db: Optional[Dict[str,
+  pd.DataFrame]] = None, ncol: Optional[int] = None, combine: bool = True,
+  ylabel: str = "Signaling score", text_nudge_x: float = -8.0, text_size:
+  float = 3.0, point_size: float = 2.0, line_size: float = 1.0) -> Figure
+purpose: Plot the top-loading features (or ligand/pathway-aggregated scores) per PCA (or other reduction) dimension, one ranked line+label panel per dimension.
+description: >
+  Direct port of R's vizDimLoadings (visualization.R:5138). Loadings are read
+  from adata.varm[f"{reduction.upper()}s"] (e.g. "PCAs" for reduction="pca")
+  or, as a scanpy-convention fallback, adata.varm["PCs"]; if neither varm key
+  exists, falls back to uns["cellchat"][reduction]["loadings"] (raises
+  ValueError if none of these are found). When projected=True, reads the
+  parallel "*_projected" slot instead (adata.varm[f"{key}_projected"] or
+  uns["cellchat"][reduction]["loadings_projected"]; raises ValueError if that
+  projected slot is absent). For each requested dim (1-based), selects
+  features via Seurat::TopFeatures semantics: balanced=False takes the top
+  nfeatures by |loading|; balanced=True takes the top nfeatures most-positive
+  UNION top nfeatures most-negative (de-duplicated, positive-first). When
+  feature_cat is "ligand" or "signaling", loads a CellChatDB (via db= or
+  spatialcellchat.database.load_db(species)) and aggregates loading scores by
+  ligand or pathway_name (mean). Ranks all resolved features by |score|,
+  labels the top nTop with repelled text annotations coloured by sign (col
+  dict, keys "pos"/"neg"), and plots the ranked |score| curve. Panels are
+  arranged in a plt.subplots(nrow, ncol) grid (ncol auto-derived from
+  len(dims) when None: 1 for a single dim, else 2/3/4 as len(dims) grows).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with PCA-style loadings in varm (or a uns["cellchat"][reduction]["loadings"] fallback).
+  - name: dims
+    type: Sequence[int]
+    required: false
+    default: tuple(range(1, 6))
+    description: 1-based dimension indices to plot (one subplot each); raises ValueError if any is out of range of the resolved loadings.
+  - name: nfeatures
+    type: int
+    required: false
+    default: 30
+    description: Number of features selected per PC before ranking/labelling (2x when balanced=True).
+  - name: nTop
+    type: int
+    required: false
+    default: 10
+    description: Number of top-|score| features labelled per panel.
+  - name: feature_cat
+    type: 'Literal["LR-pair", "ligand", "signaling"]'
+    required: false
+    default: LR-pair
+    description: Whether to keep raw feature (gene/LR-pair) scores, or aggregate by ligand or pathway_name via the CellChatDB interaction table; raises ValueError for any other value.
+  - name: col
+    type: Optional[Dict[str, str]]
+    required: false
+    default: null
+    description: 'Colour map with keys "neg"/"pos"; defaults to {"neg": "#377EB8", "pos": "#E41A1C"}.'
+  - name: reduction
+    type: str
+    required: false
+    default: pca
+    description: Reduction name used to build the varm/uns loadings lookup keys and the panel titles.
+  - name: projected
+    type: bool
+    required: false
+    default: false
+    description: When True, read the "*_projected" loadings slot instead of the un-projected one; raises ValueError if that slot is missing.
+  - name: balanced
+    type: bool
+    required: false
+    default: false
+    description: Seurat TopFeatures(balanced=True) semantics — top nfeatures by +score union top nfeatures by -score, instead of top nfeatures by |score|.
+  - name: species
+    type: 'Literal["mouse", "human"]'
+    required: false
+    default: mouse
+    description: Species passed to spatialcellchat.database.load_db when db is None and feature_cat is "ligand"/"signaling".
+  - name: db
+    type: Optional[Dict[str, pandas.DataFrame]]
+    required: false
+    default: null
+    description: CellChatDB dict with an "interaction" table (ligand/receptor/pathway_name columns); loaded via load_db(species) when None.
+  - name: ncol
+    type: Optional[int]
+    required: false
+    default: null
+    description: Number of subplot columns; auto-derived from len(dims) when None (1/2/3/4 as len(dims) grows).
+  - name: combine
+    type: bool
+    required: false
+    default: true
+    description: When True, calls fig.tight_layout() before returning.
+  - name: ylabel
+    type: str
+    required: false
+    default: Signaling score
+    description: Y-axis label for every panel.
+  - name: text_nudge_x
+    type: float
+    required: false
+    default: -8.0
+    description: X offset (in rank units) applied to the labelled-point annotation text.
+  - name: text_size
+    type: float
+    required: false
+    default: 3.0
+    description: Base label font size (actual fontsize is text_size + 4).
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Marker size scale for labelled points (actual size is point_size * 8).
+  - name: line_size
+    type: float
+    required: false
+    default: 1.0
+    description: Line width of the ranked |score| curve.
+returns: A new matplotlib.figure.Figure with one axes per requested dim (spare axes hidden), laid out via plt.subplots(nrow, ncol).
+mutates: >-
+  execution_class=pure_function; reads adata.varm (or
+  uns["cellchat"][reduction]) and, for feature_cat in {"ligand","signaling"},
+  loads a CellChatDB via spatialcellchat.database.load_db (a fresh read of
+  bundled resources, independent of adata); does not write back into
+  adata.uns/obs/var/varm; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - 'scc.vizDimLoadings(adata, dims=[1, 2], nfeatures=10, nTop=3, feature_cat="LR-pair", reduction="pca")'
+  - 'scc.vizDimLoadings(adata, dims=[1, 2, 3], nTop=2, ncol=3)'
+  - 'scc.vizDimLoadings(adata, dims=[1], nfeatures=4, nTop=2, balanced=True, feature_cat="LR-pair")'
+failure_fixes:
+  - when: "no loadings found in adata.varm or uns['cellchat'][reduction]['loadings']"
+    suggest:
+      - 'Run PCA (populating adata.varm["PCs"]) or set uns["cellchat"][reduction]["loadings"] before calling vizDimLoadings.'
+    explanation: "vizDimLoadings raises ValueError(\"vizDimLoadings: no loadings found at adata.varm or adata.uns['cellchat'][{reduction!r}]['loadings']\")."
+  - when: "feature_cat is not one of LR-pair/ligand/signaling"
+    suggest:
+      - 'Pass feature_cat="LR-pair", "ligand", or "signaling".'
+    explanation: 'vizDimLoadings raises ValueError("invalid feature_cat") for any other value.'
+  - when: "projected=True but the projected loadings slot is absent"
+    suggest:
+      - 'Populate adata.varm[f"{key}_projected"] (or uns["cellchat"][reduction]["loadings_projected"]) before calling with projected=True, or call with projected=False.'
+    explanation: "vizDimLoadings raises ValueError naming the expected projected slot when projected=True and it is not found."
+  - when: "dims contains an index out of range of the resolved loadings"
+    suggest:
+      - "Pass 1-based dims within the number of available loading columns."
+    explanation: 'vizDimLoadings raises ValueError("`dims` out of range of available loadings").'
+related:
+  - spatialcellchat.load_db

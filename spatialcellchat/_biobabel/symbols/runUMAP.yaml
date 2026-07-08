@@ -1,0 +1,142 @@
+id: spatialcellchat.runUMAP
+import_path: spatialcellchat.preprocessing.runUMAP
+kind: function
+signature: >-
+  runUMAP(adata: ad.AnnData, n_neighbors: int = 30, n_components: int = 2,
+  metric: str = "correlation", n_epochs: Optional[int] = None,
+  learning_rate: float = 1.0, min_dist: float = 0.3, spread: float = 1.0,
+  set_op_mix_ratio: float = 1.0, local_connectivity: int = 1,
+  repulsion_strength: float = 1.0, negative_sample_rate: int = 5, a:
+  Optional[float] = None, b: Optional[float] = None, seed_use: int = 42,
+  metric_kwds: Optional[dict] = None, angular_rp_forest: bool = False,
+  verbose: bool = False, use_rep: str = "X_pca", obsm_key: str = "X_umap")
+  -> ad.AnnData
+purpose: Run UMAP on a cell embedding stored on adata and store the 2D (or n_components-D) result.
+description: >
+  Direct port of R's runUMAP (utilities.R:1805), built on the umap-learn
+  package. Reads adata.obsm[use_rep] (default "X_pca", typically written by
+  runPCA) or adata.X when use_rep=None, and fits umap.UMAP with the given
+  hyperparameters (random_state / np.random.seed both set from seed_use).
+
+  Orientation note (verified from source and docstring): R's runUMAP
+  transposes a (features x cells) matrix to (cells x features) before
+  fitting, because Seurat-style matrices are features x cells. This Python
+  port does NOT transpose: it consumes adata.obsm[use_rep] directly, which
+  is already cells x features per AnnData/scverse convention. Callers must
+  pass a representation whose first axis is cells (e.g. the output of
+  runPCA), not a raw genes x cells matrix.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object, modified in place.
+  - name: n_neighbors
+    type: int
+    required: false
+    default: 30
+    description: Passed to umap.UMAP.
+  - name: n_components
+    type: int
+    required: false
+    default: 2
+    description: Output embedding dimensionality.
+  - name: metric
+    type: str
+    required: false
+    default: '"correlation"'
+    description: Distance metric passed to umap.UMAP.
+  - name: n_epochs
+    type: Optional[int]
+    required: false
+    default: null
+    description: Passed to umap.UMAP.
+  - name: learning_rate
+    type: float
+    required: false
+    default: 1.0
+    description: Passed to umap.UMAP.
+  - name: min_dist
+    type: float
+    required: false
+    default: 0.3
+    description: Passed to umap.UMAP.
+  - name: spread
+    type: float
+    required: false
+    default: 1.0
+    description: Passed to umap.UMAP.
+  - name: set_op_mix_ratio
+    type: float
+    required: false
+    default: 1.0
+    description: Passed to umap.UMAP.
+  - name: local_connectivity
+    type: int
+    required: false
+    default: 1
+    description: Passed to umap.UMAP.
+  - name: repulsion_strength
+    type: float
+    required: false
+    default: 1.0
+    description: Passed to umap.UMAP.
+  - name: negative_sample_rate
+    type: int
+    required: false
+    default: 5
+    description: Passed to umap.UMAP.
+  - name: a
+    type: Optional[float]
+    required: false
+    default: null
+    description: Passed to umap.UMAP.
+  - name: b
+    type: Optional[float]
+    required: false
+    default: null
+    description: Passed to umap.UMAP.
+  - name: seed_use
+    type: int
+    required: false
+    default: 42
+    description: Random seed (R's seed.use); used for both np.random.seed and umap.UMAP's random_state.
+  - name: metric_kwds
+    type: Optional[dict]
+    required: false
+    default: null
+    description: Passed to umap.UMAP.
+  - name: angular_rp_forest
+    type: bool
+    required: false
+    default: false
+    description: Passed to umap.UMAP.
+  - name: verbose
+    type: bool
+    required: false
+    default: false
+    description: Passed to umap.UMAP.
+  - name: use_rep
+    type: str
+    required: false
+    default: '"X_pca"'
+    description: obsm key to embed (cells x features layout). Set to None to consume adata.X instead.
+  - name: obsm_key
+    type: str
+    required: false
+    default: '"X_umap"'
+    description: obsm key that will receive the UMAP embedding.
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData).
+mutates: >-
+  execution_class=builder; mutates adata.obsm[obsm_key] in place;
+  returns_kind=same_object
+requires: []
+writes:
+  - obsm.X_umap
+examples:
+  - pp.runUMAP(A, n_neighbors=5, n_components=2, seed_use=1, use_rep="X_pca")
+  - pp.runUMAP(A, n_neighbors=5, seed_use=99, use_rep="X_pca")
+failure_fixes: []
+related:
+  - spatialcellchat.runPCA

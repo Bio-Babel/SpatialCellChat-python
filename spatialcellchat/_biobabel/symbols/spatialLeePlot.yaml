@@ -1,0 +1,213 @@
+id: spatialcellchat.spatialLeePlot
+import_path: spatialcellchat.viz_spatial.spatialLeePlot
+kind: function
+signature: >-
+  spatialLeePlot(adata: ad.AnnData, group_by2: Union[str, Sequence],
+  group_by1: Optional[Union[str, Sequence]] = None, x_levels:
+  Optional[Sequence[str]] = None, y_levels: Optional[Sequence[str]] = None,
+  lw_type: str = "Itself", lw: Optional[sparse.spmatrix] = None,
+  interaction_range: float = 250.0, contact_range: float = 10.0, cutoff: bool
+  = True, cutoff_lee: float = 0.0, type: str = "heatmap", color_use:
+  Optional[Sequence[str]] = None, color_heatmap: str = "Reds",
+  reverse_colorscale: bool = False, n_colors: int = 6, dot_size:
+  Sequence[float] = (1.0, 6.0), angle_x: float = 45.0, xlabel: Optional[str] =
+  None, ylabel: Optional[str] = None, title_name: Optional[str] = None,
+  legend_title: Optional[str] = None, font_size: int = 10, font_size_title:
+  int = 10, x_lab_rot: float = 45.0, row_show: Optional[Sequence] = None,
+  col_show: Optional[Sequence] = None) -> Figure
+purpose: Plot Lee's spatial co-occurrence statistic between two (categorical or continuous) per-cell feature sets.
+description: >
+  Mirrors R's spatialLeePlot (visualization.R:8118). Only the
+  categorical-or-matrix, non-comparison branch is ported (a single AnnData,
+  no merged-object mode). Each of `group_by1` (y-axis, defaults to
+  adata.obs["active_ident"] when None) and `group_by2` (x-axis) is resolved
+  independently into either a categorical label vector (an adata.obs column
+  name, or a raw categorical/vector — one-hot encoded via a model-matrix-style
+  encoding) or a continuous feature matrix (a pandas.DataFrame or 2-D
+  array/sparse matrix, rows = cells, columns = features — used as-is, no
+  one-hot encoding); the tutorial demonstrates both forms (categorical
+  Hot/Cold/Other label via `group_by2="SecretedHotspot"`, and continuous
+  per-cell expression/centrality matrices via `group_by1=mat1,
+  group_by2=mat2`). Builds the spatial weight matrix W from `lw` if given,
+  else from `lw_type`: "Itself" is the identity (no spatial smoothing),
+  "contact.range"/"interaction.range" call computeCellDistance directly on
+  adata.obsm["spatial"] (with interaction_range/contact_range) and derive a
+  contact-adjacency or inverse-distance row-standardised weight matrix — this
+  branch needs no adata.uns state, only obsm["spatial"]. Computes Lee's L
+  statistic for every (group_by1 column, group_by2 column) pair into a
+  DataFrame, optionally NaN-masking entries <= cutoff_lee (cutoff=True), then
+  renders as a heatmap (type="heatmap", default), dot plot (type="dot"), or a
+  text-table figure of the raw matrix (type="data"). Purely reads adata; does
+  not mutate it.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] and the obs column(s)/matrices named by group_by1/group_by2.
+  - name: group_by2
+    type: Union[str, Sequence]
+    required: true
+    default: null
+    description: x-axis grouping — an adata.obs column name, a raw label vector, or a cells x features matrix/DataFrame.
+  - name: group_by1
+    type: Optional[Union[str, Sequence]]
+    required: false
+    default: null
+    description: y-axis grouping, same accepted forms as group_by2; defaults to adata.obs["active_ident"] when None.
+  - name: x_levels
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict/reorder the x-axis (group_by2) categories/columns.
+  - name: y_levels
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Restrict/reorder the y-axis (group_by1) categories/columns.
+  - name: lw_type
+    type: str
+    required: false
+    default: Itself
+    description: >-
+      Spatial weight matrix when lw is not supplied: "Itself" (identity,
+      no spatial smoothing), "contact.range", or "interaction.range"
+      (the latter two computed from obsm["spatial"] via computeCellDistance).
+  - name: lw
+    type: Optional[scipy.sparse.spmatrix]
+    required: false
+    default: null
+    description: Precomputed spatial weight matrix, overriding lw_type.
+  - name: interaction_range
+    type: float
+    required: false
+    default: 250.0
+    description: Passed to computeCellDistance when lw_type="interaction.range" and lw is None.
+  - name: contact_range
+    type: float
+    required: false
+    default: 10.0
+    description: Passed to computeCellDistance when lw_type="contact.range" and lw is None.
+  - name: cutoff
+    type: bool
+    required: false
+    default: true
+    description: When True, mask Lee's-L entries <= cutoff_lee to NaN before plotting.
+  - name: cutoff_lee
+    type: float
+    required: false
+    default: 0.0
+    description: Threshold used by the cutoff mask.
+  - name: type
+    type: str
+    required: false
+    default: heatmap
+    description: '"heatmap" (annotated heatmap), "dot" (dot plot), or "data" (text-table figure of the raw Lee''s-L matrix).'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Colors for the "dot" plot mode.
+  - name: color_heatmap
+    type: str
+    required: false
+    default: Reds
+    description: Named colormap for the "heatmap" mode.
+  - name: reverse_colorscale
+    type: bool
+    required: false
+    default: false
+    description: Reverse the heatmap colormap direction.
+  - name: n_colors
+    type: int
+    required: false
+    default: 6
+    description: Number of discrete colormap steps.
+  - name: dot_size
+    type: Sequence[float]
+    required: false
+    default: (1.0, 6.0)
+    description: (min, max) marker size range for the "dot" plot mode.
+  - name: angle_x
+    type: float
+    required: false
+    default: 45.0
+    description: Kept for R-argument parity (dot-plot label angle).
+  - name: xlabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: x-axis label override.
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: y-axis label override.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Figure title.
+  - name: legend_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Legend/colorbar title override.
+  - name: font_size
+    type: int
+    required: false
+    default: 10
+    description: Axis/tick font size.
+  - name: font_size_title
+    type: int
+    required: false
+    default: 10
+    description: Title font size.
+  - name: x_lab_rot
+    type: float
+    required: false
+    default: 45.0
+    description: x tick label rotation, in degrees.
+  - name: row_show
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict the rendered matrix to these row labels (post x/y_levels).
+  - name: col_show
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict the rendered matrix to these column labels (post x/y_levels).
+returns: >-
+  A matplotlib.figure.Figure: an annotated heatmap (type="heatmap"), a dot
+  plot (type="dot"), or a text-table rendering of the raw Lee's-L matrix
+  (type="data", oriented rows=group_by1, columns=group_by2).
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"] and the obs
+  column(s)/matrices named by group_by1/group_by2 only; does not mutate
+  adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+writes: []
+examples:
+  - >-
+    scc.spatialLeePlot(sub, group_by2="SecretedHotspot", cutoff_lee=0.05,
+    y_levels=("Hot", "Cold", "Other"))
+  - >-
+    scc.spatialLeePlot(sub, group_by1=mat1, group_by2=mat2,
+    lw_type="interaction.range")
+failure_fixes:
+  - when: "lw_type is not one of 'Itself', 'contact.range', 'interaction.range' and lw is None"
+    suggest:
+      - "Pass lw_type='Itself', 'contact.range', or 'interaction.range', or supply lw= directly."
+    explanation: >-
+      Raises ValueError("lw_type must be one of 'Itself', 'contact.range',
+      'interaction.range'.").
+  - when: "group_by1/group_by2 name an adata.obs column that does not exist"
+    suggest:
+      - "Pass an existing adata.obs column name, or a raw label vector / matrix directly."
+    explanation: adata.obs[<name>] raises KeyError for a missing column.
+related:
+  - spatialcellchat.spatialGiPlot
+  - spatialcellchat.computeCellDistance
+  - spatialcellchat.plotStatistics_Lee

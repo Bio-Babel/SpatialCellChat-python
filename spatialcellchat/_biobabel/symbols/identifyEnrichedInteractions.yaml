@@ -1,0 +1,105 @@
+id: spatialcellchat.identifyEnrichedInteractions
+import_path: spatialcellchat.modeling.identifyEnrichedInteractions
+kind: function
+signature: >-
+  identifyEnrichedInteractions(adata: ad.AnnData, from_: Sequence, to:
+  Sequence, bidirection: bool = False, pair_only: bool = True, pairLR_use0:
+  Optional[pd.DataFrame] = None, thresh: float = 0.05) -> pd.DataFrame
+purpose: Identify all significant interactions between specified cell groups.
+description: >
+  Direct port of R's identifyEnrichedInteractions (modeling.R:2613-2683).
+  Reads adata.uns["cellchat"]["net"]["pairwiseRank"] (a nested dict keyed
+  by [from_group][to_group] of per-pair DataFrames with "prob"/"pval"
+
+  columns, set by rankNetPairwise) — raises if net is missing or
+  "pairwiseRank" is absent. from_ and to must be the same length (raises
+  otherwise) and are each resolved to 0-based group indices (1-based
+  integers per R convention, or group names looked up in
+  pairwiseRank.keys()). If bidirection=True, the reverse (to -> from) pairs
+  are appended to the from/to index lists. When pairLR_use0 is not
+  supplied, it is built by concatenating, for each (from, to) pair, the
+  rows of pairwiseRank[from][to] with pval < thresh. For every (from, to)
+  pair, pval is discretized into {1: >0.05, 2: (0.01, 0.05], 3: <=0.01} and
+  prob is zeroed wherever the discretized pval is 1 (not significant);
+  prob values of exactly 0 are then treated as NaN and rows that are NaN
+  across every (from, to) column are dropped. If pair_only=True (default)
+  the returned frame is restricted to the ligand/receptor columns. This
+  function only reads adata.uns["cellchat"]["net"]; it does not mutate
+  adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object providing uns["cellchat"]["net"]["pairwiseRank"] (written by
+      rankNetPairwise).
+  - name: from_
+    type: Sequence
+    required: true
+    default: null
+    description: >-
+      Source cell-group indices (1-based, R convention) or names. Must be
+      the same length as to.
+  - name: to
+    type: Sequence
+    required: true
+    default: null
+    description: >-
+      Target cell-group indices (1-based, R convention) or names. Must be
+      the same length as from_.
+  - name: bidirection
+    type: bool
+    required: false
+    default: false
+    description: When True, the reverse (to -> from) pairs are appended alongside the given (from, to) pairs.
+  - name: pair_only
+    type: bool
+    required: false
+    default: true
+    description: When True, restrict the returned DataFrame to the ligand/receptor columns only.
+  - name: pairLR_use0
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: >-
+      Pre-computed LR pair table to use directly; otherwise it is built from
+      net["pairwiseRank"][from][to] entries with pval < thresh.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold used both to pre-select rows into pairLR_use0 (when not supplied) and to discretize pval into significance bins.
+returns: >-
+  A new pandas.DataFrame of significant LR interactions between the
+  specified cell-group pairs. If pair_only=True (default), only the
+  "ligand" and "receptor" columns are returned; otherwise the full
+  pairLR_use0 frame (filtered to rows with at least one non-NaN prob across
+  the requested from/to columns). Does not modify adata.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net']['pairwiseRank']
+  only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.pairwiseRank
+writes: []
+examples:
+  - "modeling.identifyEnrichedInteractions(adata, from_=['A'], to=['B'], thresh=0.05)"
+  - "modeling.identifyEnrichedInteractions(adata, from_=['A'], to=['B', 'A'])"
+  - "modeling.identifyEnrichedInteractions(adata, from_=[1], to=[2], bidirection=True, pair_only=False)"
+failure_fixes:
+  - when: "uns['cellchat']['net']['pairwiseRank'] is missing"
+    suggest:
+      - "Run rankNetPairwise(adata) first."
+    explanation: >-
+      identifyEnrichedInteractions raises ValueError("The interactions
+      between pairwise cell groups have not been extracted! Please first
+      run rankNetPairwise(adata)") when net is None or 'pairwiseRank' is
+      absent.
+  - when: "len(from_) != len(to)"
+    suggest:
+      - "Pass from_ and to sequences of the same length (one entry per source-target pair)."
+    explanation: >-
+      identifyEnrichedInteractions raises ValueError("The length of 'from'
+      and 'to' must be the same!") when the two sequences differ in length.
+related:
+  - spatialcellchat.rankNetPairwise

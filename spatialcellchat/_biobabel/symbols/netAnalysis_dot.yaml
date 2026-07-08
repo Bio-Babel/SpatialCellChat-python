@@ -1,0 +1,121 @@
+id: spatialcellchat.netAnalysis_dot
+import_path: spatialcellchat.viz_basic.netAnalysis_dot
+kind: function
+signature: >-
+  netAnalysis_dot(adata: ad.AnnData, slot_name: str = "netP", pattern:
+  Literal["outgoing", "incoming"] = "outgoing", cutoff: Optional[float] =
+  None, color_use: Optional[Sequence[str]] = None, pathway_show:
+  Optional[Sequence[str]] = None, group_show: Optional[Sequence[str]] = None,
+  shape: str = "o", dot_size: Tuple[float, float] = (1.0, 3.0), dot_alpha:
+  float = 1.0, main_title: Optional[str] = None, font_size: int = 10,
+  font_size_title: int = 12) -> Figure
+purpose: Dot plot of NMF-derived outgoing/incoming communication patterns (cell groups x signaling pathways, dot size = pattern contribution product).
+description: >
+  Direct port of R's netAnalysis_dot (visualization.R:4044). Reads
+  uns["cellchat"][slot_name]["pattern"][pattern] (written by
+  identifyCommunicationPatterns; raises ValueError if slot_name or the
+  pattern sub-key is missing). For each (CellGroup, Signaling) pair, computes
+  Contribution = cell-pattern contribution * signaling-pattern contribution
+  after zeroing entries below cutoff (default 1/nPatterns), keeps only the
+  top-1 contributing pattern per (cell, signaling) pair, zeroes out pairs
+  where the underlying pattern "data" matrix entry is exactly zero, and
+  renders a scatter plot with cell groups on the y-axis (reversed order,
+  mirroring ggplot2's scale_y_discrete(limits=rev(...))) and signaling
+  pathways on the x-axis; dot size is linearly scaled between dot_size[0]
+  and dot_size[1] over the range of non-NaN contributions, dot colour is
+  per-cell-group (scPalette by default).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with uns["cellchat"][slot_name]["pattern"][pattern] populated by identifyCommunicationPatterns.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Which uns["cellchat"] sub-slot holds the "pattern" dict.
+  - name: pattern
+    type: 'Literal["outgoing", "incoming"]'
+    required: false
+    default: outgoing
+    description: Which pattern direction to plot; raises ValueError for any other value.
+  - name: cutoff
+    type: Optional[float]
+    required: false
+    default: null
+    description: Minimum per-side contribution kept before multiplying; defaults to 1 / number of patterns.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: One colour per cell group; defaults to scPalette(len(cell groups)).
+  - name: pathway_show
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset/order the x-axis signaling pathways; pathways absent from the data are added with zero contribution (only when more than one is missing).
+  - name: group_show
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset/order the y-axis cell groups.
+  - name: shape
+    type: str
+    required: false
+    default: o
+    description: Matplotlib marker spec for the scatter dots.
+  - name: dot_size
+    type: Tuple[float, float]
+    required: false
+    default: (1.0, 3.0)
+    description: (min, max) marker-size mapping (scaled by 20 for matplotlib's points^2 units) over the contribution range.
+  - name: dot_alpha
+    type: float
+    required: false
+    default: 1.0
+    description: Marker alpha.
+  - name: main_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; auto-derived ("Outgoing/Incoming communication patterns of ... cells") from pattern when None.
+  - name: font_size
+    type: int
+    required: false
+    default: 10
+    description: Tick label font size.
+  - name: font_size_title
+    type: int
+    required: false
+    default: 12
+    description: Title font size.
+returns: A new matplotlib.figure.Figure with the dot plot, laid out via plt.subplots() and fig.tight_layout().
+mutates: >-
+  execution_class=pure_function; reads uns["cellchat"][slot_name]["pattern"]
+  via spatialcellchat._anndata.cellchat_dict; copies the cell/signaling
+  DataFrames internally (data1.copy(), data2.copy()) so no mutation of the
+  stored pattern tables occurs; does not write back into
+  adata.uns/obs/var; returns_kind=new_object
+requires:
+  - uns.cellchat.netP
+  - uns.cellchat.netP.pattern.outgoing
+examples:
+  - 'scc.netAnalysis_dot(adata, pattern="outgoing")'
+  - 'scc.netAnalysis_dot(adata, pattern="outgoing", pathway_show=["pair0", "pair1"], group_show=["G0", "G1"])'
+  - 'scc.netAnalysis_dot(adata, slot_name="netP", pattern="incoming", cutoff=0.2, dot_size=(2.0, 5.0))'
+failure_fixes:
+  - when: "pattern is not 'outgoing' or 'incoming'"
+    suggest:
+      - 'Pass pattern="outgoing" or pattern="incoming".'
+    explanation: "netAnalysis_dot raises ValueError(\"`pattern` must be 'outgoing' or 'incoming'\") for any other value."
+  - when: "uns['cellchat'][slot_name] is missing"
+    suggest:
+      - "Run computeCommunProbPathway (or the modeling step that populates netP) before calling netAnalysis_dot."
+    explanation: "netAnalysis_dot raises ValueError(f\"adata.uns['cellchat'][{slot_name!r}] missing\")."
+  - when: "the pattern sub-key ('pattern' or pattern direction) is missing from slot_name"
+    suggest:
+      - "Run identifyCommunicationPatterns(adata, pattern=...) before calling netAnalysis_dot with the matching pattern= argument."
+    explanation: 'netAnalysis_dot raises ValueError("Run identifyCommunicationPatterns first to populate the slot") when slot["pattern"] or slot["pattern"][pattern] is absent.'
+related:
+  - spatialcellchat.identifyCommunicationPatterns

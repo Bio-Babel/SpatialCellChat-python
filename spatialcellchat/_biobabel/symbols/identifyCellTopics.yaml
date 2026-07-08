@@ -1,0 +1,131 @@
+id: spatialcellchat.identifyCellTopics
+import_path: spatialcellchat.analysis_topics.identifyCellTopics
+kind: function
+signature: >-
+  identifyCellTopics(adata: ad.AnnData, slot_name: str = "net", pattern:
+  Literal["incoming", "outgoing"] = "incoming", do_scale: bool = False,
+  topic_k: Sequence[int] = tuple(range(5, 51, 5)), n_reps: int = 10, prop:
+  float = 0.33, tol: float = 1e-6, maxit: int = 600, L1: Sequence[float] =
+  (0.0, 0.0), verbose: bool = True, seed_use: int = 666) -> ad.AnnData
+purpose: Identify per-cell signaling "topics" via L1-regularised NMF on the network centrality matrix.
+description: >
+  Direct port of R's identifyCellTopics (analysis.R:3393). Per the project's
+  Tier-2 design contract, R's RcppML::nmf(L1=...) is replaced by sklearn's
+  solver='cd' with alpha_W=L1[0], alpha_H=L1[1], l1_ratio=1.0, init='nndsvd'.
+  Requires slot["centr.cell"] (uns["cellchat"][slot_name]["centr.cell"]),
+  written by netAnalysis_computeCentrality(do_group=False); raises when
+  absent or empty. Selects the "outdeg" (pattern="outgoing") or "indeg"
+  (pattern="incoming") measure slice of centr.cell (shape (nC, nLR)),
+  transposes to features-by-samples (nLR, nC), optionally row-scales by RMS
+  (do_scale=True, mirroring Seurat::ScaleData(do.center=FALSE)). If
+  len(topic_k) > 1, cross-validates rank choice by calling suggestK1 on the
+  (nLR, nC) matrix and stores the result dict under
+  slot["tmp"]["suggestK"][pattern] (no topic embedding is fit in this
+  branch). If len(topic_k) == 1, fits a single L1-regularised NMF at that
+  rank k, rescales W/H so factor norms are symmetric (mirrors R's
+  W <- w %*% diag(sqrt(d)); H <- diag(sqrt(d)) %*% h), and stores
+  {"cell": H.T as (nC, k) DataFrame indexed by adata.obs_names, "signaling":
+  W as (nLR, k) DataFrame indexed by signaling/LR-pair names, "iter": NMF
+  iteration count} under slot["topic"][pattern].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object with uns["cellchat"][slot_name]["centr.cell"] populated by
+      netAnalysis_computeCentrality(do_group=False).
+  - name: slot_name
+    type: str
+    required: false
+    default: net
+    description: Which uns["cellchat"] slot holds centr.cell / receives the topic result.
+  - name: pattern
+    type: 'Literal["incoming", "outgoing"]'
+    required: false
+    default: incoming
+    description: '"incoming" uses the "indeg" centrality measure; "outgoing" uses "outdeg".'
+  - name: do_scale
+    type: bool
+    required: false
+    default: false
+    description: If True, row-scale the (nLR, nC) input matrix by its RMS (Seurat ScaleData(do.center=FALSE) analogue).
+  - name: topic_k
+    type: Sequence[int]
+    required: false
+    default: tuple(range(5, 51, 5))
+    description: Candidate rank(s). len > 1 triggers cross-validation via suggestK1; len == 1 fits a single NMF and writes the topic embedding.
+  - name: n_reps
+    type: int
+    required: false
+    default: 10
+    description: Random restarts per k, forwarded to suggestK1 when topic_k has multiple values.
+  - name: prop
+    type: float
+    required: false
+    default: 0.33
+    description: Held-out sub-block proportion for suggestK1's cross-validation.
+  - name: tol
+    type: float
+    required: false
+    default: 1e-6
+    description: NMF convergence tolerance.
+  - name: maxit
+    type: int
+    required: false
+    default: 600
+    description: Maximum NMF iterations.
+  - name: L1
+    type: Sequence[float]
+    required: false
+    default: (0.0, 0.0)
+    description: L1 penalties for (W, H), forwarded to the NMF solver.
+  - name: verbose
+    type: bool
+    required: false
+    default: true
+    description: Kept for API parity; not read by the current implementation body.
+  - name: seed_use
+    type: int
+    required: false
+    default: 666
+    description: RNG seed for NMF and suggestK1.
+returns: >-
+  The mutated adata (same object). When len(topic_k) > 1, only
+  uns["cellchat"][slot_name]["tmp"]["suggestK"][pattern] is written (the
+  suggestK1 output dict). When len(topic_k) == 1,
+  uns["cellchat"][slot_name]["topic"][pattern] is written with keys "cell"
+  ((nC, k) DataFrame), "signaling" ((nLR, k) DataFrame), and "iter" (int).
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat'][slot_name] in place
+  (writes either tmp.suggestK.<pattern> or topic.<pattern>, depending on
+  len(topic_k)); returns_kind=same_object
+requires:
+  - uns.cellchat.net.centr.cell
+writes:
+  - uns.cellchat.net.topic.incoming
+  - uns.cellchat.net.topic.outgoing
+  - uns.cellchat.net.tmp.suggestK.incoming
+  - uns.cellchat.net.tmp.suggestK.outgoing
+examples:
+  - "scc.identifyCellTopics(sub, slot_name='net', pattern='incoming', topic_k=(12,), verbose=False)"
+  - "scc.identifyCellTopics(sub, slot_name='net', pattern='outgoing', topic_k=tuple(range(5, 51, 5)))"
+failure_fixes:
+  - when: "pattern is not 'incoming' or 'outgoing'"
+    suggest:
+      - "Pass pattern='incoming' or pattern='outgoing'."
+    explanation: >-
+      identifyCellTopics raises ValueError("`pattern` must be 'incoming' or
+      'outgoing'.").
+  - when: "slot['centr.cell'] is missing or empty"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata, do_group=False) before identifyCellTopics."
+    explanation: >-
+      identifyCellTopics raises ValueError("Please run
+      `netAnalysis_computeCentrality` with `do.group=F` to compute the
+      network centrality scores!").
+related:
+  - spatialcellchat.suggestK1
+  - spatialcellchat.identifyTopicCommunities
+  - spatialcellchat.extractTopicSignaling
+  - spatialcellchat.identifyCommunicationPatterns

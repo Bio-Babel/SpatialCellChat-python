@@ -1,0 +1,34 @@
+id: spatialcellchat.extractGene
+import_path: spatialcellchat.database.extractGene
+kind: function
+signature: 'def extractGene(CellChatDB: Mapping[str, pd.DataFrame]) -> list[str]:'
+purpose: Return the unique union of all gene symbols referenced by a CellChatDB.
+description: >
+  Collects every gene symbol implied by a CellChatDB's interaction table:
+  ligand/receptor symbols (expanded through complex subunits via
+  extractGeneSubset), and cofactor genes referenced from the `agonist`,
+  `antagonist`, `co_A_receptor`, `co_I_receptor` columns (expanded through
+  the cofactor table's `cofactor*` subunit columns). Also invokes
+  checkGeneSymbol on the complex table, the cofactor table, and the raw
+  ligand/receptor symbols purely for its diagnostic print side effect (the
+  return value of those calls is discarded). Returns the final deduplicated
+  union, order preserved (first occurrence wins).
+parameters:
+  - name: CellChatDB
+    type: Mapping[str, pandas.DataFrame]
+    required: true
+    default: null
+    description: A CellChatDB dict, as returned by load_db.
+returns: >
+  A new list of unique gene symbols (ligands/receptors, their complex
+  subunits, and referenced cofactor subunits), in first-occurrence order.
+mutates: 'execution_class=pure_function; no in-place mutation of `CellChatDB` or its tables (only prints a diagnostic via checkGeneSymbol for unofficial symbols); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.extractGene(db)'
+failure_fixes: []
+related:
+  - spatialcellchat.load_db
+  - spatialcellchat.extractGeneSubset
+  - spatialcellchat.checkGeneSymbol

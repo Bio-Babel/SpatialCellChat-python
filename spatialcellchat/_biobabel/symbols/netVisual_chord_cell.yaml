@@ -1,0 +1,207 @@
+id: spatialcellchat.netVisual_chord_cell
+import_path: spatialcellchat.viz_network.netVisual_chord_cell
+kind: function
+signature: >-
+  netVisual_chord_cell(adata: ad.AnnData, signaling: Optional[Union[str,
+  Sequence[str]]] = None, net: Optional[Union[np.ndarray, pd.DataFrame]] =
+  None, slot_name: str = "netP", color_use: Optional[Union[Sequence[str],
+  Dict[str, str]]] = None, group: Optional[Dict[str, str]] = None,
+  cell_order: Optional[Sequence[str]] = None, sources_use:
+  Optional[Sequence] = None, targets_use: Optional[Sequence] = None,
+  lab_cex: float = 0.8, small_gap: float = 1.0, big_gap: float = 10.0,
+  annotation_track_height: float = 0.03, remove_isolate: bool = False,
+  link_visible: bool = True, scale: bool = False, directional: int = 1,
+  link_target_prop: bool = True, reduce: float = -1.0, transparency: float =
+  0.4, link_border: Optional[str] = None, title_name: Optional[str] = None,
+  show_legend: bool = False, legend_pos_x: float = 20.0, legend_pos_y: float =
+  20.0, n_col: Optional[int] = None, thresh: float = 0.05, figsize:
+  Tuple[float, float] = (7.0, 7.0)) -> Union[Figure, List[Figure]]
+purpose: Chord diagram of cell-cell communication for a signaling pathway (or an arbitrary net) read off an AnnData.
+description: >
+  Direct port of R's netVisual_chord_cell (visualization.R:3262). Exactly
+  one of `signaling` or `net` must be given (raises otherwise). When
+  `signaling` is given: resolves the matching L-R pairs from
+  adata.uns['cellchat']['LR']['LRsig'] via searchPair(key='pathway_name'),
+  reads adata.uns['cellchat']['net']['prob']/['pval'] (zeroing entries with
+  pval > thresh), restricts to the pairs' entries in net['dimnames'] with
+  nonzero total, then dispatches on slot_name: "netP" sums the selected
+  pairs into one (K, K) matrix and renders a single aggregate chord diagram
+  via netVisual_chord_cell_internal; "net" renders one chord diagram per
+  surviving L-R pair (returned as a list of Figures). When `net` is given
+  directly instead, it is passed straight through to
+  netVisual_chord_cell_internal (no adata state is read in that branch).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns['cellchat']['net']['prob'] and uns['cellchat']['LR']['LRsig'] populated (required only when `signaling` is used).
+  - name: signaling
+    type: Optional[Union[str, Sequence[str]]]
+    required: false
+    default: null
+    description: Pathway name(s) to look up in the LR table's pathway_name column. Mutually exclusive with `net` (raises if neither is given).
+  - name: net
+    type: Optional[Union[numpy.ndarray, pandas.DataFrame]]
+    required: false
+    default: null
+    description: A raw matrix/long-form DataFrame passed straight through to netVisual_chord_cell_internal, bypassing adata entirely.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" renders one aggregate pathway-level chord diagram; "net" renders one chord diagram per surviving L-R pair. Only used with `signaling`.'
+  - name: color_use
+    type: Optional[Union[Sequence[str], Dict[str, str]]]
+    required: false
+    default: null
+    description: Per-cell-group colours forwarded to netVisual_chord_cell_internal.
+  - name: group
+    type: Optional[Dict[str, str]]
+    required: false
+    default: null
+    description: Forwarded to netVisual_chord_cell_internal (kept for R-argument parity, not read by the rendering path).
+  - name: cell_order
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit sector display order.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these source cell groups.
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these target cell groups.
+  - name: lab_cex
+    type: float
+    required: false
+    default: 0.8
+    description: Sector label font-size scale.
+  - name: small_gap
+    type: float
+    required: false
+    default: 1.0
+    description: Gap (degrees) between adjacent sectors.
+  - name: big_gap
+    type: float
+    required: false
+    default: 10.0
+    description: Gap (degrees) at the sector-order wrap-around point.
+  - name: annotation_track_height
+    type: float
+    required: false
+    default: 0.03
+    description: Fractional radial height of the sector annotation track.
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: Drop cell groups with no surviving edges instead of showing them via negligible-weight self-loops.
+  - name: link_visible
+    type: bool
+    required: false
+    default: true
+    description: Kept for R-argument parity.
+  - name: scale
+    type: bool
+    required: false
+    default: false
+    description: Row-normalise sector arc lengths.
+  - name: directional
+    type: int
+    required: false
+    default: 1
+    description: Link directionality style.
+  - name: link_target_prop
+    type: bool
+    required: false
+    default: true
+    description: Scale link width by the target's proportion of incoming weight.
+  - name: reduce
+    type: float
+    required: false
+    default: -1.0
+    description: Minimum-link-width-fraction pruning threshold; -1.0 disables pruning.
+  - name: transparency
+    type: float
+    required: false
+    default: 0.4
+    description: Link fill opacity.
+  - name: link_border
+    type: Optional[str]
+    required: false
+    default: null
+    description: Kept for R-argument parity.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; defaults to "<pathway> signaling pathway network" in the netP branch, or the L-R pair's interaction_name_2 per-pair in the net branch.
+  - name: show_legend
+    type: bool
+    required: false
+    default: false
+    description: Draw a sector-colour legend.
+  - name: legend_pos_x
+    type: float
+    required: false
+    default: 20.0
+    description: Legend x offset.
+  - name: legend_pos_y
+    type: float
+    required: false
+    default: 20.0
+    description: Legend y offset.
+  - name: n_col
+    type: Optional[int]
+    required: false
+    default: null
+    description: Kept for R-argument parity (grid layout hint for the returned list of per-pair figures); not applied by this function itself.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold; net['prob'] entries with pval > thresh are zeroed before pathway/pair selection.
+  - name: figsize
+    type: Tuple[float, float]
+    required: false
+    default: (7.0, 7.0)
+    description: Matplotlib figure size in inches, per panel.
+returns: >-
+  slot_name="netP" (or `net` given directly): a single matplotlib.figure.Figure.
+  slot_name="net" (with `signaling`): a list of matplotlib.figure.Figure, one
+  per surviving L-R pair.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net'] and
+  ['LR']['LRsig'] only (when `signaling` is used); does not mutate adata;
+  returns_kind=new_object
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "scc.netVisual_chord_cell(sub, signaling='TNF', slot_name='netP')"
+  - "scc.netVisual_chord_cell(sub, signaling=['TNF'], slot_name='net', thresh=0.05)"
+  - "scc.netVisual_chord_cell(sub, net=net_sum_df, title_name='custom')"
+failure_fixes:
+  - when: "neither signaling nor net is given"
+    suggest:
+      - "Pass signaling= (a pathway name) or net= (a raw matrix)."
+    explanation: "Raises ValueError(\"Please assign values to either `signaling` or `net`\")."
+  - when: "no L-R pair of `signaling` has significant communication"
+    suggest:
+      - "Lower thresh, or verify the pathway via subsetCommunication."
+    explanation: "Raises ValueError(f\"There is no significant communication of {signaling}\")."
+  - when: "slot_name is not 'netP' or 'net'"
+    suggest:
+      - "Pass slot_name='netP' or slot_name='net'."
+    explanation: "Raises ValueError(f\"Unknown slot_name: {slot_name}\")."
+related:
+  - spatialcellchat.netVisual_chord_cell_internal
+  - spatialcellchat.netVisual_chord_gene
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.identifyOverExpressedInteractions

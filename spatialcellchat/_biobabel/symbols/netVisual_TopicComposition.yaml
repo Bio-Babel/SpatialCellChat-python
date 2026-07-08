@@ -1,0 +1,228 @@
+id: spatialcellchat.netVisual_TopicComposition
+import_path: spatialcellchat.viz_heatmap.netVisual_TopicComposition
+kind: function
+signature: >-
+  netVisual_TopicComposition(adata: ad.AnnData, y_group: Union[str,
+  np.ndarray, pd.DataFrame], x_group: Optional[Union[str, np.ndarray,
+  pd.DataFrame]] = None, x_levels: Optional[Sequence[str]] = None, y_levels:
+  Optional[Sequence[str]] = None, scale_rows: bool = True, cutoff_prop: float
+  = 0.1, trim: float = 0.1, type_: str = "heatmap", color_use:
+  Optional[Sequence[str]] = None, color_heatmap: str = "RdPu", n_colors: int =
+  8, dot_size: Tuple[float, float] = (1.0, 6.0), angle_x: float = 45.0,
+  xlabel: Optional[str] = None, ylabel: Optional[str] = None, title_name:
+  Optional[str] = None, legend_title: Optional[str] = None, font_size: float =
+  8.0, font_size_title: float = 10.0, cluster_rows: bool = True, cluster_cols:
+  bool = False, clustering_distance_rows: str = "euclidean", x_lab_rot: float
+  = 45.0, row_show: Optional[Sequence] = None, col_show: Optional[Sequence] =
+  None, remove_isolate: bool = True) -> Figure
+purpose: Topic (NMF pattern) composition across cell groups, as a heatmap or dot plot.
+description: >
+  Direct port of R's netVisual_TopicComposition (visualization.R:4581).
+  Builds a (topic x cells) loading matrix `pred` from `y_group`: the
+  special strings "topicIn"/"topicOut" read
+  uns['cellchat']['net']['topic']['incoming'/'outgoing']['cell'] (a
+  cells x k DataFrame written by identifyCellTopics, transposed to
+  k x cells; note the R-inherited literal mapping is
+  y_group="topicIn"->pattern="incoming",
+  y_group="topicOut"->pattern="outgoing"); any other string is looked up as
+  an adata.obs column and one-hot expanded per category; anything else
+  (ndarray/DataFrame) is used directly as a topic x cells matrix. `x_group`
+  resolves similarly: None/str looks up an adata.obs column (falling back
+  to "cellchat_idents"/"active_ident"/"cell.type" when x_group is None),
+  and per (topic, cell-group) cell a trimmed mean
+  (thresholdedMean(trim=trim)) of the topic loading is computed to build
+  the (cell-group x topic) proportion matrix, then transposed to
+  (topic x cell-group) and row- or column-normalised (scale_rows). Columns
+  whose max proportion is below cutoff_prop are dropped when
+  remove_isolate=True. x_levels/y_levels reorder/subset the axes; row_show/
+  col_show apply an additional explicit subset. For type_="dot" draws a
+  dot plot sized+coloured by proportion; for type_="heatmap" (default)
+  optionally reorders rows/columns via an average-linkage dendrogram leaf
+  order (cluster_rows/cluster_cols with clustering_distance_rows) and
+  renders a brewer-palette heatmap (white-anchored) with a bottom
+  cell-group colour strip and a rotated colorbar. Pure reader; does not
+  mutate adata. Passing a DataFrame x_group raises NotImplementedError
+  (the spot-deconvolution branch is not implemented/tested).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object providing uns['cellchat']['net']['topic'] (for y_group in {"topicIn","topicOut"}) and/or the relevant obs columns.
+  - name: y_group
+    type: Union[str, numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: '"topicIn"/"topicOut"/"inmfNorm" (reads uns cellchat net topic slots), an adata.obs column name, or a topic x cells matrix/DataFrame.'
+  - name: x_group
+    type: Optional[Union[str, numpy.ndarray, pandas.DataFrame]]
+    required: false
+    default: null
+    description: adata.obs column of cell-group labels (defaults to cellchat_idents/active_ident/cell.type). A DataFrame x_group raises NotImplementedError.
+  - name: x_levels
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit ordering/subset of the cell-group (x) axis, applied before remove_isolate/row_show/col_show ordering.
+  - name: y_levels
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit ordering/subset of the topic (y) axis.
+  - name: scale_rows
+    type: bool
+    required: false
+    default: true
+    description: Normalise each topic's proportions across cell groups (row-wise) when True; else normalise per cell-group (column-wise).
+  - name: cutoff_prop
+    type: float
+    required: false
+    default: 0.1
+    description: When remove_isolate=True, drop cell-group columns whose maximum proportion across topics is below this cutoff.
+  - name: trim
+    type: float
+    required: false
+    default: 0.1
+    description: Trim fraction passed to thresholdedMean when averaging topic loadings within each cell group.
+  - name: type_
+    type: str
+    required: false
+    default: "heatmap"
+    description: '"heatmap" or "dot".'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group colours for the heatmap's bottom annotation strip. Defaults to scPalette(n_groups).
+  - name: color_heatmap
+    type: str
+    required: false
+    default: "RdPu"
+    description: RColorBrewer palette name (white-anchored) for the heatmap colormap.
+  - name: n_colors
+    type: int
+    required: false
+    default: 8
+    description: Brewer palette anchor count.
+  - name: dot_size
+    type: Tuple[float, float]
+    required: false
+    default: (1.0, 6.0)
+    description: (min, max) sizing range used for type_="dot".
+  - name: angle_x
+    type: float
+    required: false
+    default: 45.0
+    description: Accepted for API parity but not read anywhere in the function body; x_lab_rot is the parameter actually wired to both the heatmap and dot-plot x-tick rotation.
+  - name: xlabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: x-axis label (dot-plot path only).
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: y-axis label.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; for y_group in {"topicIn","topicOut"} defaults to "outgoing/incoming CCC topics"; heatmap path renders it as "Compositions of {title_name}".
+  - name: legend_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Colorbar / dot-size legend label. Defaults to "Proportion".
+  - name: font_size
+    type: float
+    required: false
+    default: 8.0
+    description: Tick-label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Title font size.
+  - name: cluster_rows
+    type: bool
+    required: false
+    default: true
+    description: Reorder topic rows by an average-linkage dendrogram leaf order (heatmap path only; the dendrogram glyph itself is not drawn).
+  - name: cluster_cols
+    type: bool
+    required: false
+    default: false
+    description: Reorder cell-group columns by an average-linkage dendrogram leaf order (heatmap path only).
+  - name: clustering_distance_rows
+    type: str
+    required: false
+    default: "euclidean"
+    description: Distance metric forwarded to scipy.spatial.distance.pdist for both row and column clustering (e.g. "euclidean", "correlation").
+  - name: x_lab_rot
+    type: float
+    required: false
+    default: 45.0
+    description: x-axis tick-label rotation in degrees (both heatmap and dot-plot paths).
+  - name: row_show
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Explicit topic (row) subsetting applied after remove_isolate/x_levels/y_levels.
+  - name: col_show
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Explicit cell-group (column) subsetting applied after remove_isolate/x_levels/y_levels.
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: true
+    description: Drop cell-group columns whose maximum proportion across topics is below cutoff_prop.
+returns: >-
+  A new matplotlib.figure.Figure: a heatmap (topics x cell groups) with a
+  cell-group colour strip and colorbar, or a dot plot when type_="dot".
+  Does not modify adata.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net']['topic']
+  and/or adata.obs only, does not mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.net.topic.incoming.cell
+  - uns.cellchat.net.topic.outgoing.cell
+writes: []
+examples:
+  - 'scc.netVisual_TopicComposition(sub, y_group="topicIn", x_group=None, cluster_rows=True)'
+  - 'scc.netVisual_TopicComposition(sub, y_group="topicOut", x_group="cellchat_idents", type_="dot")'
+  - 'scc.netVisual_TopicComposition(sub, y_group="topicIn", cutoff_prop=0.2, remove_isolate=True)'
+failure_fixes:
+  - when: "y_group is 'topicIn'/'topicOut'/'inmfNorm' but uns['cellchat']['net']['topic'][pattern] is missing"
+    suggest:
+      - "Run identifyCellTopics(adata) (and identifyTopicCommunities as needed) before calling netVisual_TopicComposition with y_group='topicIn'/'topicOut'."
+    explanation: >-
+      netVisual_TopicComposition raises
+      ValueError(f"adata.uns['cellchat']['net']['topic'][{pattern!r}]
+      missing.") when the resolved topic slot is absent.
+  - when: "y_group is a string that is neither a topic keyword nor a column of adata.obs"
+    suggest:
+      - "Pass y_group='topicIn'/'topicOut', an existing adata.obs column name, or a topic x cells matrix/DataFrame."
+    explanation: >-
+      netVisual_TopicComposition raises ValueError(f"y_group {y_group!r} not
+      in adata.obs.columns") in that case.
+  - when: "x_group cannot be resolved to an adata.obs column"
+    suggest:
+      - "Pass x_group as an existing adata.obs column name, or ensure one of cellchat_idents/active_ident/cell.type exists so x_group=None can resolve."
+    explanation: >-
+      netVisual_TopicComposition raises ValueError("Cannot resolve x.group
+      from adata.obs.") when x_group is None/str but no matching column is
+      found.
+  - when: "x_group is passed as a DataFrame/matrix"
+    suggest:
+      - "Pass x_group as a string adata.obs column name instead; the DataFrame/matrix (spot-deconvolution) code path is not implemented."
+    explanation: >-
+      netVisual_TopicComposition raises NotImplementedError("DataFrame
+      x.group is reserved for the spot-deconvolution branch and is not
+      driven by tests.") for non-string, non-None x_group.
+related:
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.identifyTopicCommunities
+  - spatialcellchat.netVisual_TopicSignaling

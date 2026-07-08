@@ -1,0 +1,33 @@
+id: spatialcellchat.geometricMean
+import_path: spatialcellchat.geometricMean
+kind: function
+signature: 'geometricMean(x: ''ArrayLike'', na_rm: ''bool'' = True) -> ''Union[float,
+  np.ndarray]'''
+purpose: Compute the geometric mean.
+description: >
+  Direct port of R's geometricMean (modeling.R:2556). For a 1-D vector
+  (R's is.null(nrow(x)) branch) returns exp(mean(log(x))) as a single
+  float; for a 2-D matrix returns the column-wise geometric mean as a 1-D
+  ndarray (exp(colMeans(log(x)))). NaN entries (R's NA) are dropped from
+  the mean when na_rm=True (the default); otherwise any NaN in a
+  column/vector propagates to NaN in that result.
+parameters:
+- name: x
+  type: ArrayLike
+  required: true
+  default: null
+- name: na_rm
+  type: bool
+  required: false
+  default: true
+mutates: "execution_class=pure_function; no in-place mutation of `x`; returns_kind=new_object"
+returns: Union[float, np.ndarray]
+requires: []
+writes: []
+examples:
+  - "geometricMean(np.array([1.0, 2.0, 4.0, 8.0]))"
+  - "geometricMean(np.array([[1.0, 4.0, 6.0], [2.0, 3.0, 12.0]]))"
+  - "geometricMean(np.array([1.0, np.nan, 2.0, 4.0]), na_rm=True)"
+failure_fixes: []
+related:
+  - spatialcellchat.computeExpr_complex

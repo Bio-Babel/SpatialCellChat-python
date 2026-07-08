@@ -1,0 +1,159 @@
+id: spatialcellchat.netVisual_CommunFieldZoomIn
+import_path: spatialcellchat.viz_spatial.netVisual_CommunFieldZoomIn
+kind: function
+signature: >-
+  netVisual_CommunFieldZoomIn(adata: ad.AnnData, signaling: str, slot_name:
+  str = "netP", pattern: str = "incoming", color_use: Optional[Sequence[str]]
+  = None, point_size: float = 2.0, zoom_to: int = 1, anchor_x: float = 0.5,
+  anchor_y: float = 0.5, zoom_pt_size: Optional[float] = None, alpha_image:
+  float = 0.2, arrow_angle: float = 15.0, arrow_length: float = 0.6,
+  arrow_size: float = 1.0, arrow_color: Optional[str] = None, legend_size:
+  float = 0.5, legend_text_size: int = 8, plot_title_name: Optional[str] =
+  None, plot_title_text_size: int = 8, lib_id: str = "slice1", image_key:
+  Optional[str] = "lowres") -> Figure
+purpose: Side-by-side full-view + zoomed-in communication-field figure.
+description: >
+  Mirrors R's netVisual_CommunFieldZoomIn (visualization.R:6108). Internally
+  calls netVisual_CommunField twice with the same signaling/slot_name/pattern:
+  once with zoom_mode=True (full view, anchored zoom cell highlighted) and
+  once with zoom_mode=False (isolated zoom cell only, marker size
+  zoom_pt_size, title annotated with "zoom.to=/anchor.x=/anchor.y="), then
+  rasterizes both matplotlib Figures via their canvases and stitches them
+  side by side into one combined Figure using two imshow panels. zoom_pt_size
+  defaults to point_size + zoom_to * 0.5 when None. All preconditions and
+  failure modes are inherited from netVisual_CommunField (via _resolve_field
+  and the pattern/zoom_to guards).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] and a computed communication field under uns["cellchat"][slot_name]["field"][pattern][signaling].
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Pathway or LR-pair name to look up in the field dict.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" (pathway-level) or "net" (LR-pair level) field container.'
+  - name: pattern
+    type: str
+    required: false
+    default: incoming
+    description: '"incoming" or "outgoing" direction; forwarded to both netVisual_CommunField calls.'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-ident-category colors, forwarded to both panels.
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Spot marker size for the full-view panel.
+  - name: zoom_to
+    type: int
+    required: false
+    default: 1
+    description: Number of extra grid subdivisions per axis selecting the zoom cell; forwarded to both panels.
+  - name: anchor_x
+    type: float
+    required: false
+    default: 0.5
+    description: Fractional x-position (0-1) selecting the zoom cell.
+  - name: anchor_y
+    type: float
+    required: false
+    default: 0.5
+    description: Fractional y-position (0-1) selecting the zoom cell.
+  - name: zoom_pt_size
+    type: Optional[float]
+    required: false
+    default: null
+    description: Spot marker size for the zoomed-in panel; defaults to point_size + zoom_to * 0.5 when None.
+  - name: alpha_image
+    type: float
+    required: false
+    default: 0.2
+    description: Baseline spot opacity, forwarded to both panels.
+  - name: arrow_angle
+    type: float
+    required: false
+    default: 15.0
+    description: Arrow head-width scaling factor, forwarded to both panels.
+  - name: arrow_length
+    type: float
+    required: false
+    default: 0.6
+    description: Arrow head-length scaling factor, forwarded to both panels.
+  - name: arrow_size
+    type: float
+    required: false
+    default: 1.0
+    description: Inverse scale factor for arrow length, forwarded to both panels.
+  - name: arrow_color
+    type: Optional[str]
+    required: false
+    default: null
+    description: Single color for all arrows; defaults to per-spot ident color when None.
+  - name: legend_size
+    type: float
+    required: false
+    default: 0.5
+    description: Legend marker scale.
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Legend font size.
+  - name: plot_title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Base title for the full-view panel; the zoomed panel appends a "zoom.to=...,anchor.x=...,anchor.y=..." suffix.
+  - name: plot_title_text_size
+    type: int
+    required: false
+    default: 8
+    description: Title font size.
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image.
+returns: A new matplotlib.figure.Figure containing two side-by-side rasterized panels (full view and zoomed-in view).
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"], adata.obs
+  (idents), and uns["cellchat"][slot_name]["field"][pattern] via two internal
+  netVisual_CommunField calls; does not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - uns.cellchat.netP.field.incoming
+  - uns.cellchat.netP.field.outgoing
+writes: []
+examples:
+  - 'scc.netVisual_CommunFieldZoomIn(adata, signaling="PathA", zoom_to=1)'
+  - 'scc.netVisual_CommunFieldZoomIn(adata, signaling="PathA", pattern="outgoing", anchor_x=0.25, anchor_y=0.75)'
+failure_fixes:
+  - when: pattern is not "incoming" or "outgoing"
+    suggest:
+      - Pass pattern="incoming" or pattern="outgoing".
+    explanation: Propagated from the underlying netVisual_CommunField call, which raises ValueError("pattern must be 'incoming' or 'outgoing'.").
+  - when: uns["cellchat"][slot_name] or its ["field"][pattern][signaling] entry is missing
+    suggest:
+      - Run computeCommunField(adata, slot_name=...) before plotting.
+    explanation: >-
+      Propagated from netVisual_CommunField's internal _resolve_field helper,
+      which raises ValueError("Please check the input 'signaling' and make
+      sure it has been computed via `computeCommunField`.").
+related:
+  - spatialcellchat.netVisual_CommunField
+  - spatialcellchat.computeCommunField

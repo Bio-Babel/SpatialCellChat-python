@@ -1,0 +1,153 @@
+id: spatialcellchat.netAnalysis_computeCentrality
+import_path: spatialcellchat.analysis_network.netAnalysis_computeCentrality
+kind: function
+signature: >-
+  netAnalysis_computeCentrality(adata: Optional[ad.AnnData] = None, net:
+  Union[None, np.ndarray, Mapping[str, np.ndarray]] = None, slot_name: str =
+  "net", signaling_name: Optional[Sequence[str]] = None, do_group: bool =
+  False, thresh: float = 0.05, degree_only: bool = True) -> Union[np.ndarray,
+  ad.AnnData]
+purpose: Compute per-signaling-network centrality scores (out/in-degree, page-rank, etc.) over cell groups or individual cells.
+description: >
+  Direct port of R's netAnalysis_computeCentrality (analysis.R:82). Two
+  input modes: (1) net=None (default) reads from
+  adata.uns["cellchat"][slot_name] — when do_group=True it reads the group
+  x group x N "prob" array (zeroing prob where the optional "pval" array is
+  >= thresh; pval is treated as all-significant when absent, e.g. on netP or
+  after computeAvgCommunProb with do.permutation=False), splitting it into a
+  {name: 2-D array} mapping keyed by "pathways" / "pathway_names" /
+  dimnames["interaction_name"] (falls back to integer strings); when
+  do_group=False it reads the cell x cell sparse mapping
+  slot["tmp"]["prob.cell"] directly. (2) net is passed explicitly as a raw
+  2-D array (wrapped as one "net_temp" network), a 3-D array (K, K, N)
+  (split into N integer-keyed 2-D slices), or a {name: 2-D array} mapping —
+  in this mode adata is not required and no adata.uns write happens.
+  signaling_name (mode 1 or 2) subsets the resulting {name: array} mapping to
+  only the named entries. For each retained signaling network,
+  computeCentralityLocal(net_i, degree_only=degree_only) is run (5 measures
+  if degree_only, else all 11; see spatialcellchat._centrality) and stacked
+  into a (n_measure, n_nodes, n_signal) array. When adata is provided, the
+  result plus its names is written back as a flat 4-key schema into
+  slot["centr"] (do_group=True) or slot["centr.cell"] (do_group=False,
+  default) and the mutated adata is returned; when adata is None, the raw
+  (n_measure, n_nodes, n_signal) ndarray is returned instead.
+parameters:
+  - name: adata
+    type: Optional[anndata.AnnData]
+    required: false
+    default: null
+    description: >-
+      Object whose uns["cellchat"][slot_name] is consumed/written. When
+      None, `net` must be supplied directly and the function returns a raw
+      ndarray instead of mutating anything.
+  - name: net
+    type: "Union[None, numpy.ndarray, Mapping[str, numpy.ndarray]]"
+    required: false
+    default: null
+    description: >-
+      A 2-D array (single network), a 3-D array (K, K, N), or a
+      {name: 2-D array} mapping. When given, adata/slot_name are ignored for
+      input (but adata, if also given, is still not required in this branch).
+  - name: slot_name
+    type: str
+    required: false
+    default: "net"
+    description: >-
+      Slot to read from / write to when net is None ("net" for LR-pair level,
+      "netP" for pathway level).
+  - name: signaling_name
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset of signaling / LR names to keep; all entries must already be present in the resolved net mapping.
+  - name: do_group
+    type: bool
+    required: false
+    default: false
+    description: >-
+      When True, compute group-level centrality from slot["prob"]/["pval"]
+      and write to slot["centr"]. When False (default), compute per-cell
+      centrality from slot["tmp"]["prob.cell"] and write to
+      slot["centr.cell"].
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold for the do_group=True branch; entries with pval >= thresh (and prob==0 entries) are zeroed before centrality computation.
+  - name: degree_only
+    type: bool
+    required: false
+    default: true
+    description: >-
+      Forwarded to computeCentralityLocal. True computes only the 5
+      degree-style measures (outdeg_unweighted, indeg_unweighted, outdeg,
+      indeg, page_rank); False computes all 11.
+returns: >-
+  When adata is None: a new numpy.ndarray of shape (len(centr_names),
+  n_nodes, n_signaling). When adata is given: the mutated adata (same
+  object), with the flat schema {"values": ndarray(n_measure, n_nodes,
+  n_signal), "centr_names": [...], "node_names": [...], "signaling_names":
+  [...]} written into slot["centr"] (do_group=True) or slot["centr.cell"]
+  (do_group=False).
+mutates: >-
+  execution_class=builder when adata is not None: mutates
+  adata.uns['cellchat'][slot_name]['centr'] (do_group=True) or
+  adata.uns['cellchat'][slot_name]['centr.cell'] (do_group=False) in place;
+  returns_kind=same_object. execution_class=pure_function when adata is None
+  (net= supplied directly): no mutation; returns_kind=new_object (returns a
+  new centrality ndarray).
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.net.tmp.prob.cell
+  - uns.cellchat.netP.prob
+  - uns.cellchat.netP.tmp.prob.cell
+writes:
+  - uns.cellchat.net.centr
+  - uns.cellchat.net.centr.cell
+  - uns.cellchat.netP.centr
+  - uns.cellchat.netP.centr.cell
+examples:
+  - 'scc.netAnalysis_computeCentrality(sub, slot_name="net", do_group=False, degree_only=True)'
+  - 'scc.netAnalysis_computeCentrality(sub, slot_name="net", do_group=True, degree_only=True)'
+  - 'scc.netAnalysis_computeCentrality(sub, slot_name="netP", do_group=False, degree_only=True)'
+  - 'scc.netAnalysis_computeCentrality(sub, slot_name="netP", do_group=True, degree_only=True)'
+failure_fixes:
+  - when: "both adata and net are omitted"
+    suggest:
+      - "Pass either adata= (with uns['cellchat'][slot_name] populated) or net= directly."
+    explanation: netAnalysis_computeCentrality raises ValueError("Either `adata` or `net` must be provided.") otherwise.
+  - when: "do_group=True but uns['cellchat'][slot_name]['prob'] is missing"
+    suggest:
+      - "Run computeAvgCommunProb (slot_name='net') or computeCommunProbPathway (slot_name='netP') before calling with do_group=True."
+    explanation: >-
+      netAnalysis_computeCentrality raises ValueError("do_group=True requires
+      a `prob` array in adata.uns['cellchat']['{slot_name}'].") when prob is
+      absent.
+  - when: "do_group=False (default) and slot_name='net' but tmp['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb() first."
+    explanation: >-
+      netAnalysis_computeCentrality raises ValueError("Please run
+      `computeCommunProb` to compute the communication probability/strength
+      between any interacting individual cells!") for slot_name='net'.
+  - when: "do_group=False (default) and slot_name='netP' but tmp['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProbPathway() first."
+    explanation: >-
+      netAnalysis_computeCentrality raises ValueError("Please run
+      `computeCommunProbPathway` to compute the communication
+      probability/strength between any interacting individual cells!") for
+      slot_name='netP'.
+  - when: "signaling_name includes names not present in the resolved net mapping"
+    suggest:
+      - "Only pass signaling_name values that already appear as significant signaling in net/slot."
+    explanation: >-
+      netAnalysis_computeCentrality raises ValueError("Please check the
+      input `signaling.name` because some are not the significant
+      signaling: {missing!r}") listing the offending names.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.computeCommunProbPathway
+  - spatialcellchat.centr_value
+  - spatialcellchat.centr_signaling_names
+  - spatialcellchat.aggregateNet

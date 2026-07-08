@@ -1,0 +1,29 @@
+id: spatialcellchat.datasets
+import_path: spatialcellchat.datasets
+kind: object
+purpose: Submodule namespace for bundled tutorial-dataset loaders.
+description: >
+  The `datasets` submodule itself, re-exported at the top level
+  (`spatialcellchat.datasets`) so callers can access it as a namespace
+  (e.g. `scc.datasets.load_visium_psoriasis()`) in addition to importing
+  the loader directly (`from spatialcellchat.datasets import
+  load_visium_psoriasis`, as the package tutorial does). Its only current
+  public member is `load_visium_psoriasis` (documented in its own
+  symbols/load_visium_psoriasis.yaml contract); this entry documents the
+  namespace object itself, not a callable.
+parameters: []
+returns: >-
+  The `spatialcellchat.datasets` module object; attribute access
+  (`datasets.load_visium_psoriasis`) resolves to the function documented
+  under its own symbol contract.
+mutates: >-
+  execution_class=pure_function; a module object carries no call-time
+  behavior or mutation of its own; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.datasets.load_visium_psoriasis()"
+  - "from spatialcellchat.datasets import load_visium_psoriasis"
+failure_fixes: []
+related:
+  - spatialcellchat.load_visium_psoriasis

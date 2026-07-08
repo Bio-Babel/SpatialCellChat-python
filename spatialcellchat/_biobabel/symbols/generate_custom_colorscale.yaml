@@ -1,0 +1,56 @@
+id: spatialcellchat.generate_custom_colorscale
+import_path: spatialcellchat._themes.generate_custom_colorscale
+kind: function
+signature: "generate_custom_colorscale(color_heatmap: Union[str, Sequence[str]], n_colors: int = 8, reversescale: bool = False, plotly_format: bool = True) -> list"
+purpose: "Build a 99-step colour scale from an RColorBrewer palette name (or a literal colour vector), a port of generate_custom_colorscale from visualization.R."
+description: >
+  When color_heatmap is a known RColorBrewer palette name, pulls n_colors
+  colours from a bundled brewer.pal-style subset table; unknown names fall
+  back to a matplotlib colormap sampled with direction=-1 (mirroring
+  scales::viridis_pal). The chosen anchors are optionally reversed, then
+  expanded to 99 colours via R-style colorRampPalette linear interpolation,
+  and the first colour is forced to "#E5E5E5". When color_heatmap is
+  already a sequence of colours, it is used as-is (no expansion). Raises
+  ValueError when n_colors < 2. When plotly_format is True, wraps the
+  colour list as plotly-style [index, colour] pairs with index evenly
+  spaced in [0, 1].
+parameters:
+  - name: color_heatmap
+    type: Union[str, Sequence[str]]
+    required: true
+    default: null
+    description: RColorBrewer/viridis palette name, or a literal sequence of hex colours to use as-is.
+  - name: n_colors
+    type: int
+    required: false
+    default: 8
+    description: Number of palette anchors to pull before expansion to 99 steps; must be >= 2.
+  - name: reversescale
+    type: bool
+    required: false
+    default: false
+    description: Reverse the anchor colour order before expansion.
+  - name: plotly_format
+    type: bool
+    required: false
+    default: true
+    description: If True, return [[index, colour], ...] plotly-compatible pairs instead of a flat hex list.
+returns: >
+  A list of 99 hex colour strings, or (when plotly_format=True) a list of
+  99 [index, colour] pairs. When color_heatmap is passed as a literal
+  vector, the output length matches that vector instead.
+mutates: "execution_class=pure_function; no in-place mutation of `color_heatmap`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "generate_custom_colorscale('Spectral', n_colors=8, reversescale=False, plotly_format=False)"
+  - "generate_custom_colorscale('YlOrRd', n_colors=5, reversescale=False, plotly_format=False)"
+  - "generate_custom_colorscale(['#000000', '#ffffff'], n_colors=8, reversescale=False, plotly_format=False)"
+failure_fixes:
+  - when: 'ValueError: ''`n.colors` must be greater than 1.'''
+    suggest:
+      - pass n_colors >= 2.
+  - when: 'ValueError: ''n=... exceeds maximum ... colours for palette ...'''
+    suggest:
+      - reduce n_colors to at most the palette's supported maximum (9 for most sequential palettes, 11 for diverging palettes).
+related: []

@@ -1,0 +1,90 @@
+id: spatialcellchat.computeCommunProbPathway
+import_path: spatialcellchat.modeling.computeCommunProbPathway
+kind: function
+signature: >-
+  computeCommunProbPathway(adata: ad.AnnData, pairLR_use: Optional[pd.DataFrame]
+  = None, thresh: float = 0.05, do_group: bool = True, do_cell: bool = True) ->
+  ad.AnnData
+purpose: Aggregate the L-R-pair communication net to pathway-level.
+description: >
+  Direct port of R's computeCommunProbPathway (modeling.R:1517-1645). Reads
+  adata.uns["cellchat"]["net"] and writes the pathway-level result to
+  adata.uns["cellchat"]["netP"]. Two parallel branches: (1) do_group=True
+
+  aggregates the dense net["prob"] (zeroing entries where net["pval"] >=
+  thresh) by pathway, keeps pathways with non-zero total signaling, and sorts
+  them decreasing by total signaling — this branch raises if net["prob"] is
+  missing (i.e. computeAvgCommunProb has not been run); when do_group=False,
+  netP["pathways"] and netP["prob"] are set to None. (2) do_cell=True (and
+  net["prob.cell"] present) sums the per-LR-pair sparse cell-level matrices
+  in net["tmp"]["prob.cell"] by shared pathway_name, keeps pathways with
+  positive total, sorts decreasing by total, and stacks the result into a
+  3-D sparse array written to netP["prob.cell"] / netP["pathways.cell"] /
+  netP["tmp"]["prob.cell"]. Also mirrors "source"/"target"/"cells" dimnames
+  from net["dimnames"] plus the pathway name lists into netP["dimnames"].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"]["net"] populated.
+  - name: pairLR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: >-
+      L-R table with a pathway_name column. Defaults to
+      uns["cellchat"]["LR"]["LRsig"].
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: Significance threshold, used only by the do_group branch (net["pval"] >= thresh entries are zeroed).
+  - name: do_group
+    type: bool
+    required: false
+    default: true
+    description: Whether to run the group-level (net["prob"]/net["pval"]) pathway aggregation branch.
+  - name: do_cell
+    type: bool
+    required: false
+    default: true
+    description: Whether to run the cell-level (net["prob.cell"]) pathway aggregation branch.
+returns: >-
+  The mutated adata (same object). Writes adata.uns["cellchat"]["netP"] with keys
+  "pathways"/"prob" (do_group branch, or None/None if do_group=False),
+  "pathways.cell"/"prob.cell"/"tmp" (do_cell branch, only if net["prob.cell"] present),
+  and "dimnames" (mirrored source/target/cells plus pathway name lists).
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['netP'] in place (overwrites
+  the whole netP dict each call); returns_kind=same_object
+requires:
+  - uns.cellchat.net
+writes:
+  - uns.cellchat.netP.pathways
+  - uns.cellchat.netP.prob
+  - uns.cellchat.netP.pathways.cell
+  - uns.cellchat.netP.prob.cell
+  - uns.cellchat.netP.tmp.prob.cell
+  - uns.cellchat.netP.dimnames
+examples:
+  - "scc.computeCommunProbPathway(sub)"
+  - "modeling.computeCommunProbPathway(adata, do_group=False, do_cell=True)"
+  - "modeling.computeCommunProbPathway(adata, thresh=0.05, do_group=True, do_cell=False)"
+failure_fixes:
+  - when: "uns['cellchat']['net'] is missing"
+    suggest:
+      - "Run computeCommunProb() first to populate uns['cellchat']['net']."
+    explanation: >-
+      computeCommunProbPathway raises ValueError("computeCommunProbPathway
+      requires uns['cellchat']['net']; run computeCommunProb first") when
+      net is absent.
+  - when: "do_group=True but net['prob'] is missing"
+    suggest:
+      - "Run computeAvgCommunProb (or computeAvgCommunProb_Visium) before computeCommunProbPathway, or call with do_group=False."
+    explanation: >-
+      computeCommunProbPathway raises ValueError("computeCommunProbPathway(do_group=True)
+      requires net['prob']; run computeAvgCommunProb first") when the
+      do_group branch is requested but net['prob'] has not been written yet.
+related:
+  - spatialcellchat.computeCommunProb

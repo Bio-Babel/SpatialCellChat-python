@@ -1,0 +1,136 @@
+id: spatialcellchat.identifyCommunicationPatterns
+import_path: spatialcellchat.analysis_topics.identifyCommunicationPatterns
+kind: function
+signature: >-
+  identifyCommunicationPatterns(adata: ad.AnnData, slot_name: str = "netP",
+  pattern: Literal["outgoing", "incoming"] = "outgoing", k: Optional[int] =
+  None, k_range: Sequence[int] = tuple(range(2, 11)), heatmap_show: bool =
+  True, color_use: Optional[Sequence[str]] = None, color_heatmap: str =
+  "Spectral", title_legend: str = "Contributions", width: float = 4.0,
+  height: float = 6.0, font_size: int = 8, seed: int = 10) -> ad.AnnData
+purpose: Identify major cell-group communication patterns via NMF on the pathway/cell-group probability tensor.
+description: >
+  Direct port of R's identifyCommunicationPatterns (analysis.R:1219). Per the
+  project's Tier-2 design contract, R's NMF::nmf(method='lee', seed='nndsvd')
+  is replaced by sklearn's solver='mu' with NNDSVD initialisation. Requires
+  slot["prob"] (uns["cellchat"][slot_name]["prob"]); raises if the slot or
+  "prob" key is absent, and raises if `k` is None (R requires the caller to
+  first run selectK). The (K, K, nLR) prob tensor is reduced via
+  _prepare_pattern_data (sum over receivers for pattern="outgoing", over
+  senders for pattern="incoming", then column-max normalised and
+  zero-row-filtered) into a (K_keep, nLR) matrix, which is factorised into
+  W (K_keep x k) and H (k x nLR) via Lee-NMF, then scaled with
+  scaleMat(W, 'r1') and scaleMat(H, 'c1'). Long-form data frames are built:
+  df_W with columns CellGroup/Pattern/Contribution and df_H with columns
+  Pattern/Signaling/Contribution. The result is written to
+  slot["pattern"][pattern] as a dict with keys "data" (unfiltered, column-max
+  -normalised (K, nLR) matrix — R parity: R stores this under the "data" key),
+  "data_filtered" (the filtered NMF input), "pattern" ({"cell": df_W,
+  "signaling": df_H}), "W", "H" (scaled factors), "rows_kept", "cells_kept",
+  "pattern_labels", and "options" (the visual parameters).
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with uns["cellchat"][slot_name]["prob"] populated.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Which uns["cellchat"] slot's "prob" tensor to factorise.
+  - name: pattern
+    type: 'Literal["outgoing", "incoming"]'
+    required: false
+    default: outgoing
+    description: '"outgoing" sums prob over receivers; "incoming" sums over senders.'
+  - name: k
+    type: Optional[int]
+    required: false
+    default: null
+    description: Number of communication patterns (NMF rank); required — None raises.
+  - name: k_range
+    type: Sequence[int]
+    required: false
+    default: tuple(range(2, 11))
+    description: Reserved for API parity with R; not used when `k` is provided directly.
+  - name: heatmap_show
+    type: bool
+    required: false
+    default: true
+    description: Visual option carried through to slot["pattern"][pattern]["options"] for a downstream plot helper.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Visual option carried through to slot["pattern"][pattern]["options"].
+  - name: color_heatmap
+    type: str
+    required: false
+    default: Spectral
+    description: Visual option carried through to slot["pattern"][pattern]["options"].
+  - name: title_legend
+    type: str
+    required: false
+    default: Contributions
+    description: Visual option carried through to slot["pattern"][pattern]["options"].
+  - name: width
+    type: float
+    required: false
+    default: 4.0
+    description: Visual option carried through to slot["pattern"][pattern]["options"].
+  - name: height
+    type: float
+    required: false
+    default: 6.0
+    description: Visual option carried through to slot["pattern"][pattern]["options"].
+  - name: font_size
+    type: int
+    required: false
+    default: 8
+    description: Visual option carried through to slot["pattern"][pattern]["options"].
+  - name: seed
+    type: int
+    required: false
+    default: 10
+    description: Random seed for the NMF fit.
+returns: >-
+  The mutated adata (same object), with
+  uns["cellchat"][slot_name]["pattern"][pattern] populated as described
+  above.
+mutates: >-
+  execution_class=builder; mutates
+  adata.uns['cellchat'][slot_name]['pattern'][pattern] in place;
+  returns_kind=same_object
+requires:
+  - uns.cellchat.netP.prob
+  - uns.cellchat.net.prob
+writes:
+  - uns.cellchat.netP.pattern.outgoing
+  - uns.cellchat.netP.pattern.incoming
+examples:
+  - "scc.identifyCommunicationPatterns(adata, slot_name='netP', pattern='outgoing', k=3)"
+  - "scc.identifyCommunicationPatterns(adata, slot_name='netP', pattern='incoming', k=4, seed=10)"
+failure_fixes:
+  - when: "uns['cellchat'][slot_name] is missing"
+    suggest:
+      - "Verify slot_name matches a populated slot ('netP' or 'net')."
+    explanation: >-
+      identifyCommunicationPatterns raises ValueError("adata.uns['cellchat']['<slot_name>']
+      is missing.").
+  - when: "slot['prob'] is missing"
+    suggest:
+      - "Run computeAvgCommunProb (or computeCommunProbPathway for netP) before identifyCommunicationPatterns."
+    explanation: >-
+      identifyCommunicationPatterns raises
+      ValueError("adata.uns['cellchat']['<slot_name>']['prob'] is missing.").
+  - when: "k is None"
+    suggest:
+      - "Run selectK() first to choose a suitable k, then pass it explicitly."
+    explanation: >-
+      identifyCommunicationPatterns raises ValueError("Please run the
+      function `selectK` for selecting a suitable k!").
+related:
+  - spatialcellchat.selectK
+  - spatialcellchat.identifyCellTopics
+  - spatialcellchat.computeCommunProbPathway

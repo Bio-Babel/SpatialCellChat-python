@@ -1,0 +1,176 @@
+id: spatialcellchat.doHeatmap
+import_path: spatialcellchat.viz_heatmap.doHeatmap
+kind: function
+signature: >-
+  doHeatmap(adata: ad.AnnData, features: Optional[Sequence[str]] = None,
+  cells: Optional[Sequence[str]] = None, group_by: str = "ident", colors_use:
+  Optional[Mapping[str, str]] = None, colors_ggplot: bool = False, group_bar:
+  bool = True, additional_group_by: Optional[Sequence[str]] = None,
+  additional_group_sort_by: Optional[Sequence[str]] = None, color_heatmap: str
+  = "RdBu", n_colors: int = 11, direction: int = -1, disp_min: float = -2.1,
+  disp_max: float = 2.1, slot: str = "scale.data", label: bool = True,
+  text_size: float = 8.0, size: float = 4.0, angle: float = 45.0, raster: bool
+  = True, legend_title: Optional[str] = None, legend_remove: bool = False) ->
+  Figure
+purpose: Cell-by-feature expression heatmap (Seurat-style DoHeatmap port).
+description: >
+  Direct port of R's doHeatmap (visualization.R:9212). Resolves `features`
+  to `adata.var_names` when omitted, de-duplicates them (keeping the last
+  occurrence, mirroring R's rev+unique idiom), and errors if none are
+  present in var_names. Resolves `cells` to all obs (or a 1-based/name
+  subset). Maps the Seurat-style `slot` name onto the chat-slot vocabulary
+  ("scale.data" -> "data.scale" -> adata.layers["data_scale"]; "data" ->
+  "data" -> adata.X; "counts" -> "data.raw" -> adata.layers["counts"]) and
+  reads the matrix via resolve_data_matrix, transposing to
+  cells x genes. Resolves `group_by`: "ident" falls back to the first of
+  "cellchat_idents" / "active_ident" / "cell.type" found in adata.obs,
+  otherwise the literal column name is required to exist in adata.obs
+  (raises otherwise). Cells are sorted by group code (stable), the
+  expression matrix is clipped to [disp_min, disp_max], and a colormap is
+  built either via the R MyRdBu-style asymmetric ramp
+  (color_heatmap="MyRdBu") or a brewer palette (optionally reversed via
+  direction=-1). Renders a gridspec: main cell x feature heatmap (features
+  on the rows), an optional top colour-coded group bar (with centered
+  group-name labels when label=True), and a colorbar (skippable via
+  legend_remove). Pure reader; does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object providing var_names, the resolved expression slot, and the group_by obs column.
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Genes to plot (rows). Defaults to all adata.var_names; entries not in var_names are dropped.
+  - name: cells
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Subset of cells to plot (obs_names, or 1-based integer indices). Defaults to all cells.
+  - name: group_by
+    type: str
+    required: false
+    default: "ident"
+    description: adata.obs column used for grouping. "ident" resolves to the first of "cellchat_idents"/"active_ident"/"cell.type" present.
+  - name: colors_use
+    type: Optional[Mapping[str, str]]
+    required: false
+    default: null
+    description: Per-group colour overrides keyed by group level.
+  - name: colors_ggplot
+    type: bool
+    required: false
+    default: false
+    description: Use ggPalette-style colours instead of scPalette when colors_use does not cover a level.
+  - name: group_bar
+    type: bool
+    required: false
+    default: true
+    description: Draw the coloured group annotation strip above the heatmap.
+  - name: additional_group_by
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Reserved for API parity with R (not applied in this implementation).
+  - name: additional_group_sort_by
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Reserved for API parity with R (not applied in this implementation).
+  - name: color_heatmap
+    type: str
+    required: false
+    default: "RdBu"
+    description: Brewer palette name, or the special value "MyRdBu" for the asymmetric R-style Reds/Blues ramp.
+  - name: n_colors
+    type: int
+    required: false
+    default: 11
+    description: Brewer palette anchor count (ignored for "MyRdBu").
+  - name: direction
+    type: int
+    required: false
+    default: -1
+    description: Reverse the brewer palette when -1.
+  - name: disp_min
+    type: float
+    required: false
+    default: -2.1
+    description: Lower clip bound for the expression matrix / colour scale.
+  - name: disp_max
+    type: float
+    required: false
+    default: 2.1
+    description: Upper clip bound for the expression matrix / colour scale.
+  - name: slot
+    type: str
+    required: false
+    default: "scale.data"
+    description: Seurat-style slot name mapped to the chat-slot vocabulary ("scale.data"/"data"/"counts") via resolve_data_matrix.
+  - name: label
+    type: bool
+    required: false
+    default: true
+    description: Draw group-level text labels centred over each group run in the top bar.
+  - name: text_size
+    type: float
+    required: false
+    default: 8.0
+    description: Feature (row) tick-label font size.
+  - name: size
+    type: float
+    required: false
+    default: 4.0
+    description: Scales the group-label font size in the top bar (fontsize = size * 2.0).
+  - name: angle
+    type: float
+    required: false
+    default: 45.0
+    description: Rotation, in degrees, of the group-name labels in the top bar.
+  - name: raster
+    type: bool
+    required: false
+    default: true
+    description: Reserved; matplotlib's imshow is always rasterised regardless of this flag.
+  - name: legend_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Colorbar label.
+  - name: legend_remove
+    type: bool
+    required: false
+    default: false
+    description: Hide the colorbar entirely when True.
+returns: >-
+  A new matplotlib.figure.Figure with the cell x feature heatmap (features
+  on rows, cells on columns, sorted by group), an optional group colour
+  bar, and an optional colorbar. Does not modify adata.
+mutates: >-
+  execution_class=pure_function; reads adata (var_names, resolved
+  expression layer, obs[group_by]) only, does not mutate adata;
+  returns_kind=new_object
+requires:
+  - var_names
+writes: []
+examples:
+  - "scc.doHeatmap(sub)"
+  - "scc.doHeatmap(sub, features=['Il6', 'Il6ra', 'Tgfb1'], group_by='cellchat_idents')"
+  - "scc.doHeatmap(sub, color_heatmap='MyRdBu', group_bar=False, legend_remove=True)"
+failure_fixes:
+  - when: "none of the requested features are present in adata.var_names"
+    suggest:
+      - "Pass features that exist in adata.var_names, or omit features to use all genes."
+    explanation: >-
+      doHeatmap raises ValueError("No requested features found in the
+      slot/assay.") when the filtered feature_list is empty.
+  - when: "group_by cannot be resolved (not 'ident' and not a column of adata.obs)"
+    suggest:
+      - "Pass a group_by value that is an existing adata.obs column, or write one of cellchat_idents/active_ident/cell.type and use group_by='ident'."
+    explanation: >-
+      doHeatmap raises ValueError(f"adata.obs[{group_by!r}] not found.")
+      when group_by cannot be resolved.
+related:
+  - spatialcellchat.netAnalysis_signalingRole_heatmap

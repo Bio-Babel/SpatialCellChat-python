@@ -1,0 +1,35 @@
+id: spatialcellchat.checkGeneSymbol
+import_path: spatialcellchat.database.checkGeneSymbol
+kind: function
+signature: 'def checkGeneSymbol(geneSet: Sequence[str], geneInfo: pd.DataFrame) -> bool:'
+purpose: Print a diagnostic listing any gene symbols not found in a reference gene-info table.
+description: >
+  Cleans `geneSet` by dropping NA-like sentinels (`None`, `NaN`, `pd.NA`,
+  `pd.NaT`, `""`) and deduplicating (order preserved), then checks which
+  cleaned symbols are absent from `geneInfo["Symbol"]`. If any are missing,
+  prints (does not raise or warn) a message listing them. Always returns
+  `False`, mirroring the R source's unconditional `return(FALSE)` — the
+  return value carries no pass/fail signal, only the printed side effect
+  (if any) is informative.
+parameters:
+  - name: geneSet
+    type: Sequence[str]
+    required: true
+    default: null
+    description: Gene symbols to check; may contain "", None, or NaN-like values.
+  - name: geneInfo
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Reference gene table with a `Symbol` column.
+returns: 'Always `False` (matches the R source''s unconditional `return(FALSE)`; carries no signal).'
+mutates: 'execution_class=pure_function; no in-place mutation of `geneSet` or `geneInfo` (side effect limited to a `print(...)` diagnostic to stdout when unofficial symbols are found); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.checkGeneSymbol(["TGFB1", "TGFB2"], db["geneInfo"])'
+  - 'scc.checkGeneSymbol(["TGFB1", "FOOBAR"], db["geneInfo"])'
+failure_fixes: []
+related:
+  - spatialcellchat.extractGene
+  - spatialcellchat.extractGeneSubset

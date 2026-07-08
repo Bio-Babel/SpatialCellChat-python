@@ -1,0 +1,166 @@
+id: spatialcellchat.netVisual_chord_cell_internal
+import_path: spatialcellchat.viz_network.netVisual_chord_cell_internal
+kind: function
+signature: >-
+  netVisual_chord_cell_internal(net: Union[np.ndarray, pd.DataFrame],
+  color_use: Optional[Union[Sequence[str], Dict[str, str]]] = None, group:
+  Optional[Dict[str, str]] = None, cell_order: Optional[Sequence[str]] = None,
+  sources_use: Optional[Sequence] = None, targets_use: Optional[Sequence] =
+  None, lab_cex: float = 0.8, small_gap: float = 1.0, big_gap: float = 10.0,
+  annotation_track_height: float = 0.03, remove_isolate: bool = False,
+  link_visible: bool = True, scale: bool = False, directional: int = 1,
+  link_target_prop: bool = True, reduce: float = -1.0, transparency: float =
+  0.4, link_border: Optional[str] = None, title_name: Optional[str] = None,
+  show_legend: bool = False, legend_pos_x: float = 20.0, legend_pos_y: float =
+  20.0, figsize: Tuple[float, float] = (7.0, 7.0)) -> Figure
+purpose: Chord diagram of a cell-group communication matrix (low-level renderer).
+description: >
+  Direct port of R's netVisual_chord_cell_internal (visualization.R:3382),
+  using pycirclize in lieu of circlize::chordDiagram. Accepts `net` either
+  as a long-form DataFrame with "source"/"target"/"prob" columns, or as a
+  square matrix (DataFrame with named index/columns, or a plain ndarray —
+  melted into the same long form via _ensure_named_matrix). Restricts to
+  sources_use/targets_use (resolved via _resolve_indices against the cell
+  levels) and to strictly-positive prob rows. When remove_isolate=False
+  (the default), cell groups absent from the filtered edges are kept
+  visible as sectors by adding negligible-weight (1e-10 * rank) self-loop
+  "fake" rows, forcing scale=True. Sector order follows cell_order if
+  given, else the levels of `net`. Sector colours come from color_use (a
+  {level: colour} dict, or a sequence indexed positionally against the
+  full level list) or scPalette(n) by default. Delegates the actual
+  rendering to the internal _chord_diagram helper. netVisual_chord_cell
+  (the adata-level entry point) is the only in-package caller; `group` and
+  `link_border` are accepted for R-argument parity but not read by this
+  implementation's rendering path. Pure function of `net` and the other
+  arguments; does not read or mutate any AnnData.
+parameters:
+  - name: net
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Either a long-form DataFrame with "source"/"target"/"prob" columns, or a square cell-group adjacency matrix (DataFrame index/columns or plain ndarray).
+  - name: color_use
+    type: Optional[Union[Sequence[str], Dict[str, str]]]
+    required: false
+    default: null
+    description: Per-cell-group colours, as a {level:colour} dict or a sequence indexed against the full level list. Defaults to scPalette(n).
+  - name: group
+    type: Optional[Dict[str, str]]
+    required: false
+    default: null
+    description: Kept for R-argument parity (cell-group -> higher-level group mapping); not read by this rendering path.
+  - name: cell_order
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Explicit sector display order, overriding the levels found in net.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these source cell groups (names or 1-based indices, resolved via _resolve_indices).
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict edges to these target cell groups.
+  - name: lab_cex
+    type: float
+    required: false
+    default: 0.8
+    description: Sector label font-size scale.
+  - name: small_gap
+    type: float
+    required: false
+    default: 1.0
+    description: Gap (degrees) between adjacent sectors.
+  - name: big_gap
+    type: float
+    required: false
+    default: 10.0
+    description: Gap (degrees) at the sector-order wrap-around point.
+  - name: annotation_track_height
+    type: float
+    required: false
+    default: 0.03
+    description: Fractional radial height of the sector annotation track.
+  - name: remove_isolate
+    type: bool
+    required: false
+    default: false
+    description: When False, cell groups with no surviving edges are kept visible via negligible-weight self-loops (forcing scale=True); when True they are dropped entirely.
+  - name: link_visible
+    type: bool
+    required: false
+    default: true
+    description: Whether links are drawn (kept for R-argument parity).
+  - name: scale
+    type: bool
+    required: false
+    default: false
+    description: Row-normalise sector arc lengths; forced True internally whenever isolate-filling fake rows are added.
+  - name: directional
+    type: int
+    required: false
+    default: 1
+    description: Link directionality style forwarded to the chord renderer (1 = directed source->target arrows).
+  - name: link_target_prop
+    type: bool
+    required: false
+    default: true
+    description: Scale link width by the target's proportion of incoming weight.
+  - name: reduce
+    type: float
+    required: false
+    default: -1.0
+    description: Minimum-link-width-fraction pruning threshold forwarded to the chord renderer; -1.0 disables pruning.
+  - name: transparency
+    type: float
+    required: false
+    default: 0.4
+    description: Link fill opacity.
+  - name: link_border
+    type: Optional[str]
+    required: false
+    default: null
+    description: Kept for R-argument parity; not read by this rendering path.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title.
+  - name: show_legend
+    type: bool
+    required: false
+    default: false
+    description: Draw a sector-colour legend.
+  - name: legend_pos_x
+    type: float
+    required: false
+    default: 20.0
+    description: Legend x offset.
+  - name: legend_pos_y
+    type: float
+    required: false
+    default: 20.0
+    description: Legend y offset.
+  - name: figsize
+    type: Tuple[float, float]
+    required: false
+    default: (7.0, 7.0)
+    description: Matplotlib figure size in inches.
+returns: A new matplotlib.figure.Figure containing the rendered chord diagram.
+mutates: >-
+  execution_class=pure_function; reads only the `net` argument (no AnnData
+  involved); returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "scc.netVisual_chord_cell_internal(net_sum_df, title_name='TNF signaling pathway network')"
+  - "scc.netVisual_chord_cell_internal(net_df, sources_use=['A'], remove_isolate=True)"
+failure_fixes: []
+related:
+  - spatialcellchat.netVisual_chord_cell
+  - spatialcellchat.netVisual_chord_gene
+  - spatialcellchat.netVisual
+  - spatialcellchat.netVisual_aggregate

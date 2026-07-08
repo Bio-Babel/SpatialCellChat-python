@@ -1,0 +1,66 @@
+id: spatialcellchat.normalizeData
+import_path: spatialcellchat.preprocessing.normalizeData
+kind: function
+signature: >-
+  normalizeData(adata: ad.AnnData, scale_factor: float = 10000.0, do_log: bool
+  = True, layer_in: Optional[str] = None, layer_out: Optional[str] = None) ->
+  ad.AnnData
+purpose: Library-size normalise (and optionally log1p) an AnnData expression matrix.
+description: >
+  Direct port of R's normalizeData (utilities.R:787). Reads adata.X (or
+  adata.layers[layer_in] when layer_in is given), divides each cell's row by
+  its library size (row sum), multiplies by scale_factor, and — when
+  do_log=True — applies numpy.log1p. Sparse and dense adata.X are both
+  handled (sparse path scales via a diagonal matrix and only applies log1p
+  to the stored nonzero .data). Before overwriting, if layer_in is None and
+  layer_out is None and "counts" is not already a key of adata.layers, the
+  pre-normalisation matrix is stashed into adata.layers["counts"] so the raw
+  counts are not lost. The R do.log=FALSE branch contains a dead-code bug
+  (data.norm is referenced but never assigned); this Python port instead
+  returns the un-logged expr matrix in that branch, matching the documented
+  intent of the do.log parameter rather than the R bug.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Input object; normalised in place.
+  - name: scale_factor
+    type: float
+    required: false
+    default: 10000.0
+    description: Per-cell scaling factor applied after library-size division (R's scale.factor).
+  - name: do_log
+    type: bool
+    required: false
+    default: true
+    description: Whether to apply numpy.log1p to the scaled matrix.
+  - name: layer_in
+    type: Optional[str]
+    required: false
+    default: null
+    description: If set, normalise this layer instead of adata.X.
+  - name: layer_out
+    type: Optional[str]
+    required: false
+    default: null
+    description: If set, write the normalised matrix to this layer instead of overwriting adata.X.
+returns: >-
+  The same adata object, mutated in place (not a new/copied AnnData).
+mutates: >-
+  execution_class=builder; mutates adata.X (default) or
+  adata.layers[layer_out] in place, and conditionally caches the
+  pre-normalisation matrix into adata.layers["counts"]; returns_kind=same_object
+requires: []
+writes:
+  - X
+  - layers.counts
+examples:
+  - scc.normalizeData(adata)
+  - pp.normalizeData(A, scale_factor=5000.0, do_log=False)
+  - pp.normalizeData(A, layer_in="raw", layer_out="data_norm")
+failure_fixes: []
+related:
+  - spatialcellchat.subsetData
+  - spatialcellchat.scaleData
+  - spatialcellchat.preProcessing

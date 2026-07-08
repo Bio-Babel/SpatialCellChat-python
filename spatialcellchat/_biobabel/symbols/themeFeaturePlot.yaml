@@ -1,0 +1,28 @@
+id: spatialcellchat.themeFeaturePlot
+import_path: spatialcellchat._themes.themeFeaturePlot
+kind: function
+signature: "themeFeaturePlot(legend_text_size: int = 8) -> dict"
+purpose: "Theme overrides for feature plots, mirroring themeFeaturePlot from visualization.R."
+description: >
+  Returns a matplotlib rcParams-style dict that places the legend on the
+  right with no title and a configurable text size, hides x/y axis ticks
+  and tick labels, sets a white panel background, removes axis label
+  padding, and disables the legend frame. legend.key.size (0.15 inches) is
+  approximated via legend.handlelength/handleheight.
+parameters:
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Font size of the legend text.
+returns: >
+  A dict mapping matplotlib rc keys (e.g. "legend.fontsize",
+  "xtick.bottom", "axes.facecolor") to their override values.
+mutates: "execution_class=pure_function; no in-place mutation; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "themeFeaturePlot()"
+  - "themeFeaturePlot(legend_text_size=12)"
+failure_fixes: []
+related: []

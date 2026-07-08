@@ -1,0 +1,58 @@
+id: spatialcellchat.computeNetD_structure
+import_path: spatialcellchat.analysis_network.computeNetD_structure
+kind: function
+signature: >-
+  computeNetD_structure(g: np.ndarray, h: np.ndarray, w1: float = 0.45, w2:
+  float = 0.45, w3: float = 0.1) -> float
+purpose: Weighted structural distance between two directed signaling-network adjacency matrices.
+description: >
+  Direct port of R's computeNetD_structure (analysis.R:2051). Builds directed
+  igraph graphs G, H from the binarised (>0) adjacency matrices g, h. When
+  w1+w2>0, computes normalised node-distance-distribution vectors (internal
+  _nnd, an entropy-based signature over shortest-path histograms) for G and H
+  and combines their entropy difference (component "first") with a term
+  comparing their trailing entropy-normalisation values ("second"). When
+  w3>0, computes alpha-centrality-based entropy terms ("third") for G/H and
+  their complements. The final distance is
+  w1*first + w2*second + w3*third. Used internally as the pairwise distance
+  kernel for type_="structural" in both computeNetSimilarity and
+  computeNetSimilarityPairwise.
+parameters:
+  - name: g
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: First square directed adjacency matrix (binarised internally via >0).
+  - name: h
+    type: numpy.ndarray
+    required: true
+    default: null
+    description: Second square directed adjacency matrix (binarised internally via >0).
+  - name: w1
+    type: float
+    required: false
+    default: 0.45
+    description: Weight on the node-distance-distribution entropy term ("first").
+  - name: w2
+    type: float
+    required: false
+    default: 0.45
+    description: Weight on the trailing node-distance-distribution term ("second").
+  - name: w3
+    type: float
+    required: false
+    default: 0.1
+    description: Weight on the alpha-centrality entropy term ("third", graph + complement).
+returns: A new float, the weighted structural distance w1*first + w2*second + w3*third between g and h.
+mutates: >-
+  execution_class=pure_function; operates only on the input arrays g/h; no
+  in-place mutation; returns_kind=new_object
+requires: []
+writes: []
+examples:
+  - "computeNetD_structure(g, h)"
+  - "computeNetD_structure(g, h, w1=0.5, w2=0.4, w3=0.1)"
+failure_fixes: []
+related:
+  - spatialcellchat.computeNetSimilarity
+  - spatialcellchat.computeNetSimilarityPairwise

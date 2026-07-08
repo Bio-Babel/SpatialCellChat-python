@@ -1,0 +1,27 @@
+id: spatialcellchat.ggPalette
+import_path: spatialcellchat._palette.ggPalette
+kind: function
+signature: "ggPalette(n: int) -> np.ndarray"
+purpose: "Generate n evenly spaced HCL colours, matching R's scales::hue_pal / grDevices::hcl(h, l=65, c=100)."
+description: >
+  Samples n evenly spaced hues in [15, 375) and converts each polarLUV
+  (HCL) colour with lightness 65 and chroma 100 to an sRGB hex string via
+  the CIE-LUV -> XYZ (D65) -> linear-sRGB -> sRGB pipeline, replicating
+  grDevices::hcl's default channel-clipping ("fixup") behaviour.
+parameters:
+  - name: n
+    type: int
+    required: true
+    default: null
+    description: Number of colours to generate.
+returns: >
+  A numpy.ndarray of length n containing uppercase "#RRGGBB" hex strings.
+mutates: "execution_class=pure_function; no in-place mutation; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "ggPalette(5)"
+  - "ggPalette(1)"
+  - "ggPalette(30)"
+failure_fixes: []
+related: []

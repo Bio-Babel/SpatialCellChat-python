@@ -1,0 +1,152 @@
+id: spatialcellchat.barplot_internal
+import_path: spatialcellchat.viz_basic.barplot_internal
+kind: function
+signature: >-
+  barplot_internal(df: pd.DataFrame, x: str = "cellType", y: str = "value",
+  fill: str = "condition", legend_title: Optional[str] = None, width: float =
+  0.6, title_name: Optional[str] = None, xlabel: Optional[str] = None, ylabel:
+  Optional[str] = None, color_use: Optional[Union[Sequence[str], Dict[str,
+  str]]] = None, remove_xtick: bool = False, stat_add: bool = False,
+  stat_method: str = "wilcox.test", percent_y: bool = False, label_x: float =
+  1.5, show_legend: bool = True, x_lab_rot: Union[bool, float] = False,
+  size_text: int = 10, ax: Optional[Axes] = None) -> Axes
+purpose: Draw a dodged (side-by-side) bar chart for a tidy data frame, optionally with a Wilcoxon/t-test p-value annotation.
+description: >
+  Internal bar-plotting primitive, direct port of R's barplot_internal
+  (visualization.R:6617). Aggregates df[y] by df[x] for each level of
+  df[fill] (sum via groupby), draws one dodged matplotlib.axes.Axes.bar call
+  per fill level (mirroring ggplot2's geom_bar(stat="identity",
+  position=position_dodge())), applies theme_classic-style spines, optional
+  x-tick rotation/removal, percent-formatted y-axis, and an optional
+  Mann-Whitney U (stat_method="wilcox.test", via scipy.stats.mannwhitneyu) or
+  Welch t-test (stat_method="t.test", via scipy.stats.ttest_ind) p-value
+  annotation comparing the first two fill levels. Colours default to
+  spatialcellchat._palette.scPalette(len(fill_levels)) when color_use is
+  None; a dict maps fill levels to hex colours directly, a sequence is
+  assigned to fill levels in order (cycling via modulo if shorter). Draws
+  into ax if given, else creates a new Figure/Axes via plt.subplots().
+parameters:
+  - name: df
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Tidy data frame with at least the x, y, and fill columns.
+  - name: x
+    type: str
+    required: false
+    default: cellType
+    description: Column of df used for the x-axis groups.
+  - name: y
+    type: str
+    required: false
+    default: value
+    description: Column of df summed (via groupby) to give bar heights.
+  - name: fill
+    type: str
+    required: false
+    default: condition
+    description: Column of df used for the dodged bar-fill groups.
+  - name: legend_title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Legend title; None removes the title (blank legend title).
+  - name: width
+    type: float
+    required: false
+    default: 0.6
+    description: Bar width and ggplot2-style dodge stride (no shrink-by-n-fills).
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title (centred, bold, fontsize 10) when given.
+  - name: xlabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: X-axis label; empty string when None.
+  - name: ylabel
+    type: Optional[str]
+    required: false
+    default: null
+    description: Y-axis label; empty string when None.
+  - name: color_use
+    type: Optional[Union[Sequence[str], Dict[str, str]]]
+    required: false
+    default: null
+    description: >-
+      Colour palette for fill levels. A dict maps fill level -> hex colour
+      (missing levels fall back to "#777777"); a sequence is assigned in
+      fill-level order; None uses scPalette(len(fill_levels)).
+  - name: remove_xtick
+    type: bool
+    required: false
+    default: false
+    description: If True, hide x ticks, tick labels, and the x-axis label/spine ticks.
+  - name: stat_add
+    type: bool
+    required: false
+    default: false
+    description: Whether to overlay a p-value comparing the first two fill levels of y.
+  - name: stat_method
+    type: str
+    required: false
+    default: wilcox.test
+    description: '"wilcox.test" (Mann-Whitney U) or "t.test" (Welch t-test); any other value falls back to Mann-Whitney U.'
+  - name: percent_y
+    type: bool
+    required: false
+    default: false
+    description: If True, format the y-axis as percentages via matplotlib.ticker.PercentFormatter.
+  - name: label_x
+    type: float
+    required: false
+    default: 1.5
+    description: X data-coordinate at which the p-value annotation is drawn.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: If False, remove any existing legend instead of drawing one.
+  - name: x_lab_rot
+    type: Union[bool, float]
+    required: false
+    default: false
+    description: True rotates x tick labels by 45 degrees; a float rotates by that many degrees; falsy values leave them unrotated.
+  - name: size_text
+    type: int
+    required: false
+    default: 10
+    description: Font size for tick labels and the legend.
+  - name: ax
+    type: Optional[matplotlib.axes.Axes]
+    required: false
+    default: null
+    description: Existing axes to draw into; a new Figure/Axes pair is created via plt.subplots() when None.
+returns: >-
+  The matplotlib.axes.Axes containing the dodged bar plot (note: unlike most
+  other symbols in this module, this returns an Axes, not a Figure).
+mutates: >-
+  execution_class=pure_function; takes no adata argument at all — operates
+  purely on the passed-in pandas.DataFrame and draws into the given (or a
+  newly created) matplotlib Axes; does not touch adata.uns/obs/var;
+  returns_kind=new_object (or the mutated caller-supplied Axes when ax= is
+  passed)
+requires: []
+writes: []
+examples:
+  - >-
+    scc.barplot_internal(df, x="labels", y="value", fill="condition",
+    color_use=["#FF0000", "#0000FF"])
+  - >-
+    scc.barplot_internal(df, x="labels", y="value", fill="condition",
+    remove_xtick=True, show_legend=False, percent_y=True, title_name="My
+    title")
+  - >-
+    scc.barplot_internal(df, x="labels", y="value", fill="condition",
+    stat_add=True, stat_method="wilcox.test")
+failure_fixes: []
+related:
+  - spatialcellchat.barPlot
+  - spatialcellchat.netVisual_barplot

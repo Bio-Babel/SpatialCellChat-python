@@ -1,0 +1,99 @@
+id: spatialcellchat.updateCellChatDB
+import_path: spatialcellchat.database.updateCellChatDB
+kind: function
+signature: >-
+  def updateCellChatDB(db: pd.DataFrame, gene_info: pd.DataFrame | None = None,
+  other_info: Mapping[str, pd.DataFrame] | None = None, trim_pathway: bool = False,
+  merged: bool = False, species_target: Literal["human", "mouse"] | None = None) ->
+  dict[str, pd.DataFrame]:
+purpose: Build a CellChatDB dict from a user-supplied ligand-receptor table, optionally merged with a bundled species DB.
+description: >
+  Validates that `db` has `ligand` and `receptor` columns, then casts all
+  columns to nullable string dtype (preserving `pd.NA` rather than folding
+  it to `""`). Warns if `pathway_name` is missing (and fills it with `""`);
+  if present, rows with a literal empty `pathway_name` are either dropped
+  (when `trim_pathway=True`, printing a count) or left in place with a
+  `UserWarning` (when `False`) — `pd.NA` pathway rows are never treated as
+  missing for this check, matching R's `== ""` semantics. Auto-derives
+  `interaction_name` (`toupper(ligand)_toupper(receptor)`) and
+  `interaction_name_2` (`"ligand - receptor"`, original case) if absent,
+  and fills `agonist`/`antagonist`/`co_A_receptor`/`co_I_receptor` with `""`
+  if absent. Drops rows with duplicate `interaction_name` (keeping the
+  first), warning with the drop count. Reorders columns to the CellChatDB
+  default order followed by any package-specific extras, and indexes by
+  `interaction_name`. Builds `complex`/`cofactor` frames from `other_info`
+  (validating `subunit_<n>` / `cofactor<n>` column naming, else empty
+  frames) and resolves `geneInfo` either from the caller (must have a
+  `Symbol` column) or by loading the bundled DB for `species_target`
+  (required when `gene_info=None`). If `merged=True`, loads the bundled DB
+  for `species_target` (required) and unions the interaction/complex/
+  cofactor tables with the user's, tagging `source.merged` as `"CellChatDB"`
+  or `"User"`, padding `subunit_*`/`cofactor*` columns to a common width,
+  and dropping duplicate `interaction_name`/index entries (bundled kept
+  first).
+parameters:
+  - name: db
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: Custom L-R pair table; must contain `ligand` and `receptor` columns (`pathway_name` strongly recommended).
+  - name: gene_info
+    type: pandas.DataFrame | None
+    required: false
+    default: null
+    description: Gene-info frame with at least a `Symbol` column; if None, `species_target` must be given to reuse the bundled gene info.
+  - name: other_info
+    type: Mapping[str, pandas.DataFrame] | None
+    required: false
+    default: null
+    description: 'Optional dict with optional keys "complex"/"cofactor", whose columns must follow `subunit_<n>` / `cofactor<n>` naming.'
+  - name: trim_pathway
+    type: bool
+    required: false
+    default: 'False'
+    description: If True, drop interactions whose `pathway_name` is a literal empty string.
+  - name: merged
+    type: bool
+    required: false
+    default: 'False'
+    description: If True, merge the result with the bundled CellChatDB for `species_target`.
+  - name: species_target
+    type: '"human" | "mouse" | None'
+    required: false
+    default: null
+    description: Required when `gene_info=None` or `merged=True`.
+returns: >
+  A new CellChatDB dict with keys `"interaction"`, `"complex"`, `"cofactor"`,
+  `"geneInfo"`, built (and optionally merged) from the user-supplied table.
+mutates: 'execution_class=builder; no in-place mutation of caller-supplied `db`/`gene_info`/`other_info` (works on `db.copy()` and copies of `other_info` entries throughout; when `merged=True` also loads and copies the bundled species DB via load_db); returns_kind=new_object'
+requires: []
+writes: []
+examples:
+  - 'scc.updateCellChatDB(custom_db, gene_info=None, species_target="human")'
+  - 'scc.updateCellChatDB(custom_db, gene_info=pd.DataFrame({"Symbol": ["X1"]}))'
+  - 'scc.updateCellChatDB(custom_db, merged=True, species_target="human")'
+failure_fixes:
+  - when: ValueError "The input `db` must contain at least two columns named as ligand,receptor"
+    suggest:
+      - ensure `db` has both columns.
+  - when: ValueError "The input `gene_info` must contain at least one column named as `Symbol`"
+    suggest:
+      - rename/add a `Symbol` column, or pass `gene_info=None` with `species_target=`.
+  - when: ValueError "...input `species_target` should be provided..."
+    suggest:
+      - pass species_target="human" or "mouse" when gene_info=None or merged=True.
+  - when: ValueError "The colnames of the input `other_info$complex`/`other_info$cofactor` should be `subunit_1`,.../`cofactor1`,..."
+    suggest:
+      - rename other_info["complex"]/["cofactor"] columns to that pattern.
+  - when: UserWarning "The pathway_name...is not provided..."
+    suggest:
+      - informational; pass a `pathway_name` column to silence.
+  - when: UserWarning "...pathway names of N interactions are missing..."
+    suggest:
+      - set `trim_pathway=True` to drop them, or leave as-is if acceptable.
+  - when: UserWarning "N duplicated interaction_names are identified..."
+    suggest:
+      - informational; first occurrence per `interaction_name` is kept automatically.
+related:
+  - spatialcellchat.load_db
+  - spatialcellchat.subsetDB

@@ -1,0 +1,59 @@
+id: spatialcellchat.computeExpr_agonist
+import_path: spatialcellchat._expr.computeExpr_agonist
+kind: function
+signature: "computeExpr_agonist(data_use: ArrayLike, pairLRsig: pd.DataFrame, cofactor_input: pd.DataFrame, index_agonist: int, Kh: float, n: float) -> np.ndarray"
+purpose: "Hill-aggregated per-cell agonist factor for one L-R pair; a port of computeExpr_agonist (modeling.R:2491)."
+description: >
+  Looks up pairLRsig['agonist'].iloc[index_agonist] to find the agonist's
+  name, resolves its cofactor* subunit rows from cofactor_input, drops
+  blank/NA entries, and intersects with data_use's row index. With one
+  resolved cofactor gene x: returns 1 + x^n / (Kh^n + x^n). With more than
+  one: returns the per-cell product of that expression across cofactors.
+  With zero resolved cofactors (including when the agonist name is
+  blank/NA or absent from cofactor_input): returns an all-ones row.
+  Delegates to the shared `_hill_cofactor_one` helper (also used by
+  computeExpr_antagonist).
+parameters:
+  - name: data_use
+    type: Union[numpy.ndarray, pandas.DataFrame]
+    required: true
+    default: null
+    description: Genes-by-cells expression matrix (row-named).
+  - name: pairLRsig
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: L-R interaction table; the `agonist` column references cofactor_input's row index.
+  - name: cofactor_input
+    type: pandas.DataFrame
+    required: true
+    default: null
+    description: CellChatDB cofactor table.
+  - name: index_agonist
+    type: int
+    required: true
+    default: null
+    description: 0-based row index into pairLRsig (Python equivalent of R's 1-based index.agonist).
+  - name: Kh
+    type: float
+    required: true
+    default: null
+    description: Hill EC50 parameter (R default 0.5, passed explicitly here).
+  - name: n
+    type: float
+    required: true
+    default: null
+    description: Hill coefficient (R default 1, passed explicitly here).
+returns: >
+  A numpy.ndarray of shape (1, n_cells): the per-cell agonist multiplier.
+mutates: "execution_class=pure_function; no in-place mutation of `data_use`, `pairLRsig`, or `cofactor_input`; returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "computeExpr_agonist(data_use, pairLRsig, cofactor_input, index_agonist=0, Kh=0.5, n=1)"
+failure_fixes:
+  - when: 'ValueError: _hill_cofactor_one requires a row-named data_use'
+    suggest:
+      - pass data_use as a pandas.DataFrame indexed by gene symbol.
+related:
+  - spatialcellchat.computeCommunProb

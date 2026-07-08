@@ -1,0 +1,74 @@
+id: spatialcellchat.rankNetPairwise
+import_path: spatialcellchat.analysis_ranking.rankNetPairwise
+kind: function
+signature: >-
+  rankNetPairwise(adata: ad.AnnData, LR_use: Optional[pd.DataFrame] = None) ->
+  ad.AnnData
+purpose: Rank all L-R interactions independently for every (source, target) cell-group pair.
+description: >
+  Direct port of R's rankNetPairwise (analysis.R:1932). Reads
+  uns["cellchat"]["net"]["prob"] and ["pval"] (dense (K, K, nLR) arrays, as
+  written by computeAvgCommunProb) and the significant-LR table
+  uns["cellchat"]["LR"]["LRsig"] (or the `LR_use` override, which must have
+  the same length as the LR axis of prob). For every ordered pair (i, j) of
+  the K cell groups it builds a per-pair pandas.DataFrame with one row per
+  L-R pair — columns pathway_index (1-based), interaction_name,
+  interaction_name_2, pathway_name, ligand, receptor, prob, pval — sorted
+  ascending by pval then descending by prob, and stores it at
+  pairwiseRank[source_name][target_name]. The nested dict is written to
+  uns["cellchat"]["net"]["pairwiseRank"].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      AnnData populated by computeAvgCommunProb so that net["prob"] and
+      net["pval"] are dense (K, K, nLR) arrays.
+  - name: LR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: >-
+      Override for uns["cellchat"]["LR"]["LRsig"]. Must have columns
+      interaction_name, interaction_name_2, pathway_name, ligand, receptor,
+      and the same row count as prob's third axis (nLR).
+returns: >-
+  The same adata object, mutated in place. uns["cellchat"]["net"]["pairwiseRank"]
+  is a dict keyed by source cell-group name, each value a dict keyed by
+  target cell-group name, each value a per-(source,target) pandas.DataFrame
+  as described above.
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat']['net']['pairwiseRank']
+  in place; returns_kind=same_object
+requires:
+  - uns.cellchat.net.prob
+  - uns.cellchat.net.pval
+  - uns.cellchat.LR.LRsig
+writes:
+  - uns.cellchat.net.pairwiseRank
+examples:
+  - "scc.rankNetPairwise(adata)"
+  - "scc.rankNetPairwise(adata, LR_use=custom_lr_table)"
+failure_fixes:
+  - when: "net['prob'] or net['pval'] is missing"
+    suggest:
+      - "Run computeAvgCommunProb() (or computeAvgCommunProb_Visium()) before rankNetPairwise."
+    explanation: >-
+      rankNetPairwise raises ValueError("rankNetPairwise requires
+      uns['cellchat']['net']['prob'] and ['pval']") when either is absent.
+  - when: "LR_use is None and uns['cellchat']['LR']['LRsig'] is missing"
+    suggest:
+      - "Run the modeling pipeline through the LR-significance step, or pass an explicit LR_use DataFrame."
+    explanation: >-
+      rankNetPairwise raises ValueError("rankNetPairwise requires
+      uns['cellchat']['LR']['LRsig'] or an explicit LR_use DataFrame").
+  - when: "LR_use (or LR['LRsig']) length does not match net['prob'].shape[2]"
+    suggest:
+      - "Pass an LR_use table with exactly one row per L-R pair on prob's third axis."
+    explanation: >-
+      rankNetPairwise raises ValueError("LR_use length ... != net['prob'].shape[2]
+      ...") on a length mismatch.
+related:
+  - spatialcellchat.rankNet
+  - spatialcellchat.computeAvgCommunProb

@@ -1,0 +1,204 @@
+id: spatialcellchat.netAnalysis_diff_signalingRole_scatter
+import_path: spatialcellchat.viz_embedding.netAnalysis_diff_signalingRole_scatter
+kind: function
+signature: >-
+  netAnalysis_diff_signalingRole_scatter(adata_list: Sequence[ad.AnnData],
+  color_use: Optional[Sequence[str]] = None, comparison: Sequence[int] =
+  (1, 2), signaling: Optional[Sequence[str]] = None, signaling_exclude:
+  Optional[Sequence[str]] = None, idents_exclude: Optional[Sequence[str]] =
+  None, slot_name: str = "netP", group: Optional[Sequence] = None,
+  dataset_names: Optional[Sequence[str]] = None, dot_size: float = 2.5,
+  point_shape: Sequence[str] = ("o", "s", "^", "D", "v", "P", "X"),
+  label_size: float = 3.0, dot_alpha: float = 0.6, x_measure: str =
+  "outdeg", y_measure: str = "indeg", xlabel: str = "Differential outgoing
+  interaction strength", ylabel: str = "Differential incoming interaction
+  strength", title: Optional[str] = None, font_size: float = 10.0,
+  font_size_title: float = 10.0, do_label: bool = True, show_legend: bool =
+  True, show_axes: bool = True) -> Figure
+purpose: Two-dataset differential signaling-role scatter — one point per cell group, x/y = summed change in outgoing/incoming interaction strength.
+description: >
+  MULTI-DATASET function — the first parameter is a Sequence[AnnData], not
+  a single AnnData. Direct port of R's netAnalysis_diff_signalingRole_scatter
+  (analysis.R:2773); R's mergeCellChat(list(c1, c2)) is a no-op in this port
+  so the Python equivalent is simply passing [c1, c2]. Requires len(adata_list)
+  >= 2, else raises ValueError immediately (R parity: the
+  is.list(object@net[[1]]) single-dataset discriminator at analysis.R:2779).
+  Delegates the numeric core to the pure helper compute_diff_signalingRole_data,
+  which: computes the joint cell-group level set via joint_idents_levels;
+  resolves the default signaling list as the union of each comparison
+  dataset's adata.uns['cellchat'][slot_name]['pathways'] (minus
+  signaling_exclude) when signaling is None; for each dataset index in
+  comparison (1-based, converted to 0-based), reads
+  adata_list[idx].uns['cellchat'][slot_name]['centr'] and raises ValueError
+  (mentioning netAnalysis_computeCentrality) if it is missing, or if
+  x_measure/y_measure are not in its centr_names; builds a per-dataset
+  (n_signaling, n_cell, 2) outgoing/incoming array reindexed onto the joint
+  signaling and cell_levels axes; computes mat_diff = mat_all_merged[1] -
+  mat_all_merged[0] and sums it over signaling to get outgoing_diff /
+  incoming_diff per cell group. The scatter plots one point per cell-group
+  label at (outgoing_diff, incoming_diff), coloured by scPalette per cell
+  group (or color_use), with idents_exclude dropping matching cell groups
+  from data and palette in lock-step; group (if given) drives per-point
+  marker shape via point_shape. Dashed grey guide lines are drawn at x=0
+  and y=0. Default title is f"Signaling changes  ({dataset_names[i1]} vs.
+  {dataset_names[i2]})" using resolve_dataset_names (defaults "d1", "d2",
+  ... when dataset_names is None) and comparison's two 1-based indices.
+parameters:
+  - name: adata_list
+    type: Sequence[anndata.AnnData]
+    required: true
+    default: null
+    description: Per-dataset CellChat-state AnnDatas; must contain at least 2 elements or ValueError is raised. Each dataset referenced by comparison must have adata.uns['cellchat'][slot_name]['centr'] populated.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-cell-group palette; defaults to scPalette(len(cell_levels)) when None.
+  - name: comparison
+    type: Sequence[int]
+    required: false
+    default: [1, 2]
+    description: 1-based indices into adata_list identifying the two datasets to difference (dataset 2 minus dataset 1).
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathways to include; defaults to the union of each comparison dataset's pathway list when None.
+  - name: signaling_exclude
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathways to drop from the resolved signaling list; raises ValueError if this empties the list.
+  - name: idents_exclude
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Cell-group labels to drop from both the data and the colour palette before plotting.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Chat slot (per dataset) whose ['centr'] centrality output is read.
+  - name: group
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Optional per-row group labels; when given, drives per-point marker shape via point_shape instead of a single default marker.
+  - name: dataset_names
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-dataset display names used in the default title; defaults to ["d1", "d2", ...] via resolve_dataset_names.
+  - name: dot_size
+    type: float
+    required: false
+    default: 2.5
+    description: Base marker size multiplier (rendered as (dot_size**2)*18 points^2).
+  - name: point_shape
+    type: Sequence[str]
+    required: false
+    default: ["o", "s", "^", "D", "v", "P", "X"]
+    description: Marker cycle used per unique group value when group is given.
+  - name: label_size
+    type: float
+    required: false
+    default: 3.0
+    description: Base font size multiplier for repelled point labels.
+  - name: dot_alpha
+    type: float
+    required: false
+    default: 0.6
+    description: Marker face alpha.
+  - name: x_measure
+    type: str
+    required: false
+    default: outdeg
+    description: Centrality measure name used for the outgoing/x axis; must be present in each dataset's centr_names.
+  - name: y_measure
+    type: str
+    required: false
+    default: indeg
+    description: Centrality measure name used for the incoming/y axis; must be present in each dataset's centr_names.
+  - name: xlabel
+    type: str
+    required: false
+    default: Differential outgoing interaction strength
+    description: X-axis label.
+  - name: ylabel
+    type: str
+    required: false
+    default: Differential incoming interaction strength
+    description: Y-axis label.
+  - name: title
+    type: Optional[str]
+    required: false
+    default: null
+    description: Plot title; auto-generated from dataset_names and comparison when None.
+  - name: font_size
+    type: float
+    required: false
+    default: 10.0
+    description: Axis label font size.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Title font size.
+  - name: do_label
+    type: bool
+    required: false
+    default: true
+    description: Whether to draw repelled cell-group labels at each point.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: When False, hides legend handles (if any were created).
+  - name: show_axes
+    type: bool
+    required: false
+    default: true
+    description: When False, turns off the axes frame/ticks entirely.
+returns: A matplotlib.figure.Figure with a single scatter Axes, one point per joint cell-group level.
+mutates: >-
+  execution_class=pure_function; reads each adata_list[i].uns['cellchat']
+  only, does not mutate any input AnnData; returns_kind=new_object
+requires:
+  - uns.cellchat.netP.centr
+writes: []
+examples:
+  - "scc.netAnalysis_diff_signalingRole_scatter([adata_ctrl, adata_treat], comparison=[1, 2])"
+  - "scc.netAnalysis_diff_signalingRole_scatter([a, b], comparison=[1, 2], dataset_names=['control', 'treatment'])"
+  - "scc.netAnalysis_diff_signalingRole_scatter([a, b], comparison=[1, 2], idents_exclude=['G0'])"
+failure_fixes:
+  - when: "adata_list has fewer than 2 elements"
+    suggest:
+      - "Pass a list of at least two CellChat-state AnnDatas, e.g. [adata_ctrl, adata_treat]."
+    explanation: >-
+      Raises ValueError("netAnalysis_diff_signalingRole_scatter requires at
+      least 2 AnnDatas ...") mirroring R's single-dataset discriminator at
+      analysis.R:2779 (checked in
+      test_diff_signalingRole_scatter_single_adata_raises).
+  - when: "a dataset in comparison is missing uns['cellchat'][slot_name]['centr']"
+    suggest:
+      - "Run netAnalysis_computeCentrality on each dataset in adata_list separately before comparing them."
+    explanation: >-
+      Raises ValueError mentioning "run `netAnalysis_computeCentrality` for
+      each dataset separately" (checked in
+      test_diff_signalingRole_scatter_missing_centr_raises).
+  - when: "x_measure or y_measure is not one of a dataset's centr_names"
+    suggest:
+      - "Use one of the measures written by netAnalysis_computeCentrality (e.g. 'outdeg', 'indeg', 'flowbet', 'info')."
+    explanation: >-
+      Raises ValueError("`x_measure, y_measure` should be one of ...") from
+      _build_mat_all_per_dataset.
+  - when: "signaling_exclude removes every candidate pathway"
+    suggest:
+      - "Widen signaling or narrow signaling_exclude."
+    explanation: >-
+      Raises ValueError("No signaling pathways remain after applying
+      `signaling_exclude`.") from _resolve_default_signaling.
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.netAnalysis_signalingChanges_scatter
+  - spatialcellchat.netAnalysis_signalingRole_scatter

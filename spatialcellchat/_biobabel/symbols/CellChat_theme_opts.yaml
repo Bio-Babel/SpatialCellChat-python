@@ -1,0 +1,23 @@
+id: spatialcellchat.CellChat_theme_opts
+import_path: spatialcellchat._themes.CellChat_theme_opts
+kind: function
+signature: "CellChat_theme_opts() -> dict"
+purpose: "ggplot-style theme overrides as a matplotlib rcParams dict, mirroring CellChat_theme_opts from visualization.R."
+description: >
+  Returns a dict of matplotlib rcParams-style key/value overrides that
+  reproduce CellChat's ggplot2 theme_classic customisation: white panel
+  and figure background, black axis lines with only left/bottom spines
+  drawn, no major/minor gridlines, a frameless legend, and a bold, size-10,
+  centred axes title. Takes no arguments; every call builds a fresh dict.
+parameters: []
+returns: >
+  A dict mapping matplotlib rc keys (e.g. "axes.facecolor", "axes.grid",
+  "legend.frameon", "axes.titlesize") to their override values.
+mutates: "execution_class=pure_function; no in-place mutation (takes no arguments); returns_kind=new_object"
+requires: []
+writes: []
+examples:
+  - "CellChat_theme_opts()"
+  - "matplotlib.rc_context(CellChat_theme_opts())"
+failure_fixes: []
+related: []

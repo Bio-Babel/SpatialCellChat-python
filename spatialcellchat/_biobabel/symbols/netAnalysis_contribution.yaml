@@ -1,0 +1,142 @@
+id: spatialcellchat.netAnalysis_contribution
+import_path: spatialcellchat.viz_embedding.netAnalysis_contribution
+kind: function
+signature: >-
+  netAnalysis_contribution(adata: ad.AnnData, signaling: str, signaling_name:
+  Optional[str] = None, do_group: bool = True, width: float = 0.1,
+  vertex_receiver: Optional[Sequence[int]] = None, thresh: float = 0.05,
+  return_data: bool = False, x_rotation: float = 0.0, title: str =
+  "Contribution of each L-R pair", font_size: float = 10.0,
+  font_size_title: float = 10.0) -> Figure
+purpose: Rank ligand-receptor pairs within one signaling pathway by their relative contribution to total communication probability.
+description: >
+  Direct port of R's netAnalysis_contribution (analysis.R:229). Reads the
+  LR pairs belonging to `signaling` from
+  adata.uns['cellchat']['LR']['LRsig'] (pathway_name column) and the
+  probability tensor from adata.uns['cellchat']['net']. When do_group=True,
+  builds prob by zeroing adata.uns['cellchat']['net']['prob'] wherever
+  net['pval'] > thresh; when do_group=False, reads
+  net['prob.cell'] directly (a per-cell sparse array) and raises if it is
+  absent. Restricts to the pairs of `signaling` that are also present in
+  net's pair-name dimnames, sums over source/target to drop zero-total
+  pairs, then min-max normalises the remaining sub-tensor. Pretty labels
+  are taken from adata.uns['cellchat']['DB']['interaction']
+  ['interaction_name_2'] when available, else the raw pair name is used.
+  When vertex_receiver is None, renders a single horizontal-bar panel of
+  normalised per-pair contribution (padded to at least 10 rows with blank
+  entries, sorted descending). When vertex_receiver is given, renders a
+  3-panel figure (title strip + "All"/"Hierarchy1"/"Hierarchy2" bar panels,
+  sharing one y-axis and one x-limit) where Hierarchy1 restricts the sum to
+  target indices in vertex_receiver and Hierarchy2 to the complement.
+  When return_data=True, attaches the underlying contribution DataFrame(s)
+  as non-standard attribute(s) on the returned Figure
+  (_netAnalysis_contribution_df, plus _netAnalysis_contribution_df_h1/_h2
+  in the 3-panel case) rather than changing the return type.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: AnnData with adata.uns['cellchat']['net'] and adata.uns['cellchat']['LR']['LRsig'] populated.
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Signaling pathway name to look up in the LR table's pathway_name column; raises ValueError if not found or if none of its pairs have significant communication.
+  - name: signaling_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: Display name for the pathway in titles; defaults to signaling when None.
+  - name: do_group
+    type: bool
+    required: false
+    default: true
+    description: When True, use the group-level net['prob']/net['pval'] (thresholded by thresh); when False, use net['prob.cell'] (raises if absent).
+  - name: width
+    type: float
+    required: false
+    default: 0.1
+    description: Controls bar height in each panel (bar height = max(0.3, 1.0 - 6.0*width)).
+  - name: vertex_receiver
+    type: Optional[Sequence[int]]
+    required: false
+    default: null
+    description: 0-based target-cell-group indices; when given, switches to the 3-panel All/Hierarchy1/Hierarchy2 layout restricting Hierarchy1 to these indices and Hierarchy2 to the complement.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold used to zero out non-significant entries of net['prob'] when do_group=True.
+  - name: return_data
+    type: bool
+    required: false
+    default: false
+    description: When True, attach the contribution DataFrame(s) to the returned Figure as non-standard attributes instead of returning them directly.
+  - name: x_rotation
+    type: float
+    required: false
+    default: 0.0
+    description: Rotation angle (degrees) applied to the pair-name y tick labels.
+  - name: title
+    type: str
+    required: false
+    default: Contribution of each L-R pair
+    description: Title used for the single-panel (vertex_receiver=None) layout.
+  - name: font_size
+    type: float
+    required: false
+    default: 10.0
+    description: Font size for axis labels and tick labels.
+  - name: font_size_title
+    type: float
+    required: false
+    default: 10.0
+    description: Font size for the figure/panel titles.
+returns: >-
+  A matplotlib.figure.Figure: a single Axes horizontal-bar chart when
+  vertex_receiver is None, or a 4-Axes figure (title strip + All /
+  Hierarchy1 / Hierarchy2 panels) when vertex_receiver is given. When
+  return_data=True the DataFrame(s) backing the plot are additionally
+  attached as non-standard Figure attributes.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat']['net'],
+  ['LR']['LRsig'], and ['DB']['interaction'] only, does not mutate adata;
+  returns_kind=new_object
+requires:
+  - uns.cellchat.net
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "scc.netAnalysis_contribution(sub, signaling=contribution_pw)"
+  - "scc.netAnalysis_contribution(adata, signaling='TGFb', thresh=0.05)"
+  - "scc.netAnalysis_contribution(adata, signaling='TGFb', vertex_receiver=[0, 1], return_data=True)"
+failure_fixes:
+  - when: "adata.uns['cellchat']['net'] is missing"
+    suggest:
+      - "Run computeCommunProb() (or the pathway-level computeCommunProbPathway) first."
+    explanation: "Raises ValueError(\"adata.uns['cellchat']['net'] is missing.\")."
+  - when: "adata.uns['cellchat']['LR']['LRsig'] is missing or not a DataFrame"
+    suggest:
+      - "Run identifyOverExpressedInteractions() first."
+    explanation: >-
+      Raises ValueError("adata.uns['cellchat']['LR']['LRsig'] is required
+      (run identifyOverExpressedInteractions first).").
+  - when: "signaling is not found in the LR table's pathway_name column"
+    suggest:
+      - "Check the pathway name against adata.uns['cellchat']['LR']['LRsig']['pathway_name']."
+    explanation: "Raises ValueError(f\"signaling {signaling!r} not found in LR table.\")."
+  - when: "do_group=False but net['prob.cell'] is absent"
+    suggest:
+      - "Recompute communication with per-cell probabilities enabled, or use do_group=True (the default)."
+    explanation: "Raises ValueError(\"net['prob.cell'] missing for do_group=False.\")."
+  - when: "no significant communication remains for the pathway after thresholding"
+    suggest:
+      - "Lower thresh, or verify the pathway has significant interactions via subsetCommunication."
+    explanation: >-
+      Raises ValueError(f"There is no significant communication of
+      {signaling_name}") when either no pairs remain in the data or the
+      thresholded prob sub-tensor sums to zero for every pair.
+related:
+  - spatialcellchat.netAnalysis_signalingRole_network
+  - spatialcellchat.identifyOverExpressedInteractions

@@ -1,0 +1,131 @@
+id: spatialcellchat.subsetCommunication
+import_path: spatialcellchat.modeling.subsetCommunication
+kind: function
+signature: >-
+  subsetCommunication(adata: ad.AnnData, net: Optional[Dict[str, Any]] = None,
+  slot_name: Literal["net", "netP"] = "net", sources_use: Optional[Sequence] =
+  None, targets_use: Optional[Sequence] = None, signaling:
+  Optional[Sequence[str]] = None, pairLR_use: Optional[pd.DataFrame] = None,
+  thresh: float = 0.05) -> pd.DataFrame
+purpose: Convert net / netP into a tidy long-table data frame.
+description: >
+  Direct port of R's subsetCommunication (analysis.R:2266) for the
+  mode == "single" branch (single AnnData; merged objects are out of
+  scope). Reads adata.uns["cellchat"][slot_name] (or the "netP" slot when
+
+  pairLR_use has a "pathway_name" column, which forces slot_name="netP"),
+  melts the dense prob/pval tensors into a long DataFrame of (source,
+  target, interaction_name, prob, pval) keeping only entries with prob > 0
+  after zeroing entries with pval >= thresh, joins in ligand/receptor/
+  pathway_name/annotation/evidence columns from
+  uns["cellchat"]["LR"]["LRsig"], then applies signaling / pairLR_use /
+  sources_use / targets_use filters. Raises ValueError if the melt-and-
+  threshold step or the post-filter step yields no rows ("No significant
+  signaling interactions are inferred based on the input!"), except that an
+  empty frame after sources_use/targets_use filtering is returned (not
+  raised), mirroring R's warn-not-error behavior there. For slot_name="netP"
+  the pathway-level rows are further grouped (mean pval, summed prob) by
+  source_target x pathway_name. This function only reads
+  adata.uns["cellchat"]; it does not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object providing uns["cellchat"][slot_name] (unless net= is passed
+      directly) and uns["cellchat"]["LR"]["LRsig"] / the ident factor.
+  - name: net
+    type: Optional[Dict[str, Any]]
+    required: false
+    default: null
+    description: >-
+      If supplied, used directly as the net/netP dict instead of reading
+      adata.uns["cellchat"][slot_name].
+  - name: slot_name
+    type: Literal["net", "netP"]
+    required: false
+    default: "net"
+    description: >-
+      Which uns["cellchat"] sub-dict to read prob/pval from. Forced to
+      "netP" automatically if pairLR_use has a "pathway_name" column.
+  - name: sources_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to rows whose "source" is in this list (names, or integer indices into the ident categories).
+  - name: targets_use
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Restrict to rows whose "target" is in this list (names, or integer indices into the ident categories).
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: >-
+      Pathway names to filter on; internally resolved via searchPair against
+      the LRsig table. Mutually exclusive with pairLR_use (raises if both given).
+  - name: pairLR_use
+    type: Optional[pandas.DataFrame]
+    required: false
+    default: null
+    description: >-
+      Direct LR pair restriction — a DataFrame with either an
+      "interaction_name" or a "pathway_name" column. Must be a DataFrame
+      (raises ValueError otherwise). Mutually exclusive with signaling.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: Significance threshold; entries with pval >= thresh are zeroed before the prob > 0 filter.
+returns: >-
+  A new pandas.DataFrame (long-table) of inferred communications. For
+  slot_name="net": columns are source, target, ligand, receptor, prob,
+  pval, interaction_name, interaction_name_2, pathway_name, annotation,
+  evidence (subset to whichever of these exist). For slot_name="netP":
+  columns are source, target, pathway_name, prob, pval. Does not modify
+  adata.
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'] only, does not
+  mutate adata; returns_kind=new_object
+requires:
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - "df_net = scc.subsetCommunication(sub)"
+  - "modeling.subsetCommunication(adata, sources_use=['A'], thresh=0.05)"
+  - "modeling.subsetCommunication(adata, slot_name='netP')"
+failure_fixes:
+  - when: "pairLR_use is passed but is not a pandas.DataFrame"
+    suggest:
+      - "Pass pairLR_use as a DataFrame with an 'interaction_name' or 'pathway_name' column."
+    explanation: >-
+      subsetCommunication raises ValueError("pairLR.use should be a data
+      frame with a single column named either 'interaction_name' or
+      'pathway_name'") when pairLR_use is not a DataFrame.
+  - when: "both pairLR_use and signaling are passed"
+    suggest:
+      - "Pass only one of pairLR_use or signaling, not both."
+    explanation: >-
+      subsetCommunication raises ValueError("Please do not assign values to
+      'signaling' when using 'pairLR.use'") when both are given.
+  - when: "uns['cellchat'][slot_name] is missing and net= was not passed"
+    suggest:
+      - "Run computeCommunProb + computeAvgCommunProb (for slot_name='net') or computeCommunProbPathway (for slot_name='netP') first, or pass net= directly."
+    explanation: >-
+      subsetCommunication raises ValueError(f"adata.uns['cellchat']['{slot_name}']
+      missing") when the requested slot is absent and net= is None.
+  - when: "no rows have prob > 0 after pval thresholding, or the post-filter frame has neither interaction_name nor pathway_name"
+    suggest:
+      - "Lower thresh, verify net['prob']/net['pval'] were populated (e.g. via computeAvgCommunProb), or relax the signaling/pairLR_use filter."
+    explanation: >-
+      subsetCommunication raises ValueError("No significant signaling
+      interactions are inferred based on the input!") when the melted frame
+      is empty (or becomes empty after filtering and NA-dropping), and
+      raises ValueError("subsetCommunication: result frame has neither
+      'interaction_name' nor 'pathway_name' column") if pairLR_use filtering
+      cannot find a matching key column.
+related:
+  - spatialcellchat.aggregateNet
+  - spatialcellchat.computeCommunProbPathway

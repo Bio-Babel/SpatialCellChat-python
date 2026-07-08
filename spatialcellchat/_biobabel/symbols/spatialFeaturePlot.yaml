@@ -1,0 +1,216 @@
+id: spatialcellchat.spatialFeaturePlot
+import_path: spatialcellchat.viz_spatial.spatialFeaturePlot
+kind: function
+signature: >-
+  spatialFeaturePlot(adata: ad.AnnData, features: Optional[Sequence[str]] =
+  None, signaling: Optional[Sequence[str]] = None, pairLR_use:
+  Optional[Union[Sequence[str], pd.DataFrame]] = None, slot_name: str =
+  "data.signaling", enriched_only: bool = True, thresh: float = 0.05,
+  do_group: bool = True, color_heatmap: Optional[Union[str, Sequence[str]]] =
+  None, n_colors: int = 8, direction: int = -1, do_binary: bool = False,
+  cutoff: Optional[float] = None, color_use: Optional[Sequence[str]] = None,
+  alpha: float = 1.0, point_size: float = 1.0, legend_size: float = 3.0,
+  legend_text_size: int = 8, shape_by: Union[int, str] = "o", ncol:
+  Optional[int] = None, show_legend: bool = True, show_legend_combined: bool
+  = False, lib_id: str = "slice1", image_key: Optional[str] = "lowres") ->
+  Figure
+purpose: Spatial scatter plot of gene expression (or adata.obs metadata), one panel per feature or L-R pair.
+description: >
+  Direct port of R's spatialFeaturePlot (visualization.R:252). Exactly one
+  of `features`, `signaling`, or `pairLR_use` must be given (raises
+  otherwise). The expression matrix is resolved via
+  spatialcellchat._anndata.resolve_data_matrix(adata, slot_name):
+  slot_name="data.signaling" (default) reads adata.layers["data_signaling"]
+  (the ALRA-imputed values written by preProcessing); slot_name="data" reads
+  the live adata.X (written by normalizeData). When `signaling` is given,
+  extractEnrichedLR expands the named pathway(s) into their member genes
+  (do_binary=False) or L-R pairs (do_binary=True), honoring enriched_only/
+  thresh/do_group. When `pairLR_use` is given, it is resolved against
+  adata.uns['cellchat']['LR']['LRsig'] (optionally filtered to pairs with
+  nonzero communication when enriched_only=True, reading
+  net['prob']/net['dimnames'] for do_group=True or net['prob.cell'] for
+  do_group=False — raises if the enriched-only filter empties the set).
+  With `features`, each name is looked up first in the resolved expression
+  matrix's row index, else in adata.obs columns (raises if none match).
+  do_binary=False renders each feature/gene as a continuous colour-mapped
+  scatter (color_heatmap palette, NaN-masked below `cutoff` when given);
+  do_binary=True (requires `cutoff`, and only with `signaling`/`pairLR_use`)
+  renders each L-R pair as a 4-class categorical scatter (Ligand-only /
+  Receptor-only / Both / None), computing per-spot ligand/receptor
+  expression via computeExpr_LR against adata.uns['cellchat']['DB']. Reads
+  adata.uns['cellchat'], adata.obsm['spatial'], and (optionally)
+  uns["spatial"][lib_id] for the background tissue image; does not mutate
+  adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm['spatial'] and a resolvable expression slot (see slot_name).
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Gene names (resolved-slot row index) or adata.obs column names. Mutually exclusive with signaling/pairLR_use.
+  - name: signaling
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Pathway name(s) expanded via extractEnrichedLR into member genes (do_binary=False) or L-R pairs (do_binary=True).
+  - name: pairLR_use
+    type: Optional[Union[Sequence[str], pandas.DataFrame]]
+    required: false
+    default: null
+    description: Specific L-R pair name(s), or a DataFrame with an interaction_name column; resolved against uns['cellchat']['LR']['LRsig'].
+  - name: slot_name
+    type: str
+    required: false
+    default: data.signaling
+    description: '"data.signaling" reads adata.layers["data_signaling"] (ALRA-imputed, from preProcessing); "data" reads adata.X (from normalizeData).'
+  - name: enriched_only
+    type: bool
+    required: false
+    default: true
+    description: Restrict signaling/pairLR_use to pairs with nonzero inferred communication.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold used by the enriched_only filter and by extractEnrichedLR.
+  - name: do_group
+    type: bool
+    required: false
+    default: true
+    description: Use group-level (net['prob']) vs cell-level (net['prob.cell']) significance when filtering enriched_only.
+  - name: color_heatmap
+    type: Optional[Union[str, Sequence[str]]]
+    required: false
+    default: null
+    description: Named colormap or explicit hex colour sequence for the continuous (do_binary=False) mode.
+  - name: n_colors
+    type: int
+    required: false
+    default: 8
+    description: Number of colormap anchor points.
+  - name: direction
+    type: int
+    required: false
+    default: -1
+    description: Colormap direction; -1 reverses the palette order.
+  - name: do_binary
+    type: bool
+    required: false
+    default: false
+    description: Render each L-R pair as a 4-class Ligand/Receptor/Both/None categorical scatter instead of continuous expression; requires signaling or pairLR_use, and requires cutoff.
+  - name: cutoff
+    type: Optional[float]
+    required: false
+    default: null
+    description: 'do_binary=False: values <= cutoff are masked to NaN. do_binary=True: per-spot ligand/receptor expression threshold defining the 4 classes; required in that mode (raises otherwise).'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: 4-colour palette for do_binary=True mode (Ligand/Receptor/Both/None); defaults to ggPalette(4) with the 4th replaced by grey.
+  - name: alpha
+    type: float
+    required: false
+    default: 1.0
+    description: Marker opacity.
+  - name: point_size
+    type: float
+    required: false
+    default: 1.0
+    description: Marker size scale.
+  - name: legend_size
+    type: float
+    required: false
+    default: 3.0
+    description: Legend marker scale (do_binary=True mode).
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Legend/colorbar font size.
+  - name: shape_by
+    type: Union[int, str]
+    required: false
+    default: o
+    description: Matplotlib marker style.
+  - name: ncol
+    type: Optional[int]
+    required: false
+    default: null
+    description: Panel grid columns; auto-selected from the feature count when None.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Draw a colorbar/legend on every panel (continuous mode).
+  - name: show_legend_combined
+    type: bool
+    required: false
+    default: false
+    description: Draw a colorbar only on the last panel (continuous mode), in addition to/instead of per-panel legends per show_legend.
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image entirely.
+returns: >-
+  A new matplotlib.figure.Figure with one panel per resolved feature/gene
+  (continuous colour-mapped scatter) or per L-R pair (4-class categorical
+  scatter when do_binary=True).
+mutates: >-
+  execution_class=pure_function; reads adata.uns['cellchat'],
+  adata.obsm['spatial'], adata.layers/adata.X (via resolve_data_matrix), and
+  uns["spatial"][lib_id]; does not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - layers.data_signaling
+  - uns.cellchat.LR.LRsig
+writes: []
+examples:
+  - >-
+    scc.spatialFeaturePlot(sub, features=path_genes[:8],
+    color_heatmap="Spectral", point_size=1.3)
+  - "scc.spatialFeaturePlot(sub, features=lr_genes, cutoff=0.05, point_size=1.5)"
+  - >-
+    scc.spatialFeaturePlot(sub, signaling=["TNF"], do_binary=True,
+    cutoff=0.1)
+failure_fixes:
+  - when: "none of features/signaling/pairLR_use is given, or more than one is given"
+    suggest:
+      - "Pass exactly one of features=, signaling=, or pairLR_use=."
+    explanation: >-
+      Raises ValueError("Please input either features, signaling or
+      pairLR.use.") or ValueError("Please don't input features / signaling /
+      pairLR.use simultaneously.").
+  - when: "do_binary=True but cutoff is None"
+    suggest:
+      - "Pass cutoff= (a per-spot expression threshold) when do_binary=True."
+    explanation: >-
+      Raises ValueError("A `cutoff` must be provided when plotting
+      expression in binary mode!").
+  - when: "enriched_only=True filtering empties the pairLR_use set"
+    suggest:
+      - "Set enriched_only=False, or verify the pairs via subsetCommunication."
+    explanation: >-
+      Raises ValueError("There is no significant communication related with
+      the input `pairLR.use`. Set `enriched.only=False` to show
+      non-significant signaling.").
+  - when: "none of the requested features are found in the resolved expression matrix or adata.obs"
+    suggest:
+      - "Check feature names against the resolved slot's row index or adata.obs.columns."
+    explanation: "Raises ValueError(\"Please check your input! \")."
+related:
+  - spatialcellchat.extractEnrichedLR
+  - spatialcellchat.spatialDimPlot
+  - spatialcellchat.spatialVisual_scoring
+  - spatialcellchat.preProcessing
+  - spatialcellchat.normalizeData

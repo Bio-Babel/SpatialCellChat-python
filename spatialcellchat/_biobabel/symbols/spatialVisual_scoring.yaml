@@ -1,0 +1,211 @@
+id: spatialcellchat.spatialVisual_scoring
+import_path: spatialcellchat.viz_spatial.spatialVisual_scoring
+kind: function
+signature: >-
+  spatialVisual_scoring(adata: ad.AnnData, signaling: str, method: str =
+  "centrality", measure: Sequence[str] = ("outdeg", "indeg"), measure_name:
+  Sequence[str] = ("outgoing", "incoming"), merge: bool = False, slot_name:
+  str = "netP", do_group: bool = False, color_heatmap: Union[str,
+  Sequence[str]] = "BuGn", n_colors: int = 9, direction: int = 1, alpha:
+  float = 1.0, do_binary: bool = False, color_use: Optional[Sequence[str]] =
+  None, point_size: float = 0.8, legend_size: float = 3.0, legend_text_size:
+  int = 8, legend_spacing: Sequence[float] = (0.0, -8.0), shape_by:
+  Union[int, str] = "o", ncol: Optional[int] = None, combined: bool = True,
+  show_legend: bool = True, show_legend_combined: bool = False, lib_id: str =
+  "slice1", image_key: Optional[str] = "lowres") -> Figure
+purpose: Spatial scatter plot of a single signaling pathway's/LR pair's outgoing and/or incoming network centrality score per cell (or per cell group).
+description: >
+  Direct port of R's spatialVisual_scoring (visualization.R:539). Only
+  `method="centrality"` is implemented (raises NotImplementedError
+  otherwise). Raises if `signaling` is a multi-entry sequence (only one
+  signaling name is allowed per call — the tutorial resolves a
+  per-annotation LR list externally and calls this function once per LR
+  name for hot-spot analyses). Reads the requested `measure` entries
+  ("outdeg"/"indeg", auto-relabelled to "Outgoing"/"Incoming" in
+  measure_name) from
+  adata.uns['cellchat'][slot_name]['centr.cell'] (do_group=False, the
+  default — per-cell centrality written by
+  netAnalysis_computeCentrality(do_group=False)) or
+  adata.uns['cellchat'][slot_name]['centr'] (do_group=True — per-cell-group
+  centrality, broadcast to each group's member cells). merge=False (the
+  default) renders one continuous colour-mapped panel per measure;
+  merge=True instead overlays outgoing (as marker size or a secondary
+  channel) and incoming on a single panel. Reads adata.obsm['spatial'] and
+  (optionally) uns["spatial"][lib_id] for the background tissue image; does
+  not mutate adata.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm['spatial'] and uns['cellchat'][slot_name]['centr.cell'] (or ['centr'] when do_group=True) populated by netAnalysis_computeCentrality.
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: A single pathway (slot_name="netP") or L-R pair (slot_name="net") name; raises if a multi-entry sequence is passed.
+  - name: method
+    type: str
+    required: false
+    default: centrality
+    description: Only "centrality" is implemented; any other value raises NotImplementedError.
+  - name: measure
+    type: Sequence[str]
+    required: false
+    default: '("outdeg", "indeg")'
+    description: Centrality measures to plot, one panel each (unless merge=True). "outdeg" -> Outgoing, "indeg" -> Incoming.
+  - name: measure_name
+    type: Sequence[str]
+    required: false
+    default: '("outgoing", "incoming")'
+    description: Display labels for `measure`; overwritten internally to "Outgoing"/"Incoming" when measure is "outdeg"/"indeg".
+  - name: merge
+    type: bool
+    required: false
+    default: false
+    description: Overlay all requested measures on one panel instead of one panel per measure.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: Which uns["cellchat"] slot to read centrality from ("net" for LR pairs, "netP" for pathways).
+  - name: do_group
+    type: bool
+    required: false
+    default: false
+    description: Use per-cell-group centrality (['centr'], broadcast per cell) instead of per-cell centrality (['centr.cell']).
+  - name: color_heatmap
+    type: Union[str, Sequence[str]]
+    required: false
+    default: BuGn
+    description: Named colormap or explicit hex colour sequence (continuous, do_binary=False mode).
+  - name: n_colors
+    type: int
+    required: false
+    default: 9
+    description: Number of colormap anchor points.
+  - name: direction
+    type: int
+    required: false
+    default: 1
+    description: Colormap direction; -1 reverses the palette order.
+  - name: alpha
+    type: float
+    required: false
+    default: 1.0
+    description: Marker opacity.
+  - name: do_binary
+    type: bool
+    required: false
+    default: false
+    description: Render a 2-colour (zero vs. nonzero) categorical scatter instead of a continuous colour map.
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: 2-colour palette for do_binary=True mode (zero, nonzero); defaults to grey + "#2171b5".
+  - name: point_size
+    type: float
+    required: false
+    default: 0.8
+    description: Marker size scale.
+  - name: legend_size
+    type: float
+    required: false
+    default: 3.0
+    description: Kept for R-argument parity.
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Colorbar font size.
+  - name: legend_spacing
+    type: Sequence[float]
+    required: false
+    default: (0.0, -8.0)
+    description: Kept for R-argument parity.
+  - name: shape_by
+    type: Union[int, str]
+    required: false
+    default: o
+    description: Matplotlib marker style.
+  - name: ncol
+    type: Optional[int]
+    required: false
+    default: null
+    description: Panel grid columns; auto-selected from the measure count when None (4 for >9 measures, else min(count, 2)).
+  - name: combined
+    type: bool
+    required: false
+    default: true
+    description: Kept for R-argument parity.
+  - name: show_legend
+    type: bool
+    required: false
+    default: true
+    description: Draw a colorbar/legend on every panel.
+  - name: show_legend_combined
+    type: bool
+    required: false
+    default: false
+    description: Kept for R-argument parity.
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image entirely.
+returns: A new matplotlib.figure.Figure with one continuous (or binary) colour-mapped spatial panel per requested measure (or one merged overlay panel when merge=True).
+mutates: >-
+  execution_class=pure_function; reads adata.obsm['spatial'],
+  uns['cellchat'][slot_name]['centr.cell']/['centr'], and
+  uns["spatial"][lib_id]; does not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - uns.cellchat.net.centr.cell
+  - uns.cellchat.netP.centr.cell
+  - uns.cellchat.net.centr
+  - uns.cellchat.netP.centr
+writes: []
+examples:
+  - >-
+    scc.spatialVisual_scoring(sub, signaling=pathway_show, slot_name="netP",
+    do_group=False, measure=("outdeg",), do_binary=False,
+    color_heatmap="Blues", point_size=1)
+  - >-
+    scc.spatialVisual_scoring(sub, signaling=LR_pick, slot_name="net",
+    do_group=False, merge=True, do_binary=False, point_size=1)
+failure_fixes:
+  - when: "signaling is a sequence with more than one entry"
+    suggest:
+      - "Pass a single signaling/LR-pair name; call once per name for multiple."
+    explanation: "Raises ValueError(\"Only one signaling is allowed as an input.\")."
+  - when: "method is not 'centrality'"
+    suggest:
+      - "Use the default method='centrality'; other methods are not ported."
+    explanation: "Raises NotImplementedError(\"Only method='centrality' is supported.\")."
+  - when: "uns['cellchat'][slot_name] is missing"
+    suggest:
+      - "Run computeCommunProb/computeCommunProbPathway first to populate the requested slot_name."
+    explanation: "Raises ValueError(f\"adata.uns['cellchat']['{slot_name}'] is missing.\")."
+  - when: "do_group=True but uns['cellchat'][slot_name]['centr'] is missing/empty"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata, slot_name=slot_name, do_group=True) first."
+    explanation: >-
+      Raises ValueError("Please run `netAnalysis_computeCentrality` to
+      compute the network centrality scores!").
+  - when: "do_group=False but uns['cellchat'][slot_name]['centr.cell'] is missing/empty"
+    suggest:
+      - "Run netAnalysis_computeCentrality(adata, slot_name=slot_name, do_group=False) first."
+    explanation: >-
+      Raises ValueError("Please run `netAnalysis_computeCentrality` to
+      compute the network centrality scores!").
+related:
+  - spatialcellchat.netAnalysis_computeCentrality
+  - spatialcellchat.centr_value
+  - spatialcellchat.spatialGiPlot
+  - spatialcellchat.spatialFeaturePlot

@@ -1,0 +1,133 @@
+id: spatialcellchat.plotly_spatialLRpairPlot
+import_path: spatialcellchat.viz_plotly.plotly_spatialLRpairPlot
+kind: function
+signature: >-
+  plotly_spatialLRpairPlot(adata: ad.AnnData, features: Optional[Sequence[str]]
+  = None, pairLR_use: Optional[Union[str, Sequence[str], pd.DataFrame]] =
+  None, cells_highlight: Optional[Sequence] = None, enriched_only: bool =
+  False, thresh: float = 0.05, do_group: bool = False, colormap: str =
+  "Spectral", reversescale: bool = True, point_size: float = 4.0,
+  nohighlight_alpha: float = 0.3, do_plot: bool = True) ->
+  Union[List[go.Figure], int]
+purpose: Interactive Plotly spatial feature plot of ligand/receptor gene expression, one figure per gene, colored by a continuous colorscale.
+description: >
+  Direct port of R's plotly_spatialLRpairPlot (visualization.R:6937). Exactly
+  one of features (<= 2 gene symbols) or pairLR_use (a single interaction
+  name / DataFrame with an "interaction_name" column) must be given.  When
+  pairLR_use is given, ligand/receptor genes are looked up from
+  uns["cellchat"]["LR"]["LRsig"]; if enriched_only=True the requested pair(s)
+  are first filtered against uns["cellchat"]["net"]["prob"]
+  (thresholded by uns["cellchat"]["net"]["pval"] > thresh when do_group=True)
+  or against uns["cellchat"]["net"]["prob.cell"] (when do_group=False),
+  keeping only pairs with at least one nonzero entry. The resolved gene list
+  is read from adata.X (if present in adata.var_names) or adata.obs (if
+  present as columns), then delegated per-feature to the internal
+  _plotly_feature helper, which builds one continuous-colorscale
+  go.Scatter trace per gene (optionally split into a highlighted set and a
+  nohighlight_alpha-opacity dimmed set via cells_highlight). When
+  do_plot=False, plotting is skipped entirely and the function returns the
+  resolved feature count instead of a list of figures.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] populated and gene expression in adata.X (or matching adata.obs columns).
+  - name: features
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Gene symbols (at most 2). Mutually exclusive with pairLR_use.
+  - name: pairLR_use
+    type: Optional[Union[str, Sequence[str], pandas.DataFrame]]
+    required: false
+    default: null
+    description: A single LR-pair interaction name, a length-1 sequence of one, or a DataFrame with an "interaction_name" column. Mutually exclusive with features.
+  - name: cells_highlight
+    type: Optional[Sequence]
+    required: false
+    default: null
+    description: Cell IDs or 1-based integer indices to highlight at full opacity; all other spots are dimmed to nohighlight_alpha.
+  - name: enriched_only
+    type: bool
+    required: false
+    default: false
+    description: When pairLR_use is given, restrict to pairs with nonzero significant communication probability.
+  - name: thresh
+    type: float
+    required: false
+    default: 0.05
+    description: p-value threshold used to zero out non-significant probabilities when enriched_only=True and do_group=True.
+  - name: do_group
+    type: bool
+    required: false
+    default: false
+    description: When True (with enriched_only), filter using the group-level net["prob"]/net["pval"]; when False, filter using the cell-level net["prob.cell"].
+  - name: colormap
+    type: str
+    required: false
+    default: Spectral
+    description: Plotly built-in colorscale name for the per-spot feature values.
+  - name: reversescale
+    type: bool
+    required: false
+    default: true
+    description: Reverses the colorscale direction (appends "_r" to colormap) when True.
+  - name: point_size
+    type: float
+    required: false
+    default: 4.0
+    description: Marker size.
+  - name: nohighlight_alpha
+    type: float
+    required: false
+    default: 0.3
+    description: Opacity of non-highlighted spots when cells_highlight is given.
+  - name: do_plot
+    type: bool
+    required: false
+    default: true
+    description: When False, skip figure construction entirely and return the resolved feature count as an int.
+returns: >-
+  A new list of plotly.graph_objects.Figure (one per resolved gene) when
+  do_plot=True; otherwise an int giving the number of resolved features.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"], adata.X,
+  adata.var_names, adata.obs, and uns["cellchat"]["LR"]/["net"]; does not
+  mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+writes: []
+examples:
+  - 'scc.plotly_spatialLRpairPlot(adata, features=["TGFB1"])'
+  - 'scc.plotly_spatialLRpairPlot(adata, features=["TGFB1", "TGFBR1"])'
+  - 'scc.plotly_spatialLRpairPlot(adata, pairLR_use="TGFB1_TGFBR1_TGFBR2")'
+  - 'n = scc.plotly_spatialLRpairPlot(adata, features=["TGFB1"], do_plot=False)'
+failure_fixes:
+  - when: both features and pairLR_use are given
+    suggest:
+      - Pass only one of features or pairLR_use.
+    explanation: "Raises ValueError(\"Please don't input features or pairLR.use simultaneously.\")."
+  - when: features has more than 2 genes
+    suggest:
+      - Limit features to at most 2 gene symbols.
+    explanation: "Raises ValueError(\"Please don't input more than 2 features.\")."
+  - when: pairLR_use is a non-string, non-DataFrame sequence with more than 1 entry
+    suggest:
+      - Pass a single LR-pair name (or a length-1 sequence / DataFrame).
+    explanation: "Raises ValueError(\"Please don't input more than 1 LR pair.\")."
+  - when: enriched_only=True and do_group=False but uns['cellchat']['net']['prob.cell'] is missing
+    suggest:
+      - Compute cell-level probabilities first, or call with do_group=True, or set enriched_only=False.
+    explanation: "Raises ValueError(\"enriched_only=True requires net['prob.cell'] when do_group=False\")."
+  - when: enriched_only filtering leaves no significant pairs
+    suggest:
+      - Set enriched_only=False to show non-significant signaling, or choose a different pairLR_use.
+    explanation: "Raises ValueError(\"There is no significant communication related with the input `pairLR.use`. Set `enriched.only = FALSE` to show non-significant signaling.\")."
+  - when: resolved feature_use genes are in neither adata.var_names nor adata.obs.columns
+    suggest:
+      - Check that the requested gene symbols exist in adata.var_names or as adata.obs columns.
+    explanation: 'Raises ValueError("Please check your input!").'
+related:
+  - spatialcellchat.plotly_spatialDimPlot
+  - spatialcellchat.spatialFeaturePlot

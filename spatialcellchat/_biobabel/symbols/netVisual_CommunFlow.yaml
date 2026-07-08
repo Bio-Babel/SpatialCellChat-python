@@ -1,0 +1,189 @@
+id: spatialcellchat.netVisual_CommunFlow
+import_path: spatialcellchat.viz_spatial.netVisual_CommunFlow
+kind: function
+signature: >-
+  netVisual_CommunFlow(adata: ad.AnnData, signaling: str, slot_name: str =
+  "netP", pattern: str = "incoming", cellsize: Optional[float] = None,
+  grid_resolution: Optional[float] = None, grid_field_mean: str = "median",
+  color_use: Optional[Sequence[str]] = None, point_size: float = 2.0,
+  image_alpha: float = 0.9, L: float = 300.0, min_L: float = 0.0, res: float
+  = 0.5, n: int = 30, jitter: float = 3.0, arrow_line_color: str =
+  "#666666", arrow_line_width: float = 0.7, arrow_line_alpha: float = 0.6,
+  arrow_angle: float = 12.0, arrow_length: float = 0.3, legend_size: float =
+  2.0, legend_text_size: int = 8, title_name: Optional[str] = None, lib_id:
+  str = "slice1", image_key: Optional[str] = "lowres") -> Figure
+purpose: Streamline visualization of the gridded communication-direction field, overlaid on a spatial scatter of cell groups.
+description: >
+  Mirrors R's netVisual_CommunFlow (visualization.R:5855), which uses
+  metR::geom_streamline. The Python port reads the per-spot vector field for
+  signaling/pattern from uns["cellchat"][slot_name]["field"][pattern]
+  (written by computeCommunField), aggregates it onto a uniform grid via the
+  internal _grid_aggregate helper (cellsize * grid_resolution, median or sum
+  per grid_field_mean), places the aggregated (u, v) vectors on a regular
+  mesh, and integrates seeded streamlines with the internal
+  _integrate_streamlines helper (RK4 integration on the bilinearly
+  interpolated field; honors max length L, minimum length min_L, step size
+  res, an n x n seed grid with optional jitter, and a fixed RNG seed for
+  determinism). Each surviving streamline is drawn as a colored polyline
+  with a small arrowhead at its tip, over a scatter of cell groups colored
+  by ident.
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: Object with obsm["spatial"] and a computed communication field under uns["cellchat"][slot_name]["field"][pattern][signaling].
+  - name: signaling
+    type: str
+    required: true
+    default: null
+    description: Pathway or LR-pair name to look up in the field dict.
+  - name: slot_name
+    type: str
+    required: false
+    default: netP
+    description: '"netP" (pathway-level) or "net" (LR-pair level) field container.'
+  - name: pattern
+    type: str
+    required: false
+    default: incoming
+    description: '"incoming" or "outgoing" direction; any other value raises ValueError.'
+  - name: cellsize
+    type: Optional[float]
+    required: false
+    default: null
+    description: Base grid cell size; defaults to the minimum nearest-neighbour spot distance when None.
+  - name: grid_resolution
+    type: Optional[float]
+    required: false
+    default: null
+    description: Multiplier applied to cellsize to get the aggregation cell size; defaults to 2.0 when None.
+  - name: grid_field_mean
+    type: str
+    required: false
+    default: median
+    description: 'Per-grid-cell aggregation statistic: "median" or "sum"; any other value raises ValueError.'
+  - name: color_use
+    type: Optional[Sequence[str]]
+    required: false
+    default: null
+    description: Per-ident-category colors; falls back to scPalette.
+  - name: point_size
+    type: float
+    required: false
+    default: 2.0
+    description: Spot marker size.
+  - name: image_alpha
+    type: float
+    required: false
+    default: 0.9
+    description: Spot opacity.
+  - name: L
+    type: float
+    required: false
+    default: 300.0
+    description: Maximum streamline integration length.
+  - name: min_L
+    type: float
+    required: false
+    default: 0.0
+    description: Minimum streamline length required to keep a streamline.
+  - name: res
+    type: float
+    required: false
+    default: 0.5
+    description: RK4 step size as a fraction of the grid cell spacing.
+  - name: n
+    type: int
+    required: false
+    default: 30
+    description: Seed-point density per axis (seed grid is approximately n x n).
+  - name: jitter
+    type: float
+    required: false
+    default: 3.0
+    description: Random uniform jitter added to seed positions, in cell-spacing units.
+  - name: arrow_line_color
+    type: str
+    required: false
+    default: "#666666"
+    description: Streamline color.
+  - name: arrow_line_width
+    type: float
+    required: false
+    default: 0.7
+    description: Streamline width.
+  - name: arrow_line_alpha
+    type: float
+    required: false
+    default: 0.6
+    description: Streamline opacity.
+  - name: arrow_angle
+    type: float
+    required: false
+    default: 12.0
+    description: Arrowhead opening angle, in degrees.
+  - name: arrow_length
+    type: float
+    required: false
+    default: 0.3
+    description: Arrowhead length, in matplotlib annotation units.
+  - name: legend_size
+    type: float
+    required: false
+    default: 2.0
+    description: Legend marker scale.
+  - name: legend_text_size
+    type: int
+    required: false
+    default: 8
+    description: Legend font size.
+  - name: title_name
+    type: Optional[str]
+    required: false
+    default: null
+    description: 'Figure title; defaults to "Outgoing/Incoming communication flow of {signaling}".'
+  - name: lib_id
+    type: str
+    required: false
+    default: slice1
+    description: Key into uns["spatial"] selecting the background tissue image/scale factors.
+  - name: image_key
+    type: Optional[str]
+    required: false
+    default: lowres
+    description: Which image resolution to draw as background, or None to skip the image.
+returns: A new matplotlib.figure.Figure with a spatial scatter of cell groups plus RK4-integrated streamlines of the communication field.
+mutates: >-
+  execution_class=pure_function; reads adata.obsm["spatial"],
+  adata.obs (idents), and uns["cellchat"][slot_name]["field"][pattern]; does
+  not mutate adata; returns_kind=new_object
+requires:
+  - obsm.spatial
+  - uns.cellchat.netP.field.incoming
+  - uns.cellchat.netP.field.outgoing
+writes: []
+examples:
+  - 'scc.netVisual_CommunFlow(adata, signaling="PathA")'
+  - 'scc.netVisual_CommunFlow(adata, signaling="PathA", pattern="outgoing", n=20, jitter=1.0)'
+failure_fixes:
+  - when: pattern is not "incoming" or "outgoing"
+    suggest:
+      - Pass pattern="incoming" or pattern="outgoing".
+    explanation: 'Raises ValueError("pattern must be ''incoming'' or ''outgoing''.").'
+  - when: grid_field_mean is not "median" or "sum"
+    suggest:
+      - Pass grid_field_mean="median" or grid_field_mean="sum".
+    explanation: "Raises ValueError(\"grid_field_mean must be 'median' or 'sum'.\")."
+  - when: uns["cellchat"][slot_name] or its ["field"][pattern][signaling] entry is missing
+    suggest:
+      - Run computeCommunField(adata, slot_name=...) before plotting.
+    explanation: >-
+      The internal _resolve_field helper raises ValueError("Please check the
+      input 'signaling' and make sure it has been computed via
+      `computeCommunField`.") when slot_name, the field block, the pattern,
+      or the signaling key is absent.
+related:
+  - spatialcellchat.computeCommunField
+  - spatialcellchat.netVisual_CommunFieldGrid
+  - spatialcellchat.netVisual_CommunField

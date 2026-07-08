@@ -1,0 +1,89 @@
+id: spatialcellchat.computeCommunField
+import_path: spatialcellchat.analysis_network.computeCommunField
+kind: function
+signature: >-
+  computeCommunField(adata: ad.AnnData, *, slot_name: str = "netP",
+  signaling_name: Optional[Union[str, Sequence[str], int, Sequence[int]]] =
+  None, top: float = 0.8, sparse_top: bool = True) -> ad.AnnData
+purpose: Per-cell outgoing/incoming communication-direction vector field.
+description: >
+  Direct port of R's computeCommunField (analysis.R:3952). For each pathway /
+  LR pair in uns["cellchat"][slot_name]["tmp"]["prob.cell"] (a dict of
+  per-name (nC, nC) sparse matrices), computes a 2-D direction vector per
+  spot: for the "outgoing" field, sums over row i the unit vectors from spot
+  i to every partner spot j scaled by prob[i, j] (kept partners only); for
+  "incoming", the analogous vectors from partner spots into i using
+  prob[j, i]. Partners are kept via a cumulative-probability cutoff: partners
+  are sorted by descending edge probability and kept while cumsum(probs) <
+  top * total (sparse_top=True) or with a slightly different <= / tie
+  handling (sparse_top=False). signaling_name selects a subset of pathway /
+  LR names (str, 1-based int, or a sequence of either) from the keys of
+  tmp["prob.cell"]; when slot_name="net" and net["tmp"]["LRsig.use.idx"] is
+  present the candidate name list is first reordered/filtered by that index.
+  Spot coordinates come from adata.obsm["spatial"].
+parameters:
+  - name: adata
+    type: anndata.AnnData
+    required: true
+    default: null
+    description: >-
+      Object with uns["cellchat"][slot_name]["tmp"]["prob.cell"] populated
+      (by computeCommunProb for slot_name="net" or computeCommunProbPathway
+      for slot_name="netP") and obsm["spatial"] coordinates.
+  - name: slot_name
+    type: str
+    required: false
+    default: "netP"
+    description: Either "net" (LR-pair level) or "netP" (pathway level).
+  - name: signaling_name
+    type: "Optional[Union[str, Sequence[str], int, Sequence[int]]]"
+    required: false
+    default: null
+    description: >-
+      Subset of pathway / LR-pair names to compute the field for (str, 1-based
+      int index, or a sequence of either). Defaults to every name present in
+      tmp["prob.cell"] (post LRsig.use.idx filtering when applicable).
+  - name: top
+    type: float
+    required: false
+    default: 0.8
+    description: Cumulative-probability threshold for retained partner edges per spot.
+  - name: sparse_top
+    type: bool
+    required: false
+    default: true
+    description: >-
+      If True, keep partners while cumsum(probs) < top * total (R's sparse=T
+      branch). If False, use the R cumsum <= top * total branch with its
+      small-N tie special-case.
+returns: >-
+  The mutated adata (same object). Writes
+  uns["cellchat"][slot_name]["field"]["outgoing"] and ["field"]["incoming"],
+  each a dict mapping the selected signaling / LR name to an (nC, 2) dense
+  ndarray of direction vectors in the same XY frame as obsm["spatial"].
+mutates: >-
+  execution_class=builder; mutates adata.uns['cellchat'][slot_name]['field']
+  ('outgoing' and 'incoming' sub-dicts) in place; returns_kind=same_object
+requires:
+  - uns.cellchat.netP.tmp.prob.cell
+  - uns.cellchat.net.tmp.prob.cell
+writes:
+  - uns.cellchat.netP.field.outgoing
+  - uns.cellchat.netP.field.incoming
+  - uns.cellchat.net.field.outgoing
+  - uns.cellchat.net.field.incoming
+examples:
+  - "scc.computeCommunField(adata, slot_name='netP')"
+  - "scc.computeCommunField(adata, slot_name='net', signaling_name='CXCL_CXCR4', top=0.9)"
+  - "scc.computeCommunField(adata, signaling_name=1, sparse_top=False)"
+failure_fixes:
+  - when: "uns['cellchat'][slot_name]['tmp']['prob.cell'] is missing"
+    suggest:
+      - "Run computeCommunProb() first for slot_name='net', or computeCommunProbPathway() first for slot_name='netP'."
+    explanation: >-
+      computeCommunField raises RuntimeError("Please run `computeCommunProb`
+      (slot='net') / `computeCommunProbPathway` (slot='netP') first.") when
+      tmp['prob.cell'] is absent from the requested slot.
+related:
+  - spatialcellchat.computeCommunProb
+  - spatialcellchat.computeCommunProbPathway
